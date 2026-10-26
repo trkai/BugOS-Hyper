@@ -10,11 +10,7 @@ MAIN_FOLDER="$work_dir/build/baserom/images"
 
 mods "Fix Fonts"
 if [[ $deviceTYPE == "China" ]];then
-    if [[ $rom_os == "MIUI" ]];then
-        mods "Detect MIUI!Adding..."
-        cp -rf $work_dir/bin/modfile/UpdateFile/Fonts/MIUI/fonts.xml $work_dir/build/baserom/images/system/system/etc/
-        cp -rf $work_dir/bin/modfile/UpdateFile/Fonts/MIUI/*.ttf $work_dir/build/baserom/images/system/system/fonts/
-    elif [[ $rom_os == "OS1" ]] && [[ $androidVer -le "13" ]];then
+    if [[ $rom_os == "OS1" ]] && [[ $androidVer -le "13" ]];then
         mods "Detect HyperOS A13!Adding..."
 		rm $work_dir/build/baserom/images/system/system/fonts/MiSansLatinVF.ttf
 		rm $work_dir/build/baserom/images/system/system/fonts/MiSansVF.ttf
