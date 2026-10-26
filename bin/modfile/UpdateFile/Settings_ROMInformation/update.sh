@@ -10,18 +10,21 @@ build_date=$(TZ=Asia/Ho_Chi_Minh date +"%y%m%d")
 APKEDITOR="java -jar $WORK_DIR/bin/apktool/apke.jar"
 repS="python3 $WORK_DIR/bin/strRep.py"
 
-# Xác định mã vùng hiển thị trên thẻ (như CN260710 trong ảnh mẫu)
-region_tag="CN"
-if [[ "$regionTYPE" == *"Global"* ]]; then
-    region_tag="GLOBAL"
-fi
-card_incremental="${region_tag}${build_date}"
-
 # Ghi đè vào build.prop của hệ thống
 my_props=(
     "$MAIN_FOLDER/system/system/build.prop"
     "$MAIN_FOLDER/product/etc/build.prop"
 )
+
+# Lấy version ROM thật từ build.prop (HyperOS trước, MIUI/incremental sau)
+rom_version_name=$(grep -h -m1 '^ro\.mi\.os\.version\.name=' "${my_props[@]}" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r\n ')
+[ -z "$rom_version_name" ] && rom_version_name=$(grep -h -m1 '^ro\.build\.version\.incremental=' "${my_props[@]}" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r\n ')
+[ -z "$rom_version_name" ] && rom_version_name="$base_rom_code"
+[ -z "$rom_version_name" ] && rom_version_name="BugOS"
+
+# Bỏ hậu tố build dư (vd: 3.0.307.0.WPKCNXM.C09 -> 3.0.307.0.WPKCNXM), giữ tối đa 5 thành phần
+rom_version_short=$(printf '%s\n' "$rom_version_name" | awk -F. -v OFS=. '{ if (NF > 5) NF = 5; print }')
+rom_version_display="${rom_version_short} | BUGOS"
 
 for p in "${my_props[@]}"; do
     if [ -f "$p" ]; then
@@ -34,9 +37,9 @@ for p in "${my_props[@]}"; do
         [ -n "$(tail -c1 "$p")" ] && echo "" >> "$p"
 
         {
-            echo "ro.bugos.version=BugOS 1.1 | ${base_rom_code%.*}"
-            echo "ro.bugos.incremental=${card_incremental}"
-            echo "ro.bugos.simposcode=BugOS"
+            echo "ro.bugos.version=${rom_version_display}"
+            echo "ro.bugos.incremental=${rom_version_display}"
+            echo "ro.bugos.simposcode=${rom_version_display}"
             echo "ro.bugos.osversion=${build_date}"
         } >> "$p"
     fi
