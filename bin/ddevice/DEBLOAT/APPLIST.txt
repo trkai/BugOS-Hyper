@@ -119,3 +119,5 @@ Creation
 MiuiPassword
 Padapp
 MIUIThemeManagerPad
+Mi Cion
+Mi Video
