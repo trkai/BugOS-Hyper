@@ -94,11 +94,13 @@ if [[ ${baserom_type} == 'payload' ]]; then
         unzip -o "${baserom}" payload.bin -d build/baserom/ || { error "Không giải nén được payload.bin từ zip"; exit 1; }
     fi
 
+    # Xoá ZIP ngay sau khi tách payload.bin: giữ lại sẽ hết chỗ khi extract 47 phân vùng
+    rm -f "${baserom}"
+
     payload-extract extract -o build/baserom/images/ build/baserom/payload.bin || { error "Unpacking payload.bin failed"; exit 1; }
 
-    # Giải phóng dung lượng ngay: zip gốc và payload.bin không cần nữa
+    # Giải phóng dung lượng ngay: payload.bin không cần nữa
     rm -f build/baserom/payload.bin
-    rm -f "${baserom}"
 
     echo "===== Sau khi payload-extract ====="
     ls -la build/baserom/images/

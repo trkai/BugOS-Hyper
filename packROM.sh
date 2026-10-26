@@ -117,6 +117,13 @@ for pname in ${super_list}; do
     fi
 done
 
+# Xoá cây thư mục gốc sau khi đã đóng thành .img: nhường chỗ cho super.img + ZIP
+for pname in ${super_list}; do
+    if [ -f "$IMG_DIR/${pname}.img" ]; then
+        rm -rf "$IMG_DIR/${pname}"
+    fi
+done
+
 # Chốt chặn: phải có ít nhất 1 file .img mới đóng super
 if ! ls $IMG_DIR/*.img >/dev/null 2>&1; then
     error "Không có partition .img nào để đóng vào super. Kiểm tra fstype/mkfs.erofs và thư mục config."
