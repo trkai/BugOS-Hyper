@@ -34,6 +34,14 @@ rm -rf $work_dir/out
 rm -rf $work_dir/build
 mkdir -p $work_dir/out
 
+# Kiểm tra dung lượng trước khi tải/extract ROM
+df -h / "$work_dir"
+avail_gb=$(df -BG --output=avail "$work_dir" | tail -n 1 | tr -dc "0-9")
+if [ "${avail_gb:-0}" -lt 25 ]; then
+    error "Workspace chỉ còn ${avail_gb}GB, cần >= 25GB. Kiểm tra bước Maximize build space trong workflow."
+    exit 1
+fi
+
 source "$work_dir/bin/ddevice/getROM.sh" "$baserom"
 
 # ==================== CHUẨN HÓA TÊN FILE ZIP ====================
@@ -87,7 +95,7 @@ mkdir -p build/baserom/images/
 # Extract partitions
 if [[ ${baserom_type} == 'payload' ]]; then
     unpack "Unpacking payload.bin"
-    df -h /
+    df -h / "$work_dir"
 
     # Lấy payload.bin ra khỏi file zip (nếu chưa có)
     if [[ ! -f build/baserom/payload.bin ]]; then
@@ -104,7 +112,7 @@ if [[ ${baserom_type} == 'payload' ]]; then
 
     echo "===== Sau khi payload-extract ====="
     ls -la build/baserom/images/
-    df -h /
+    df -h / "$work_dir"
 
     # ---> FIX LỖI MẤT PHÂN VÙNG TRÊN PAYLOAD.BIN (A/B DEVICE) <---
     for i in build/baserom/images/*_a.img; do
@@ -182,7 +190,7 @@ done
 
 echo "===== Sau khi extract các partition ====="
 ls -la $work_dir/build/baserom/images/
-df -h /
+df -h / "$work_dir"
 
 # Bắt buộc phải có các partition chính, nếu không thì dừng luôn (không "giả thành công")
 for must in vendor system product; do
