@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0
 
 export DEBIAN_FRONTEND=noninteractive
-sudo apt purge firefox
-sudo apt update -y && apt upgrade -y
+sudo apt purge -y firefox
+# Không chạy `apt upgrade`: kernel mới + mkinitramfs sẽ hết chỗ trên root fs (maximize-build-space)
+sudo apt update -y
 sudo apt install -y software-properties-common
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
 sudo apt update -y
