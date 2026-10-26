@@ -34,7 +34,6 @@ rm -rf $work_dir/out
 rm -rf $work_dir/build
 mkdir -p $work_dir/out
 
-python3 $work_dir/notify.py download "$repo_name" "$baserom" "$prefix_id" "$builder_name" "$builder_id"
 source "$work_dir/bin/ddevice/getROM.sh" "$baserom"
 
 # ==================== CHUẨN HÓA TÊN FILE ZIP ====================
@@ -58,7 +57,6 @@ if [[ ! -f "$baserom" ]]; then
 fi
 # ================================================================
 
-python3 $work_dir/notify.py unpack "$repo_name" "$baserom" "$prefix_id" "$builder_name" "$builder_id"
 if unzip -l "${baserom}" | grep -q "payload.bin"; then
     baserom_type="payload"
     echo $baserom_type > $work_dir/bin/ddevice/romtype.txt
@@ -248,8 +246,6 @@ echo "$MY_BRAND_NAME" > $work_dir/bin/ddevice/brand.txt
 mods "Gathering Devices Infomations"
 bash $work_dir/bin/ddevice/getname.sh "$getvar"
 bash $work_dir/bin/ddevice/fetchINFO.sh
-
-python3 $work_dir/notify.py build "$repo_name" "$baserom" "$prefix_id" "$builder_name" "$builder_id"
 
 bash $work_dir/bin/ddevice/DEBLOAT/debloat.sh
 info "Done"
