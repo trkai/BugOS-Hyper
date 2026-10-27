@@ -51,6 +51,96 @@ def layouts_referencing(res, name):
     return None
 
 
+
+
+# ---------------------------------------------------------------------------
+# Ẩn dòng version nằm ngay dưới logo (yêu cầu: "dưới logo không hiện gì").
+#
+# Dòng đó là TextView set text lúc chạy (không có android:text tĩnh) nên không
+# thể "xoá" bằng string resource - xoá prop thì dòng "Phiên bản OS" ở trang chi
+# tiết cũng mất theo. Vì vậy ẩn đúng View trong layout.
+#
+# Chỉ ẩn khi id của nó RÕ RÀNG là trường version (version/os_ver/rom_version...).
+# Không khớp thì KHÔNG đụng gì và in danh sách ứng viên ra log để lần sau chốt.
+# ---------------------------------------------------------------------------
+# id của dòng version: chấp nhận mọi id CÓ chứa "version" (os_version, miui_version,
+# device_rom_version, tv_version...) - trong layout header chỉ có logo + dòng này
+# nên tín hiệu này đủ chắc.
+VER_ID_RE = re.compile(r"(?i)version")
+
+TAG_RE = re.compile(r"<(TextView|com\.miuix\.androidx\.preference\.internal\.(?:Card)?TextView|"
+                    r"androidx\.appcompat\.widget\.AppCompatTextView)\b[^>]*?/?>", re.S)
+ID_RE = re.compile(r'android:id="@\+?id/([A-Za-z0-9_]+)"')
+TEXT_RE = re.compile(r'android:text="@string/([A-Za-z0-9_]+)"')
+
+
+def hide_version_under_logo(layout_path, logo_string_name, dry=False):
+    """Trả về (ok, msg)."""
+    body = read(layout_path)
+    if not body:
+        return False, "không đọc được layout"
+
+    elems = list(TAG_RE.finditer(body))
+    if not elems:
+        return False, "layout không có TextView nào"
+
+    # vị trí của logo
+    logo_idx = None
+    for i, m in enumerate(elems):
+        t = TEXT_RE.search(m.group(0))
+        if t and t.group(1) == logo_string_name:
+            logo_idx = i
+            break
+    if logo_idx is None:
+        return False, f"không thấy TextView android:text=@string/{logo_string_name}"
+
+    # các TextView sau logo, in ra để chẩn đoán
+    cands = []
+    no_text_elems = []
+    for m in elems[logo_idx + 1:]:
+        block = m.group(0)
+        idm = ID_RE.search(block)
+        cands.append(idm.group(1) if idm else "(no-id)")
+        if not TEXT_RE.search(block):
+            no_text_elems.append(m)
+        if idm and VER_ID_RE.search(idm.group(1)):
+            if dry:
+                return True, f"[dry] sẽ ẩn @id/{idm.group(1)}"
+            new_block = block[:-2] + ' android:visibility="gone"' + block[-2:] \
+                if block.rstrip().endswith("/>") else block[:-1] + ' android:visibility="gone">'
+            body2 = body[:m.start()] + new_block + body[m.end():]
+            # kiểm tra XML vẫn hợp lệ trước khi ghi
+            try:
+                import xml.etree.ElementTree as ET
+                ET.fromstring(body2)
+            except Exception as e:
+                return False, f"XML hỏng sau khi sửa, bỏ qua ({e})"
+            with open(layout_path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(body2)
+            return True, f"đã ẩn @id/{idm.group(1)}"
+
+    # Fallback an toàn: nếu sau logo chỉ có ĐÚNG MỘT TextView không có text tĩnh
+    # thì gần như chắc chắn đó là dòng version -> ẩn.
+    if len(no_text_elems) == 1:
+        m = no_text_elems[0]
+        block = m.group(0)
+        if dry:
+            return True, "[dry] sẽ ẩn TextView không có text tĩnh duy nhất sau logo"
+        new_block = block[:-2] + ' android:visibility="gone"' + block[-2:] \
+            if block.rstrip().endswith("/>") else block[:-1] + ' android:visibility="gone">'
+        body2 = body[:m.start()] + new_block + body[m.end():]
+        try:
+            import xml.etree.ElementTree as ET
+            ET.fromstring(body2)
+        except Exception as e:
+            return False, f"XML hỏng sau khi sửa, bỏ qua ({e})"
+        with open(layout_path, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(body2)
+        return True, "đã ẩn TextView không có text tĩnh duy nhất sau logo"
+
+    return False, "không có id dạng version; ứng viên: " + ", ".join(cands[:10])
+
+
 def main():
     if len(sys.argv) < 2:
         print("usage: patch_strings.py <res_dir> [--dry]")
@@ -92,6 +182,12 @@ def main():
                 how = "plain (không thấy layout tham chiếu)"
             changed += 1
             print(f"  [ok]   {d}/{name}: {value!r} -> {new!r}  [{how}]")
+            if lay and not dry:
+                ok, msg = hide_version_under_logo(os.path.join(res, lay), name)
+                print(f"         ẩn dòng version dưới logo: {'OK' if ok else 'BỎ QUA'} - {msg}")
+            elif lay:
+                ok, msg = hide_version_under_logo(os.path.join(res, lay), name, dry=True)
+                print(f"         [dry] ẩn dòng version: {msg}")
             return m.group(0).replace(f'>{value}<', f'>{new}<', 1)
 
         new_body = re.sub(r'<string name="([^"]+)"[^>]*>(.*?)</string>', repl, body, flags=re.S)

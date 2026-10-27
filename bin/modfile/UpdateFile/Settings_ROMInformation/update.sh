@@ -95,6 +95,19 @@ for p in "${my_props[@]}"; do
 
     [ -n "$(tail -c1 "$p")" ] && echo "" >> "$p"
 
+    # Dòng "Phiên bản OS" (trang Giới thiệu) đọc ro.mi.os.version.name.
+    # Giữ nguyên tiền tố gốc (vd "OS3.0.307.0.WPKCNXM") rồi nối thêm brand, để
+    # các đoạn code so sánh startsWith("OS") vẫn đúng.
+    if grep -q '^ro\.mi\.os\.version\.name=' "$p" 2>/dev/null; then
+        cur_name=$(grep -m1 '^ro\.mi\.os\.version\.name=' "$p" | cut -d= -f2- | tr -d '\r\n')
+        cur_name=${cur_name% | BugOS}
+        cur_name=${cur_name%|BugOS}
+        cur_name=${cur_name% }
+        sed -i "s@^ro\.mi\.os\.version\.name=.*@ro.mi.os.version.name=${cur_name} | BugOS@" "$p"
+    else
+        echo "ro.mi.os.version.name=${rom_version_display}" >> "$p"
+    fi
+
     {
         echo "ro.bugos.version=${rom_version_display}"
         echo "ro.bugos.incremental=${rom_version_display}"
