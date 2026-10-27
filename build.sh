@@ -257,6 +257,11 @@ mods "Gathering Devices Infomations"
 bash $work_dir/bin/ddevice/getname.sh "$getvar"
 bash $work_dir/bin/ddevice/fetchINFO.sh
 
+# Cổng chặn version: dừng NGAY nếu Android của ROM chưa có đủ bộ patch.
+# Không có bước này thì một ROM A17 thiếu jar_patcher_a17.sh sẽ build ra
+# framework.jar không được bypass verify chữ ký -> không boot được.
+bash $work_dir/bin/ddevice/target_check.sh || { error "Dừng: Android target chưa được hỗ trợ đầy đủ"; exit 1; }
+
 bash $work_dir/bin/ddevice/DEBLOAT/debloat.sh
 info "Done"
 

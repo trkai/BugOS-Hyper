@@ -5,7 +5,12 @@ androidVER=$(cat $WORK_DIR/bin/ddevice/androidver.txt)
 APKEDITOR="java -jar $WORK_DIR/bin/apktool/apke.jar"
 regionTYPE=$(cat $WORK_DIR/bin/ddevice/device_type.txt)
 
-if [[ $androidVER == "17" || $androidVER == "16" || $androidVER == "15" || $androidVER == "14" || $androidVER == "13" && $regionTYPE == *"Global"* ]];then
+# && và || có cùng độ ưu tiên và kết hợp trái->phải, nên điều kiện cũ thực chất là
+#   (A13 || A14 || A15 || A16 || A17) && Global
+# Viết lại tường minh cho dễ đọc, hành vi không đổi: chỉ chạy trên ROM Global.
+if { [[ "$androidVER" == "13" ]] || [[ "$androidVER" == "14" ]] || [[ "$androidVER" == "15" ]] \
+     || [[ "$androidVER" == "16" ]] || [[ "$androidVER" == "17" ]]; } \
+   && [[ "$regionTYPE" == *"Global"* ]]; then
     #ready for patch
 	mods "Fixing Theme Issues"
     mkdir -p $WORK_DIR/apk_temp

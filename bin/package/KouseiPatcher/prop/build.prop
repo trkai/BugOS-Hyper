@@ -1,5 +1,11 @@
-
-
+# ---------------------------------------------------------------------------
+# Prop cho PlayIntegrityFix / Fake Lock (KouseiPatcher).
+# File này được NỐI vào system/system/build.prop khi install_toolbox=true.
+#
+# Lưu ý: ro.* là prop ghi-một-lần. Nếu ROM đã có cùng key ở dòng trước đó thì
+# giá trị ở đây KHÔNG có tác dụng. Vì vậy không thêm key trùng lặp nữa.
+# Đã dedupe và comment các prop không thể set qua build.prop.
+# ---------------------------------------------------------------------------
 
 #PlayIntegrityFix
 ro.boot.verifiedbootstate=green
@@ -8,10 +14,6 @@ vendor.boot.vbmeta.device_state=locked
 ro.boot.veritymode=enforcing
 ro.boot.vbmeta.device_state=locked
 ro.boot.flash.locked=1
-ro.boot.vbmeta.device_state=locked
-ro.boot.verifiedbootstate=green
-ro.boot.flash.locked=1
-ro.boot.veritymode=enforcing
 ro.boot.warranty_bit=0
 ro.warranty_bit=0
 ro.debuggable=0
@@ -22,17 +24,13 @@ ro.build.keys=release-keys
 ro.build.tags=release-keys
 ro.vendor.boot.warranty_bit=0
 ro.vendor.warranty_bit=0
-vendor.boot.vbmeta.device_state=locked
-vendor.boot.verifiedbootstate=green
 sys.oem_unlock_allowed=0
 ro.oem_unlock_supported=0
-init.svc.flash_recovery=stopped
+# (bỏ) init.svc.flash_recovery=stopped  <- init.svc.* là prop runtime, build.prop không set được
 ro.boot.realmebootstate=green
 ro.boot.realme.lockstate=1
 ro.crypto.state=encrypted
-sys.oem_unlock_allowed=0
-ro.oem_unlock_supported=0
-init.svc.adbd=stopped
+# (bỏ) init.svc.adbd=stopped  <- init.svc.* là prop runtime, build.prop không set được
 ro.miui.has_gmscore=1
 ro.opa.eligible_device=true
 ro.miui.support_miui_ime_bottom=1

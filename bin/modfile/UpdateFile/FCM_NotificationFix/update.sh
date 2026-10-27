@@ -74,6 +74,12 @@ if [ "$SDK" -lt 33 ]; then
     exit 0
 fi
 
+if [ "$SDK" -ge 37 ]; then
+    # Engine chỉ có strategy hyperos/os3/android16/cn. Trên A17 nó sẽ tự reject và
+    # ta giữ nguyên jar gốc (an toàn), nhưng log trước để không ai tưởng là đã vá.
+    warn "FCM: engine chưa có strategy cho SDK $SDK (chỉ có Android 16) - sẽ bỏ qua an toàn"
+fi
+
 if [ "$REGION_TYPE" != "China" ]; then
     warn "FCM: region '$REGION_TYPE' - patch engine chỉ hỗ trợ HyperOS China - bỏ qua"
     exit 0
