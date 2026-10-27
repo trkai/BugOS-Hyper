@@ -94,6 +94,19 @@ if [ "$IS_CHINA" -eq 1 ] && [[ "$VALUE" =~ ^[Pp][Oo][Cc][Oo] ]]; then
   fi
 fi
 
+# ==================== 2c. marketname tiếng Trung ====================
+# ROM China đôi khi ghi tên nội địa (vd: 小米15) -> ưu tiên tên tiếng Anh
+is_ascii() { printf '%s' "$1" | LC_ALL=C grep -q '^[ -~]*$'; }
+
+if [ -n "$VALUE" ] && ! is_ascii "$VALUE"; then
+  ALT=$(json_pick "$JKEY")
+  if [ -n "$ALT" ] && is_ascii "$ALT"; then
+    mods "Tên máy '$VALUE' không phải ASCII -> dùng '$ALT'"
+    VALUE="$ALT"
+    SOURCE="devices.json [$JKEY] (marketname gốc không phải ASCII)"
+  fi
+fi
+
 [ -z "$VALUE" ] && VALUE="Xiaomi Device"
 
 # ==================== 3. Cuối cùng: ro.product.model (thường là mã máy) ====================
