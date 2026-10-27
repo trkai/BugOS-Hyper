@@ -1,5 +1,6 @@
 work_dir=$(pwd)
 [ -f "$work_dir/functions.sh" ] && source "$work_dir/functions.sh"
+MAIN_FOLDER="$work_dir/build/baserom/images"
 
 # ---> SỬA LỖI LẤY NHẦM 'MISSI' <---
 DEVICE_CODENAME=""
@@ -33,8 +34,10 @@ fi
 
 echo "Current device codename: $DEVICE_CODENAME"
 
-# Vòng lặp quét từng file, bọc trong nháy kép để chấp nhận mọi khoảng trắng
-find . -type f -name "*.prop" | while read -r f; do
+# Quét prop CHỈ trong images đã bung (trước đây là "find ." nên còn sửa cả .prop nằm
+# trong bin/, không liên quan tới ROM)
+if [ -d "$MAIN_FOLDER" ]; then
+    find "$MAIN_FOLDER" -type f -name "*.prop" | while read -r f; do
     [ -f "$f" ] || continue
     if [ "$DEVICE_CODENAME" = "onyx" ]; then
         sed -i \
@@ -68,4 +71,7 @@ find . -type f -name "*.prop" | while read -r f; do
         grep -q "^ro\.vendor\.perf\.scroll_opt=" "$f" || echo "ro.vendor.perf.scroll_opt=true" >> "$f"
         grep -q "^persist\.sys\.thermal\.run-control=" "$f" || echo "persist.sys.thermal.run-control=1" >> "$f"
     fi
-done
+    done
+else
+    warn "Xiaomi_NoLowEnd: không thấy $MAIN_FOLDER - bỏ qua"
+fi

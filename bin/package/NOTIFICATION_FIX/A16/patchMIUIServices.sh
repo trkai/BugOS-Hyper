@@ -42,6 +42,13 @@ PATCH_FILES=(
 
 decompile_jar() {
     patch "$JAR_NAME"
+    # Ghi nhớ xem jar đã được mod FCM_NotificationFix vá trước đó chưa, để cuối
+    # cùng kiểm tra lại xem bước reassemble có làm rơi class FcmWakeFilter không.
+    if grep -aqm1 FcmWakeFilter "$JAR_SRC" 2>/dev/null; then
+        HAD_FCM=1
+    else
+        HAD_FCM=0
+    fi
     sudo cp "$JAR_SRC" "$JAR_TMP/"
     sudo chown "$(whoami)" "$JAR_TMP/$JAR_NAME"
     rm -rf "$JAR_OUT"
@@ -134,6 +141,13 @@ patch_cn_model
 
 if recompile_jar; then
     patch "Success"
+    if [[ ${HAD_FCM:-0} -eq 1 ]]; then
+        if grep -aqm1 FcmWakeFilter "$JAR_SRC" 2>/dev/null; then
+            patch "FcmWakeFilter vẫn còn trong jar (FCM fix an toàn)"
+        else
+            patch "CẢNH BÁO: bước rebuild đã làm rơi FcmWakeFilter - vector V2/V3 của FCM mất, V1 trong services.jar vẫn còn"
+        fi
+    fi
 else
     patch "Fail: không build lại được $JAR_NAME, giữ nguyên bản gốc"
     exit 1
