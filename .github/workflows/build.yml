@@ -18,9 +18,9 @@ jobs:
     steps:
       - name: Free runner space
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache \
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
                       /usr/local/share/boost /usr/share/swift /opt/microsoft /usr/local/.ghcup \
-                      /usr/lib/mono /usr/local/lib/node_modules /opt/az
+                      /usr/lib/mono /opt/az
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
           df -h /
@@ -29,7 +29,7 @@ jobs:
         uses: easimon/maximize-build-space@master
         with:
           swap-size-mb: 1024
-          root-reserve-mb: 2048
+          root-reserve-mb: 6144
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
