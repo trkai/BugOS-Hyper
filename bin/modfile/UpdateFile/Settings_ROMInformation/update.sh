@@ -196,6 +196,7 @@ patch_settings_apk() {
     local resroot
     for resroot in "${resroots[@]}"; do
         local -a cands=()
+        local -a hide_names=()
         local f
 
         # ---- A. by resource name -------------------------------------------
@@ -280,8 +281,23 @@ patch_settings_apk() {
             size=$(make_drawable "$template" "$f" "$ow" "$oh" "$aspect")
             mods "Settings: replaced $rel  (${ow:-?}x${oh:-?} -> ${size}dp)"
             replaced_rel+=("$rel")
+            hide_names+=("${base%.xml}")
             total=$((total + 1))
         done
+
+        # ---- ẩn dòng version ngay dưới logo --------------------------------
+        # Logo trên HyperOS 3 là DRAWABLE (xiaomi_os_logo...), nên nhánh string
+        # không chạy và bước ẩn phải làm ở đây, dựa trên tên drawable vừa thay.
+        if [ ${#hide_names[@]} -gt 0 ] && [ -f "$SRC_DIR/patch_strings.py" ]; then
+            list=$(printf '%s,' "${hide_names[@]}")
+            python3 "$SRC_DIR/patch_strings.py" "$resroot" --hide-drawables "${list%,}" \
+                || warn "Settings: không ẩn được dòng version dưới logo (xem log [hide] ở trên)"
+
+            # Chạy luôn nhánh string: trên một số bản header là TextView chứ không
+            # phải drawable. Không có string nào khớp thì script không làm gì.
+            python3 "$SRC_DIR/patch_strings.py" "$resroot" >/dev/null 2>&1 \
+                && strings_done=$((strings_done + 1))
+        fi
     done
 
     if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ]; then
