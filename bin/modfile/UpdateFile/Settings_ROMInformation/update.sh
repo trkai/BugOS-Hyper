@@ -24,7 +24,10 @@ rom_version_name=$(grep -h -m1 '^ro\.mi\.os\.version\.name=' "${my_props[@]}" 2>
 
 # Bỏ hậu tố build dư (vd: 3.0.307.0.WPKCNXM.C09 -> 3.0.307.0.WPKCNXM), giữ tối đa 5 thành phần
 rom_version_short=$(printf '%s\n' "$rom_version_name" | awk -F. -v OFS=. '{ if (NF > 5) NF = 5; print }')
-rom_version_display="${rom_version_short} | BUGOS"
+# ROM China ghi version không kèm tiền tố "OS" -> bỏ đi cho khớp hiển thị
+rom_version_short=${rom_version_short#OS}
+rom_version_display="${rom_version_short} | BugOS"
+mods "OS version hiển thị: ${rom_version_display}"
 
 for p in "${my_props[@]}"; do
     if [ -f "$p" ]; then
@@ -32,7 +35,8 @@ for p in "${my_props[@]}"; do
             -e '/^ro\.bugos\.version=/d' \
             -e '/^ro\.bugos\.incremental=/d' \
             -e '/^ro\.bugos\.simposcode=/d' \
-            -e '/^ro\.bugos\.osversion=/d' "$p"
+            -e '/^ro\.bugos\.osversion=/d' \
+            -e '/^ro\.mi\.os\.version\.incremental=/d' "$p"
 
         [ -n "$(tail -c1 "$p")" ] && echo "" >> "$p"
 
@@ -41,6 +45,8 @@ for p in "${my_props[@]}"; do
             echo "ro.bugos.incremental=${rom_version_display}"
             echo "ro.bugos.simposcode=${rom_version_display}"
             echo "ro.bugos.osversion=${build_date}"
+            # Ghi đè luôn prop gốc mà Settings đọc cho dòng "OS version"
+            echo "ro.mi.os.version.incremental=${rom_version_display}"
         } >> "$p"
     fi
 done
