@@ -19,9 +19,18 @@ if [ -f "$FILE_JSON" ] && [ -n "$EXACT_KEY" ]; then
   VALUE=$(jq -r --arg key "$EXACT_KEY" '.[$key] // empty' "$FILE_JSON" 2>/dev/null)
 fi
 
-# Nếu kết quả có nhiều tên ngăn cách bằng |, lấy tên đầu tiên gọn nhất
+# Nếu kết quả có nhiều tên ngăn cách bằng |, chọn theo region:
+#   China  -> ưu tiên tên REDMI (tên bán tại Trung Quốc)
+#   Global -> ưu tiên tên POCO, nếu không có thì tên đầu tiên
+REGION_TYPE=$(cat "$work_dir/bin/ddevice/device_type.txt" 2>/dev/null | tr -d '\r\n ')
 if [[ "$VALUE" == *"|"* ]]; then
-  VALUE=$(echo "$VALUE" | cut -d'|' -f1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  if [[ "$REGION_TYPE" == "China" ]]; then
+    PICK=$(echo "$VALUE" | tr '|' '\n' | grep -i -m1 'redmi')
+  else
+    PICK=$(echo "$VALUE" | tr '|' '\n' | grep -i -m1 'poco')
+  fi
+  [ -z "$PICK" ] && PICK=$(echo "$VALUE" | cut -d'|' -f1)
+  VALUE=$(echo "$PICK" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 fi
 
 # Fallback: nếu không có trong JSON, đọc trực tiếp từ build.prop gốc
