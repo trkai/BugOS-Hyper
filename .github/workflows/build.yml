@@ -80,38 +80,50 @@ jobs:
 
       - name: Upload ROM to Gofile.io
         if: success()
-        continue-on-error: true
         env:
           GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
         run: |
           ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
           if [ ! -f "$ROM_ZIP_PATH" ]; then
             echo "Không thấy file ROM: $ROM_ZIP_PATH"
-            exit 0
+            exit 1
           fi
 
           df -h /
           free -h
 
+          # Gofile: lấy store server rồi mới upload (endpoint upload.gofile.io đã bỏ)
+          SERVER=$(curl -fsS --max-time 60 https://api.gofile.io/servers | jq -r '.data.servers[0].name')
+          if [ -z "$SERVER" ] || [ "$SERVER" = "null" ]; then
+            echo "Không lấy được Gofile server"
+            exit 1
+          fi
+          echo "Gofile server: $SERVER"
+
           AUTH=()
-          [ -n "$GOFILE_TOKEN" ] && AUTH=(-H "Authorization: Bearer $GOFILE_TOKEN")
+          if [ -n "$GOFILE_TOKEN" ]; then
+            AUTH=(-F "token=${GOFILE_TOKEN}")
+          fi
 
           LINK=""
           for i in 1 2 3; do
             RES=$(curl -sS --max-time 3600 "${AUTH[@]}" \
-                  -F "file=@${ROM_ZIP_PATH}" https://upload.gofile.io/uploadfile) || RES=""
+                  -F "file=@${ROM_ZIP_PATH}" "https://${SERVER}.gofile.io/contents/uploadfile") || RES=""
             echo "Lần $i: status=$(echo "$RES" | jq -r '.status' 2>/dev/null)"
             LINK=$(echo "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
-            [ -n "$LINK" ] && break
+            if [ -n "$LINK" ]; then
+              break
+            fi
             sleep 10
           done
 
-          if [ -n "$LINK" ]; then
-            echo "Upload thành công! Link tải: $LINK"
-            echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
-          else
+          if [ -z "$LINK" ]; then
             echo "Upload Gofile thất bại"
+            exit 1
           fi
+
+          echo "Upload thành công! Link tải: $LINK"
+          echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
 
       - name: Success Notification
         if: success()
