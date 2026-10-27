@@ -150,6 +150,7 @@ patch_settings_apk() {
     mods "Settings: Wordmark aspect: $aspect"
 
     local total=0
+    local strings_done=0
     local -a replaced_rel=()
 
     local resroot
@@ -203,10 +204,16 @@ patch_settings_apk() {
         fi
 
         if [ ${#cands[@]} -eq 0 ]; then
-            warn "Settings: KHÔNG tìm thấy asset logo. Các drawable xml nghi vấn:"
-            find "$resroot" -type f -path "*/drawable*/*" -name "*.xml" 2>/dev/null \
+            warn "Settings: không thấy asset logo dạng drawable. Drawable nghi vấn (nếu có):"
+            find "$resroot" -type f -path "*/drawable*/*" 2>/dev/null \
                 | grep -Ei '/(hyper|bugos|os_logo|logo|wordmark|brand|miui_|rom_)' \
-                | sed 's|.*/res/|  res/|' | sort -u | head -n 30
+                | sed 's|.*/res/|  res/|' | sort -u | head -n 20
+            # Header có thể là TextView -> đổi string (xem patch_strings.py)
+            if [ -f "$SRC_DIR/patch_strings.py" ]; then
+                if python3 "$SRC_DIR/patch_strings.py" "$resroot"; then
+                    strings_done=$((strings_done + 1))
+                fi
+            fi
             continue
         fi
 
@@ -237,10 +244,11 @@ patch_settings_apk() {
         done
     done
 
-    if [ "$total" -eq 0 ]; then
-        warn "Settings: Không thay được asset nào - giữ APK gốc"
+    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ]; then
+        warn "Settings: không thay được asset lẫn string nào - giữ APK gốc"
         return 1
     fi
+    mods "Settings: drawable=$total  string=$strings_done"
 
     # ---- smali: OS version ------------------------------------------------
     local p1
@@ -274,15 +282,18 @@ patch_settings_apk() {
     # NOTE: resource file names are often obfuscated inside the APK (res/hu.xml),
     # so we cannot look the entry up by its decoded name.  The pathData string is
     # stored verbatim in the binary XML string pool -> scan every res xml instead.
-    local ok=0
+    local ok=0 ok_str=0
+    # marker 1: pathData của logo (drawable)
     ok=$(unzip -p "$work/new.apk" 'res/*.xml' 2>/dev/null | grep -ac "M 106.32 72.58 Q 99.29 80.61")
-    if [ "${ok:-0}" -eq 0 ]; then
-        warn "Settings: Verify thất bại (không thấy marker trong APK mới) - giữ APK gốc"
+    # marker 2: chữ đã đổi (strings) - "Xiaomi Bug" nằm trong string pool
+    ok_str=$(unzip -p "$work/new.apk" 'resources.arsc' 2>/dev/null | grep -ac "Xiaomi Bug")
+    if [ "${ok:-0}" -eq 0 ] && [ "${ok_str:-0}" -eq 0 ]; then
+        warn "Settings: Verify thất bại (không thấy marker drawable lẫn string) - giữ APK gốc"
         return 1
     fi
 
     cp -f "$work/new.apk" "$apk"
-    mods "Settings: DONE - $ok/$total asset(s) verified in ${apk#$MAIN_FOLDER/}"
+    mods "Settings: DONE - drawable=$total (verify $ok), string=$strings_done (verify $ok_str) trong ${apk#$MAIN_FOLDER/}"
     rm -rf "$work"
     return 0
 }
