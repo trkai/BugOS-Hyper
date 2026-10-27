@@ -177,8 +177,8 @@ else
     done
 fi
 
-# Run lpmake
-lpmake $lpargs
+# Run lpmake (lọc warning "Invalid sparse file format" vô hại khi đọc image raw)
+lpmake $lpargs 2> >(grep -v "Invalid sparse file format at header magic" >&2)
 
 if [ -f "$IMG_DIR/super.img" ]; then
     repack "Successfully packed super.img."

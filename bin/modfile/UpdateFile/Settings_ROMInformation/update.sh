@@ -52,23 +52,32 @@ if [ -n "$isSettings" ] && [ -f "$isSettings" ]; then
     isSettingsDIR=$(dirname "$isSettings")
     mods "Patching Settings: Customizing BugOS Branding & Logo..."
 
-    mkdir -p "$WORK_DIR/apk_temp"
-    $APKEDITOR d -i "$isSettings" -o "$WORK_DIR/apk_temp/isSettings.apk.out" >/dev/null 2>&1
+    rm -rf "$WORK_DIR/apk_temp"
+    mkdir -p "$WORK_DIR/apk_temp/final"
+    DECODE_LOG="$WORK_DIR/apk_temp/decode.log"
 
-    if [ -d "$WORK_DIR/apk_temp/isSettings.apk.out" ]; then
+    if ! $APKEDITOR d -f -i "$isSettings" -o "$WORK_DIR/apk_temp/isSettings.apk.out" >"$DECODE_LOG" 2>&1 \
+       || [ ! -f "$WORK_DIR/apk_temp/isSettings.apk.out/apktool.yml" ]; then
+        mods "Decode Settings.apk thất bại -> bỏ qua patch Settings (ROM vẫn dùng brand build.prop)."
+        tail -n 8 "$DECODE_LOG" 2>/dev/null
+    else
         # 1. Thay thế vector/drawable logo HyperOS bằng Logo BugOS
         LOGO_SRC="$WORK_DIR/bin/modfile/UpdateFile/Settings_ROMInformation/ic_hyper_os.xml"
-        if [ -f "$LOGO_SRC" ]; then
-            find "$WORK_DIR/apk_temp/isSettings.apk.out/res" -type f \( \
+        logo_count=0
+        if [ -f "$LOGO_SRC" ] && [ -d "$WORK_DIR/apk_temp/isSettings.apk.out/res" ]; then
+            while IFS= read -r logo_target; do
+                cp -f "$LOGO_SRC" "$logo_target" && logo_count=$((logo_count + 1))
+            done < <(find "$WORK_DIR/apk_temp/isSettings.apk.out/res" -type f \( \
                 -name "ic_hyper_os.xml" -o \
                 -name "ic_hyper_os_logo.xml" -o \
                 -name "ic_os_logo.xml" -o \
                 -name "my_device_os_logo.xml" -o \
-                -name "hyper_os_logo.xml" \
-            \) | while read -r logo_target; do
-                cp -f "$LOGO_SRC" "$logo_target"
-                mods "Replaced logo asset: $(basename "$logo_target")"
-            done
+                -name "hyper_os_logo.xml" \) )
+        fi
+        if [ "$logo_count" -gt 0 ]; then
+            mods "Replaced $logo_count logo asset(s)."
+        else
+            mods "Không tìm thấy asset logo OS để thay (bỏ qua)."
         fi
 
         # 2. Patch các phương thức smali trong MiuiAboutPhoneUtils
@@ -84,18 +93,20 @@ if [ -n "$isSettings" ] && [ -f "$isSettings" ]; then
             [ -f "$tar3" ] && $repS "$tar3" "$p1" >/dev/null 2>&1
             [ -f "$tar4" ] && $repS "$tar4" "$p1" >/dev/null 2>&1
             mods "Patched MiuiAboutPhoneUtils smali methods."
+        else
+            mods "Không thấy MiuiAboutPhoneUtils.smali (bỏ qua smali patch)."
         fi
 
         # 3. Đóng gói lại Settings.apk
         Settings_name=$(basename "$isSettings")
         $APKEDITOR b -f -i "$WORK_DIR/apk_temp/isSettings.apk.out" -o "$WORK_DIR/apk_temp/final/$Settings_name" >/dev/null 2>&1
 
-        # Chỉ ghi đè khi build lại thành công (an toàn tuyệt đối, tránh bootloop)
-        if [ -f "$WORK_DIR/apk_temp/final/$Settings_name" ] && [ -s "$WORK_DIR/apk_temp/final/$Settings_name" ]; then
+        # Chỉ ghi đè khi build lại thành công (tránh bootloop)
+        if [ -s "$WORK_DIR/apk_temp/final/$Settings_name" ]; then
             cp -f "$WORK_DIR/apk_temp/final/$Settings_name" "$isSettingsDIR/$Settings_name"
             mods "Successfully applied BugOS branded Settings.apk!"
         else
-            mods "Settings rebuild skipped; build.prop brandings applied."
+            mods "Settings rebuild thất bại; giữ APK gốc, chỉ áp brand build.prop."
         fi
     fi
 

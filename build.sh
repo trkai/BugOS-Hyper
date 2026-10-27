@@ -1,4 +1,4 @@
-trap 'rc=$?; echo "[TRAP] build.sh kết thúc tại dòng $LINENO, mã thoát $rc"' EXIT
+trap 'rc=$?; echo "[TRAP] build.sh kết thúc, mã thoát $rc"' EXIT
 
 baserom="$1"
 repo_name="$2"
@@ -25,7 +25,7 @@ fi
 # Fix lỗi cấu hình gói apt/dpkg và cài đặt các phụ thuộc cần thiết
 sudo dpkg --configure -a 2>/dev/null || true
 sudo apt-get update -y
-sudo apt-get install -y xmlstarlet aapt libc++1 libc++abi1 libsparse-tools erofs-utils
+sudo apt-get install -y xmlstarlet aapt libc++1 libc++abi1 erofs-utils
 
 check unzip aria2c 7z zip java zipalign python3 zstd bc xmlstarlet aapt
 
