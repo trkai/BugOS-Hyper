@@ -53,7 +53,6 @@ MiBrowser
 MIUIMusic
 Email
 MIFinance
-MIUINewHome
 mab
 MiuiMusic
 MIUIReporter
@@ -90,7 +89,6 @@ MIService
 facebook-services
 MIUIYoupin
 MIUIVipAccount
-MIUINewHome_Removable
 Health
 MIUIMusicT
 facebook-appmanager
@@ -114,7 +112,6 @@ QuickSearchBoxPadMIUI15
 MIUIPersonalAssistantPadOS3
 MIUISecurityCenterPad
 MIUIPackageInstallerVariants
-CAJLauncher
 Creation
 MiuiPassword
 Padapp
