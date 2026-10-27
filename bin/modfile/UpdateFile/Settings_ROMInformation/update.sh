@@ -32,17 +32,44 @@ WORK_ROOT="$WORK_DIR/.settings_patch"
 my_props=(
     "$MAIN_FOLDER/system/system/build.prop"
     "$MAIN_FOLDER/system/build.prop"
+    "$MAIN_FOLDER/system_ext/etc/build.prop"
     "$MAIN_FOLDER/product/etc/build.prop"
     "$MAIN_FOLDER/vendor/build.prop"
     "$MAIN_FOLDER/odm/etc/build.prop"
 )
 
-# Lấy version ROM thật từ build.prop (HyperOS trước, MIUI/incremental sau)
-rom_version_name=$(grep -h -m1 '^ro\.mi\.os\.version\.name=' "${my_props[@]}" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r\n ')
-[ -z "$rom_version_name" ] && rom_version_name=$(grep -h -m1 '^ro\.mi\.os\.version\.incremental=' "${my_props[@]}" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r\n ')
-[ -z "$rom_version_name" ] && rom_version_name=$(grep -h -m1 '^ro\.build\.version\.incremental=' "${my_props[@]}" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r\n ')
-[ -z "$rom_version_name" ] && rom_version_name="$base_rom_code"
-[ -z "$rom_version_name" ] && rom_version_name="BugOS"
+# Lấy version ROM.
+#
+# NGUỒN CHÍNH là base_rom_code - chuỗi lấy từ TÊN FILE ROM, ví dụ
+#   annibale-ota_full-OS3.0.307.0.WPKCNXM-user-16.0-....zip  ->  OS3.0.307.0.WPKCNXM
+# Đây đúng là chuỗi mà trang Giới thiệu điện thoại hiển thị ở dòng "Phiên bản OS".
+#
+# Trước đây lấy từ build.prop trước, và trên ROM thật nó ra
+#   "16OS3.1.260716.235326947.QCPECN"   (sai hoàn toàn)
+# vì ro.mi.os.version.incremental của bản build này không cùng định dạng.
+# Prop chỉ còn là fallback, và phải qua bước kiểm tra định dạng.
+rom_version_name=""
+rom_version_src="base_rom_code (tên file ROM)"
+
+case "$base_rom_code" in
+    ""|Unknown|unknown|YourDevice) ;;
+    *) rom_version_name="$base_rom_code" ;;
+esac
+
+# Fallback: build.prop, chỉ nhận giá trị có dạng số phiên bản (3.0.307.0...)
+if [ -z "$rom_version_name" ]; then
+    for key in ro.mi.os.version.name ro.mi.os.version.incremental ro.build.version.incremental; do
+        cand=$(grep -h -m1 "^${key}=" "${my_props[@]}" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r\n ')
+        cand=${cand#OS}
+        if printf '%s' "$cand" | grep -qE '^[0-9]+\.[0-9]+'; then
+            rom_version_name="$cand"
+            rom_version_src="build.prop $key"
+            break
+        fi
+    done
+fi
+
+[ -z "$rom_version_name" ] && { rom_version_name="BugOS"; rom_version_src="mặc định"; }
 
 # Bỏ hậu tố build dư (3.0.307.0.WPKCNXM.C09 -> 3.0.307.0.WPKCNXM), giữ tối đa 5 thành phần
 rom_version_short=$(printf '%s\n' "$rom_version_name" | awk -F. -v OFS=. '{ if (NF > 5) NF = 5; print }')
@@ -52,7 +79,7 @@ rom_version_short=${rom_version_short% | BugOS}
 rom_version_short=${rom_version_short%|BugOS}
 rom_version_short=${rom_version_short% }
 rom_version_display="${rom_version_short} | BugOS"
-mods "OS version hiển thị: ${rom_version_display}"
+mods "OS version hiển thị: ${rom_version_display}  <- ${rom_version_src}"
 
 for p in "${my_props[@]}"; do
     [ -f "$p" ] || continue
