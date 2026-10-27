@@ -172,7 +172,6 @@ def build_message(status, rom_link):
 
     return "\n".join(lines)
 
-
 def send_notification(status, rom_link, channel_id, bot_token, builder_id="", download_link=""):
     is_success = status.lower() == 'success'
 
@@ -181,6 +180,8 @@ def send_notification(status, rom_link, channel_id, bot_token, builder_id="", do
         run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
 
     message = build_message(status, rom_link)
+    if is_success and not is_available(download_link):
+        message += "\n\n⚠️ <i>Upload lên Drive/Gofile thất bại — chưa có link tải.</i>"
 
     payload = {
         "text": message,
@@ -204,9 +205,12 @@ def send_notification(status, rom_link, channel_id, bot_token, builder_id="", do
         return
 
     payload["chat_id"] = target_chat_id
+    print(f"[notify] status={status} link={download_link!r} chat={target_chat_id}")
 
     try:
         response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=payload)
+        if not response.ok:
+            print(f"Telegram trả lỗi: {response.status_code} {response.text}")
         response.raise_for_status()
     except Exception as e:
         print(f"Lỗi khi gửi thông báo: {e}")

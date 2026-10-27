@@ -203,33 +203,33 @@ done
 # ==================== FIX TÊN CODENAME THIẾT BỊ ====================
 detected_codename=""
 
-# 1. Quét tìm codename trong các file build.prop thực tế
-for prop in \
-    "$work_dir/build/baserom/images/product/etc/build.prop" \
-    "$work_dir/build/baserom/images/vendor/build.prop" \
-    "$work_dir/build/baserom/images/system/system/build.prop" \
-    "$work_dir/build/baserom/images/odm/etc/build.prop"; do
-    if [ -f "$prop" ]; then
-        val=$(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device|ro\.build\.product)=" "$prop" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
-        if [ -n "$val" ] && [ "$val" != "missi" ]; then
-            detected_codename="$val"
+# 1. Ưu tiên codename thật lấy từ tên file ROM (khớp devices_data.txt)
+clean_rom_name=$(basename "$baserom" | tr '[:upper:]' '[:lower:]')
+if [ -f "$work_dir/bin/ddevice/data/devices_data.txt" ]; then
+    while read -r code; do
+        code_clean=$(echo "$code" | tr '[:upper:]' '[:lower:]' | tr -d '\r\n ')
+        if [ -n "$code_clean" ] && [[ "$clean_rom_name" =~ (^|[^a-z0-9])${code_clean}([^a-z0-9]|$) ]]; then
+            detected_codename="$code_clean"
             break
         fi
-    fi
-done
+    done < "$work_dir/bin/ddevice/data/devices_data.txt"
+fi
 
-# 2. Nếu chưa tìm được từ prop, thử đối soát tên file ROM với cơ sở dữ liệu thiết bị
-if [ -z "$detected_codename" ] || [ "$detected_codename" = "missi" ]; then
-    clean_rom_name=$(basename "$baserom" | tr '[:upper:]' '[:lower:]')
-    if [ -f "$work_dir/bin/ddevice/data/devices_data.txt" ]; then
-        while read -r code; do
-            code_clean=$(echo "$code" | tr '[:upper:]' '[:lower:]' | tr -d '\r\n ')
-            if [ -n "$code_clean" ] && [[ "$clean_rom_name" =~ (^|[^a-z0-9])${code_clean}([^a-z0-9]|$) ]]; then
-                detected_codename="$code_clean"
-                break
-            fi
-        done < "$work_dir/bin/ddevice/data/devices_data.txt"
-    fi
+# 2. Fallback: đọc build.prop, bỏ qua các giá trị chung chung (miproduct, missi...)
+if [ -z "$detected_codename" ]; then
+    for prop in \
+        "$work_dir/build/baserom/images/product/etc/build.prop" \
+        "$work_dir/build/baserom/images/vendor/build.prop" \
+        "$work_dir/build/baserom/images/system/system/build.prop" \
+        "$work_dir/build/baserom/images/odm/etc/build.prop"; do
+        if [ -f "$prop" ]; then
+            val=$(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device|ro\.build\.product)=" "$prop" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
+            case "$val" in
+                ""|missi|miproduct|product|generic|unknown|xiaomi|device|phone) ;;
+                *) detected_codename="$val"; break ;;
+            esac
+        fi
+    done
 fi
 
 if [ -n "$detected_codename" ]; then

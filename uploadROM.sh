@@ -10,9 +10,9 @@ regionTYPE=$(cat $work_dir/bin/ddevice/device_type.txt 2>/dev/null | tr -d '\r\n
 baserom_type=$(cat $work_dir/bin/ddevice/romtype.txt 2>/dev/null | tr -d '\r\n')
 
 # ƯU TIÊN LẤY CODENAME CHUẨN ĐÃ ĐƯỢC XỬ LÝ
-device_f=$(cat $work_dir/bin/ddevice/device_f.txt 2>/dev/null | tr -d '\r\n')
-if [[ -z "$device_f" || "$device_f" == "missi" ]]; then
-    device_f=$(cat $work_dir/bin/ddevice/device_code.txt 2>/dev/null | tr -d '\r\n')
+device_f=$(cat $work_dir/bin/ddevice/device_f.txt 2>/dev/null | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
+if [[ -z "$device_f" || "$device_f" == "missi" || "$device_f" == "miproduct" || "$device_f" == "product" ]]; then
+    device_f=$(cat $work_dir/bin/ddevice/device_code.txt 2>/dev/null | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
 fi
 device_code="$device_f"
 
