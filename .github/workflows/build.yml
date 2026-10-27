@@ -78,8 +78,43 @@ jobs:
         run: |
           sudo -E bash uploadROM.sh
 
-      - name: Upload ROM to Gofile.io
+      - name: Upload ROM to Google Drive
+        id: drive
         if: success()
+        continue-on-error: true
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+          GDRIVE_DIR: ${{ secrets.GDRIVE_DIR }}
+        run: |
+          if [ -z "$RCLONE_CONF" ]; then
+            echo "Chưa cấu hình RCLONE_CONF -> bỏ qua Google Drive"
+            exit 1
+          fi
+
+          ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
+          if [ ! -f "$ROM_ZIP_PATH" ]; then
+            echo "Không thấy file ROM: $ROM_ZIP_PATH"
+            exit 1
+          fi
+
+          DEST="${GDRIVE_DIR:-gdrive:BugOS}"
+          mkdir -p "$HOME/.config/rclone"
+          printf '%s\n' "$RCLONE_CONF" > "$HOME/.config/rclone/rclone.conf"
+
+          echo "Upload lên Google Drive: $DEST"
+          rclone copy "$ROM_ZIP_PATH" "$DEST" --drive-chunk-size 256M --retries 3 --low-level-retries 10 --stats 30s --stats-one-line
+
+          LINK=$(rclone link "$DEST/$(basename "$ROM_ZIP_PATH")" 2>/dev/null || true)
+          if [ -z "$LINK" ]; then
+            echo "Upload xong nhưng không tạo được link chia sẻ"
+            exit 1
+          fi
+
+          echo "Download link (Drive): $LINK"
+          echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
+
+      - name: Upload ROM to Gofile.io
+        if: success() && steps.drive.outcome != 'success'
         env:
           GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
         run: |
