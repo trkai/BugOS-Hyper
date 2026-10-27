@@ -1,5 +1,5 @@
 #!/bin/bash
-device_code=$1
+device_code=$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -d '\r\n ')
 case $device_code in
 	#13 13Pro 13Ultra K60Pro MIXFold 12TB 14Ultra
 	fuxi | nuwa | ishtar | socrates | babylon | marble | aurora | dew | garnet | vermeer) size=9663676416;;

@@ -63,8 +63,8 @@ fi
 repack "A/B device: $is_ab_device"
 
 #Generate Super.img
+repack "Super size codename: [$getvar] (device_f.txt=[$(cat $work_dir/bin/ddevice/device_f.txt 2>/dev/null)])"
 superSize=$(bash $work_dir/bin/getSuperSize.sh $getvar)
-repack $superSize
 repack "Super image size: ${superSize}"
 repack "Packing super.img"
 for pname in ${super_list}; do
@@ -128,6 +128,19 @@ done
 if ! ls $IMG_DIR/*.img >/dev/null 2>&1; then
     error "Không có partition .img nào để đóng vào super. Kiểm tra fstype/mkfs.erofs và thư mục config."
     exit 1
+fi
+
+# Bảng super size có thể thiếu codename -> nâng lên đúng bằng tổng .img + 128MB margin
+neededSize=0
+for pname in ${super_list}; do
+    if [ -f "$IMG_DIR/${pname}.img" ]; then
+        neededSize=$((neededSize + $(stat -c%s "$IMG_DIR/${pname}.img")))
+    fi
+done
+neededSize=$((neededSize + 134217728))
+if [ "$superSize" -lt "$neededSize" ]; then
+    repack "Super size $superSize quá nhỏ (cần $neededSize) -> nâng lên"
+    superSize=$neededSize
 fi
 
 # Pack super.img
