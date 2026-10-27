@@ -79,6 +79,20 @@ mapfile -t gb_apks < <(find "$MAIN_FOLDER" -type f -name "*.apk" 2>/dev/null \
 if [ ${#gb_apks[@]} -eq 0 ]; then
     warn "Không thấy APK Google basic services (com.miui.googlebase) trong images"
     warn "Có thể HyperOS 3 đặt switch này trong Settings.apk - bỏ qua bước patch switch"
+
+    # Chẩn đoán: liệt kê các APK có thể chứa switch này để lần sau chốt được ngay.
+    mods "Google default-on: các APK liên quan Google trong images:"
+    find "$MAIN_FOLDER" -type f -name "*.apk" 2>/dev/null \
+        | grep -Ei 'google|gms|gservice' \
+        | sed 's|.*/images/|  |' | sort | head -n 25
+
+    # GMS đã có sẵn thì chỉ cần prop đúng là đủ để Play services chạy.
+    if [ -n "$gmscore" ]; then
+        mods "GMS core đã có -> chỉ cần ro.miui.has_gmscore=1 (đã set ở trên)"
+    else
+        warn "Không thấy GMS core - Google services sẽ không chạy dù switch bật"
+    fi
+
     rm -rf "$WORK_ROOT"
     mods "Google default-on: chỉ áp dụng phần build.prop"
     exit 0
