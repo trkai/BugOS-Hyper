@@ -25,48 +25,12 @@ if [[ $deviceTYPE == "China" ]]; then
     mkdir -p $MAIN_FOLDER/product/overlay/
 
     # 1. Chọn gói Overlay tương thích theo phiên bản HyperOS
-    # Bộ overlay dùng cho OS4+.
-    #   zk   (mặc định) = bộ ZK Multi, cũng là bộ OS3 đang chạy tốt
-    #   tory           = bộ Tory (updatesource_os4), bản cũ
-    #
-    # Lý do đổi mặc định sang zk: bộ Tory làm Setup Wizard crash trên OS4
-    # (MissingFormatArgumentException '%2$s' trong
-    #  interconnection_service_summary_china - chuỗi dịch có 2 placeholder
-    #  nhưng code chỉ truyền 1). Bộ ZK dùng đúng 1 placeholder nên không crash.
-    # Người dùng cũng xác nhận: chuyển Setup sang tiếng Anh thì vào được.
-    MULTILANG_OS4_SET=$(grep -m1 '^multilang_os4_set=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
-    [ -z "$MULTILANG_OS4_SET" ] && MULTILANG_OS4_SET=zk
-
+    # Cả OS3 và OS4 dùng CÙNG một họ overlay (ZK Multi, file BugOS.Multi.*).
+    # OS4 có thư mục riêng để sau này chỉnh riêng nếu cần; hiện nội dung giống hệt
+    # updatesource/ nên git chỉ lưu một bản (blob trùng nội dung).
     if [[ "$rom_os" == "OS4" ]] || [[ "$rom_os" =~ ^OS[4-9] ]]; then
-        ML_DIR="$work_dir/bin/modfile/UpdateFile/MultiLang"
-        case "$MULTILANG_OS4_SET" in
-            zk)
-                mods "OS4: bộ overlay ZK Multi (giống OS3)"
-                cp -rf "$ML_DIR/updatesource/"* "$MAIN_FOLDER/product/overlay/"
-                ;;
-            tory)
-                mods "OS4: bộ overlay Tory"
-                cp -rf "$ML_DIR/updatesource_os4/"* "$MAIN_FOLDER/product/overlay/"
-                ;;
-            *)
-                # best (mặc định): Tory phủ 58 package, ZK phủ 62, nhưng chỉ trùng 38.
-                # Lấy Tory làm nền (mới hơn, nhiều chuỗi hơn: Settings 15.390 vs 12.683)
-                # rồi thêm 24 package mà chỉ ZK có -> tổng 82 package có tiếng Việt.
-                mods "OS4: ghép Tory + phần độc quyền của ZK (82 package)"
-                cp -rf "$ML_DIR/updatesource_os4/"* "$MAIN_FOLDER/product/overlay/"
-                added=0
-                while IFS= read -r ov; do
-                    [ -n "$ov" ] || continue
-                    if [ -f "$ML_DIR/updatesource/$ov" ]; then
-                        cp -f "$ML_DIR/updatesource/$ov" "$MAIN_FOLDER/product/overlay/"
-                        added=$((added + 1))
-                    else
-                        warn "OS4 best: thiếu $ov trong updatesource/"
-                    fi
-                done < "$ML_DIR/extra_zk_overlays.txt"
-                mods "OS4 best: thêm $added overlay ZK (tổng $((added + 58)) package)"
-                ;;
-        esac
+        mods "OS4: overlay BugOS.Multi (thư mục updatesource_os4)"
+        cp -rf "$work_dir/bin/modfile/UpdateFile/MultiLang/updatesource_os4/"* "$MAIN_FOLDER/product/overlay/"
     else
         mods "Applying HyperOS/MIUI MultiLanguage Overlays (ZK Multi)..."
         cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource/* $MAIN_FOLDER/product/overlay/
