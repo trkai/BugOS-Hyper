@@ -1087,16 +1087,37 @@ require_patched() {
   log "$jar OK"
 }
 
-patch_framework        || { err "patch_framework thất bại"; exit 1; }
+# smali 3.0.5 có thể chết khi GHI debug info của dex Android 17:
+#   IndexOutOfBoundsException: toIndex = N  (dexlib2 DebugInfoCache.hashCode)
+# Lần 1 giữ nguyên debug info; nếu assemble lỗi thì baksmali lại với
+# --debug-info false rồi patch lại từ đầu. Mất .line trong stack trace của
+# framework, nhưng đổi lấy việc ROM có signature bypass.
+run_patch() {
+  local fn="$1" base="$2"
+  if $fn; then
+    return 0
+  fi
+  warn "$base: patch lần 1 thất bại -> thử lại với --debug-info false"
+  export BAKSMALI_OPTS="--debug-info false"
+  rm -rf "$WORK_DIR/${base}_decompile"
+  rm -f "$WORK_DIR/${base}_patched.jar" "${base}_patched.jar"
+  if $fn; then
+    warn "$base: patch thành công ở lần 2 (không có debug info)"
+    return 0
+  fi
+  return 1
+}
+
+run_patch patch_framework      "framework"      || { err "patch_framework thất bại"; exit 1; }
 require_patched "framework_patched.jar" "PackageParser" || exit 1
 
-patch_services         || { err "patch_services thất bại"; exit 1; }
+run_patch patch_services       "services"       || { err "patch_services thất bại"; exit 1; }
 require_patched "services_patched.jar" "SystemServer" || exit 1
 
-patch_miui_services    || { err "patch_miui_services thất bại"; exit 1; }
+run_patch patch_miui_services  "miui-services"  || { err "patch_miui_services thất bại"; exit 1; }
 require_patched "miui-services_patched.jar" "" || exit 1
 
-patch_miui_framework   || { err "patch_miui_framework thất bại"; exit 1; }
+run_patch patch_miui_framework "miui-framework" || { err "patch_miui_framework thất bại"; exit 1; }
 require_patched "miui-framework_patched.jar" "" || exit 1
 
 # Add patched JARs
