@@ -25,9 +25,26 @@ if [[ $deviceTYPE == "China" ]]; then
     mkdir -p $MAIN_FOLDER/product/overlay/
 
     # 1. Chọn gói Overlay tương thích theo phiên bản HyperOS
+    # Bộ overlay dùng cho OS4+.
+    #   zk   (mặc định) = bộ ZK Multi, cũng là bộ OS3 đang chạy tốt
+    #   tory           = bộ Tory (updatesource_os4), bản cũ
+    #
+    # Lý do đổi mặc định sang zk: bộ Tory làm Setup Wizard crash trên OS4
+    # (MissingFormatArgumentException '%2$s' trong
+    #  interconnection_service_summary_china - chuỗi dịch có 2 placeholder
+    #  nhưng code chỉ truyền 1). Bộ ZK dùng đúng 1 placeholder nên không crash.
+    # Người dùng cũng xác nhận: chuyển Setup sang tiếng Anh thì vào được.
+    MULTILANG_OS4_SET=$(grep -m1 '^multilang_os4_set=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+    [ -z "$MULTILANG_OS4_SET" ] && MULTILANG_OS4_SET=zk
+
     if [[ "$rom_os" == "OS4" ]] || [[ "$rom_os" =~ ^OS[4-9] ]]; then
-        mods "Detected HyperOS 4+! Applying Tory Vietnamese Overlays (OS4)..."
-        cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource_os4/* $MAIN_FOLDER/product/overlay/
+        if [ "$MULTILANG_OS4_SET" = "tory" ]; then
+            mods "OS4: dùng bộ overlay Tory (multilang_os4_set=tory)"
+            cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource_os4/* $MAIN_FOLDER/product/overlay/
+        else
+            mods "OS4: dùng bộ overlay ZK Multi (giống OS3)"
+            cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource/* $MAIN_FOLDER/product/overlay/
+        fi
     else
         mods "Applying HyperOS/MIUI MultiLanguage Overlays (ZK Multi)..."
         cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource/* $MAIN_FOLDER/product/overlay/
