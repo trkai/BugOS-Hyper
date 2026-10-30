@@ -38,13 +38,35 @@ if [[ $deviceTYPE == "China" ]]; then
     [ -z "$MULTILANG_OS4_SET" ] && MULTILANG_OS4_SET=zk
 
     if [[ "$rom_os" == "OS4" ]] || [[ "$rom_os" =~ ^OS[4-9] ]]; then
-        if [ "$MULTILANG_OS4_SET" = "tory" ]; then
-            mods "OS4: dùng bộ overlay Tory (multilang_os4_set=tory)"
-            cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource_os4/* $MAIN_FOLDER/product/overlay/
-        else
-            mods "OS4: dùng bộ overlay ZK Multi (giống OS3)"
-            cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource/* $MAIN_FOLDER/product/overlay/
-        fi
+        ML_DIR="$work_dir/bin/modfile/UpdateFile/MultiLang"
+        case "$MULTILANG_OS4_SET" in
+            zk)
+                mods "OS4: bộ overlay ZK Multi (giống OS3)"
+                cp -rf "$ML_DIR/updatesource/"* "$MAIN_FOLDER/product/overlay/"
+                ;;
+            tory)
+                mods "OS4: bộ overlay Tory"
+                cp -rf "$ML_DIR/updatesource_os4/"* "$MAIN_FOLDER/product/overlay/"
+                ;;
+            *)
+                # best (mặc định): Tory phủ 58 package, ZK phủ 62, nhưng chỉ trùng 38.
+                # Lấy Tory làm nền (mới hơn, nhiều chuỗi hơn: Settings 15.390 vs 12.683)
+                # rồi thêm 24 package mà chỉ ZK có -> tổng 82 package có tiếng Việt.
+                mods "OS4: ghép Tory + phần độc quyền của ZK (82 package)"
+                cp -rf "$ML_DIR/updatesource_os4/"* "$MAIN_FOLDER/product/overlay/"
+                added=0
+                while IFS= read -r ov; do
+                    [ -n "$ov" ] || continue
+                    if [ -f "$ML_DIR/updatesource/$ov" ]; then
+                        cp -f "$ML_DIR/updatesource/$ov" "$MAIN_FOLDER/product/overlay/"
+                        added=$((added + 1))
+                    else
+                        warn "OS4 best: thiếu $ov trong updatesource/"
+                    fi
+                done < "$ML_DIR/extra_zk_overlays.txt"
+                mods "OS4 best: thêm $added overlay ZK (tổng $((added + 58)) package)"
+                ;;
+        esac
     else
         mods "Applying HyperOS/MIUI MultiLanguage Overlays (ZK Multi)..."
         cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource/* $MAIN_FOLDER/product/overlay/
