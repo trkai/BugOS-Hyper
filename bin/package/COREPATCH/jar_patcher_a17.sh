@@ -700,17 +700,66 @@ apply_framework_disable_secure_flag() {
 # repo vá theo anchor smali nên dễ lệch. Hai chỗ CorePatch có mà bản A16 không có:
 #
 #   1. android.content.pm.SigningDetails.hasCommonAncestor(SigningDetails)
-#      - từ Android 11, dùng cho SharedUser. A16 của repo vá "hasAncestorOrSelf"
-#        (tên cũ) nên trên A17 không khớp.
+#      - từ Android 11, dùng cho SharedUser. Đã kiểm tra trên framework.jar OS4:
+#        A17 VẪN có hasAncestorOrSelf (nên patch cũ không sai), nhưng CorePatch
+#        hook thêm hasCommonAncestor nên vá luôn cho đủ.
 #   2. com.android.server.pm.ScanPackageUtils.assertMinSignatureSchemeIsValid
 #      - từ Android 13, chạy lúc quét package. Không vá thì APK ký scheme cũ
 #        vẫn bị từ chối dù đã bypass verify.
 #
 # Cả hai đều an toàn khi không tìm thấy: helper chỉ warn rồi bỏ qua.
 # ---------------------------------------------------------------------------
+# Vá mọi chỗ gọi MessageDigest.isEqual trong file: đổi "move-result vN" ngay sau
+# đó thành "const/4 vN, 0x1" - GIỮ NGUYÊN số thanh ghi.
+#
+# Vì sao không dùng replace_move_result_after_invoke: helper đó khớp theo chuỗi
+# invoke CỐ ĐỊNH (kèm số thanh ghi) và thay bằng const/4 CỐ ĐỊNH. Trên Android 17:
+#   ApkSignatureSchemeV2Verifier : invoke {v8, v4} -> move-result v0    (khớp)
+#   ApkSignatureSchemeV3Verifier : invoke {v5, v4} -> move-result v11   (KHÔNG khớp
+#       vì anchor cũ là {v9, v3}; và nếu khớp thì const/4 v0 cũng sai, phải là v11)
+#   ApkSigningBlockUtils         : invoke {v5, v6} -> move-result v7    (khớp)
+patch_isequal_true() {
+  local file="$1"
+  [ -f "$file" ] || { warn "A17 extra: không thấy $file"; return 0; }
+  python3 - "$file" << 'PYEOF'
+import re, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+lines = p.read_text().splitlines()
+changed = 0
+i = 0
+while i < len(lines):
+    if 'Ljava/security/MessageDigest;->isEqual([B[B)Z' in lines[i]:
+        for j in range(i + 1, min(i + 6, len(lines))):
+            m = re.match(r'^(\s*)move-result\s+([vp]\d+)\s*$', lines[j])
+            if m:
+                lines[j] = f"{m.group(1)}const/4 {m.group(2)}, 0x1"
+                changed += 1
+                i = j
+                break
+    i += 1
+if changed:
+    p.write_text("\n".join(lines) + "\n")
+print(f"isequal sites patched: {changed}")
+PYEOF
+}
+
 apply_a17_extra_framework() {
   local decompile_dir="$1"
-  local f
+  local f v
+
+  # 1) MessageDigest.isEqual -> luôn true, giữ nguyên thanh ghi
+  for v in ApkSignatureSchemeV2Verifier ApkSignatureSchemeV3Verifier ApkSigningBlockUtils; do
+    f=$(find "$decompile_dir" -type f -name "$v.smali" 2>/dev/null | head -n 1)
+    if [ -n "$f" ]; then
+      log "A17 extra: $v -> isEqual true (register-preserving)"
+      patch_isequal_true "$f"
+    else
+      warn "A17 extra: không thấy $v.smali"
+    fi
+  done
+
+  # 2) SharedUser path (CorePatch hook từ Android 11)
   f=$(find "$decompile_dir" -type f -name "SigningDetails.smali" 2>/dev/null | head -n 1)
   if [ -z "$f" ]; then
     warn "A17 extra: không thấy android/content/pm/SigningDetails.smali"
