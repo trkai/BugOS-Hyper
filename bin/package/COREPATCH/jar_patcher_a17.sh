@@ -3,8 +3,9 @@
 #
 # Bản port từ jar_patcher_a16.sh. Khác biệt so với A16:
 #   1. API_LEVEL=37
-#   2. dùng smali 3.0.5 thay 2.5.2 (2.5.2 không biết dex version của A17)
+#   2. giữ smali 2.5.2 (3.0.5 chết khi ghi debug info của dex A17 - xem log)
 #   3. FAIL-FAST: nếu một jar không patch được thì DỪNG, không ghi đè jar gốc
+#   4. run_patch(): thử lại lần 2 với --debug-info false nếu lần 1 lỗi assemble
 #
 # CHƯA KIỂM CHỨNG TRÊN ROM ANDROID 17 THẬT. Nếu A17 đổi cấu trúc framework thì
 # bước decompile/patch sẽ lỗi và script dừng với thông báo rõ - không tạo ROM hỏng.
@@ -20,11 +21,13 @@ mkdir -p "$BACKUP_DIR"
 # API level for baksmali/smali
 API_LEVEL=37
 
-# Android 17 dùng smali 3.0.5 nếu có (dex version mới), fallback về 2.5.2
-if [ -f "$TOOLS_DIR/baksmali-3.0.5.jar" ] && [ -f "$TOOLS_DIR/smali-3.0.5.jar" ]; then
-  export BAKSMALI_JAR="$TOOLS_DIR/baksmali-3.0.5.jar"
-  export SMALI_JAR="$TOOLS_DIR/smali-3.0.5.jar"
-fi
+# Dùng smali 2.5.2 (mặc định của repo), KHÔNG dùng 3.0.5.
+#
+# Bằng chứng từ log build OS4: trên CÙNG framework.jar của Android 17,
+#   - smali 3.0.5  -> IndexOutOfBoundsException trong DebugInfoCache.hashCode
+#   - smali 2.5.2  -> "Success" (KouseiPatcher dùng baksmaliv2/smaliv2 và vá được)
+# Nên 3.0.5 không "hiện đại hơn" mà là bản hỏng với dex này. Giữ 2.5.2.
+# (run_patch bên dưới vẫn có lần thử 2 với --debug-info false nếu cần.)
 
 # ============================================
 # Feature Flags (set by command-line arguments)
