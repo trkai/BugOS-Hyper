@@ -38,6 +38,13 @@ mods "Apps_Replace: thay ${#apks[@]} app (OS $(cat "$WORK_DIR/bin/ddevice/rom_os
 for apk in "${apks[@]}"; do
     pkg=$(basename "$apk" .apk)
 
+    # APK nguồn phải thật sự khai đúng package (tránh đặt sai tên file)
+    src_pkg=$(python3 "$FINDER" x --pkg-of "$apk" 2>/dev/null)
+    if [ "$src_pkg" != "$pkg" ]; then
+        warn "Apps_Replace: $pkg - APK nguồn khai package '$src_pkg' - bỏ qua"
+        continue
+    fi
+
     dest=$(python3 "$FINDER" "$MAIN_FOLDER" "$pkg" 2>/dev/null)
     if [ -z "$dest" ]; then
         warn "Apps_Replace: KHÔNG thấy package '$pkg' trong images - bỏ qua"
@@ -46,6 +53,14 @@ for apk in "${apks[@]}"; do
 
     appdir=$(dirname "$dest")
     base=$(basename "$dest")
+
+    # Chốt lần 2: APK đích phải khai đúng package này. Nếu không thì bỏ, vì thay
+    # nhầm sẽ phá app khác (đã từng xảy ra với MIUICloudService / CarWith).
+    dest_pkg=$(python3 "$FINDER" x --pkg-of "$dest" 2>/dev/null)
+    if [ "$dest_pkg" != "$pkg" ]; then
+        warn "Apps_Replace: ${dest#$MAIN_FOLDER/} khai package '$dest_pkg' != '$pkg' - bỏ qua"
+        continue
+    fi
     rel="${dest#$MAIN_FOLDER/}"
     rel="${rel#$MAIN_FOLDER}"
     # nếu đường dẫn không khớp tiền tố (khác kiểu path giữa các HĐH) thì rút gọn
