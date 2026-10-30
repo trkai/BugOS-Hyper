@@ -692,6 +692,46 @@ apply_framework_disable_secure_flag() {
   log "Disable secure flag patches applied to framework.jar (Android 16)"
 }
 
+# ---------------------------------------------------------------------------
+# Bổ sung cho Android 17, đối chiếu với LSPosed/CorePatch (đã lên SDK 37):
+#   https://github.com/LSPosed/CorePatch
+#
+# CorePatch hook theo tên method nên chạy được nhiều đời Android; patcher của
+# repo vá theo anchor smali nên dễ lệch. Hai chỗ CorePatch có mà bản A16 không có:
+#
+#   1. android.content.pm.SigningDetails.hasCommonAncestor(SigningDetails)
+#      - từ Android 11, dùng cho SharedUser. A16 của repo vá "hasAncestorOrSelf"
+#        (tên cũ) nên trên A17 không khớp.
+#   2. com.android.server.pm.ScanPackageUtils.assertMinSignatureSchemeIsValid
+#      - từ Android 13, chạy lúc quét package. Không vá thì APK ký scheme cũ
+#        vẫn bị từ chối dù đã bypass verify.
+#
+# Cả hai đều an toàn khi không tìm thấy: helper chỉ warn rồi bỏ qua.
+# ---------------------------------------------------------------------------
+apply_a17_extra_framework() {
+  local decompile_dir="$1"
+  local f
+  f=$(find "$decompile_dir" -type f -name "SigningDetails.smali" 2>/dev/null | head -n 1)
+  if [ -z "$f" ]; then
+    warn "A17 extra: không thấy android/content/pm/SigningDetails.smali"
+    return 0
+  fi
+  force_methods_return_const "$f" "hasCommonAncestor" "1"
+  log "A17 extra: SigningDetails.hasCommonAncestor -> 1 (CorePatch parity)"
+}
+
+apply_a17_extra_services() {
+  local decompile_dir="$1"
+  local f
+  f=$(find "$decompile_dir" -type f -name "ScanPackageUtils.smali" 2>/dev/null | head -n 1)
+  if [ -z "$f" ]; then
+    warn "A17 extra: không thấy com/android/server/pm/ScanPackageUtils.smali"
+  else
+    patch_return_void_methods_all "assertMinSignatureSchemeIsValid" "$decompile_dir"
+    log "A17 extra: ScanPackageUtils.assertMinSignatureSchemeIsValid -> return-void (CorePatch parity)"
+  fi
+}
+
 # Main framework patching function (Android 16)
 patch_framework() {
   local framework_path="$work_dir/build/baserom/images/system/system/framework/framework.jar"
@@ -707,6 +747,7 @@ patch_framework() {
 
   # Apply feature-specific patches based on flags
   apply_framework_signature_patches "$decompile_dir"
+  apply_a17_extra_framework "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
   # modify_invoke_custom_methods "$decompile_dir"
@@ -872,6 +913,7 @@ patch_services() {
 
   # Apply feature-specific patches based on flags
   apply_services_signature_patches "$decompile_dir"
+  apply_a17_extra_services "$decompile_dir"
   #apply_services_disable_secure_flag "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
