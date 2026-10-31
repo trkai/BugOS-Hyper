@@ -2,16 +2,32 @@
 # BugOS - NOTIFICATION_FIX A17 - PowerKeeper
 # Credit: hướng dẫn gốc của @MMETMAmods
 #
-# Khác bản A16: KHÔNG rebuild cả APK bằng apke.jar.
+# Hai điểm khác bản A16, cả hai đều do cấu trúc A17 đã đổi (kiểm tra trên
+# PowerKeeper.apk thật lấy từ máy bằng `adb pull`):
 #
-# Trên Android 17, `apke.jar b` không dựng lại được PowerKeeper.apk (build im
-# lặng thất bại), nên bản A16 rơi vào nhánh "giữ nguyên bản gốc" và bản vá thông
-# báo không được áp - đúng như log build OS4:
-#     [PATCH] - Fail: không build lại được PowerKeeper.apk, giữ nguyên bản gốc!
+# 1. KHÔNG rebuild cả APK bằng apke.jar. Trên A17 `apke.jar b` thất bại, nên bản
+#    A16 rơi vào nhánh "giữ nguyên bản gốc" và bản vá không được áp:
+#        [PATCH] - Fail: không build lại được PowerKeeper.apk, giữ nguyên bản gốc!
+#    Ở đây chỉ thay classes.dex bên trong APK (bin/tools/apk_dex_patch.py).
 #
-# Ở đây chỉ thay classes*.dex bên trong APK (bin/tools/apk_dex_patch.py), mọi
-# entry khác giữ nguyên byte: không đụng resources.arsc, không đụng res/, nên
-# không có chỗ nào để hỏng.
+# 2. KHÔNG còn MilletConfig.smali, và KHÔNG vá tràn lan IS_INTERNATIONAL_BUILD.
+#
+#    Bản A16 sửa đúng MilletConfig.smali. Trên A17 file đó không tồn tại
+#    (đã xác nhận: find không ra), nên bản cũ báo "không vá được MilletConfig".
+#
+#    Cám dỗ là thay IS_INTERNATIONAL_BUILD -> IS_MIUI ở mọi file (28 class). Đã
+#    thử và ĐỪNG làm vậy: DeviceIdleController dùng cờ này để chọn 1 trong 2
+#    whitelist doze:
+#        !IS_INTERNATIONAL_BUILD -> "doze_always_white_apps"
+#                                   = com.tencent.mm, mobileqq, qqlite
+#        IS_INTERNATIONAL_BUILD  -> "doze_power_save_mode_intl_third_party"
+#                                   = app Trustonic / payjoy / airtelkiosk
+#    Ép thành "international" sẽ BỎ WeChat/QQ khỏi whitelist mà không thêm được
+#    Google nào (cả 2 danh sách đều không có Google). Tức là làm tệ hơn.
+#
+#    Việc thật sự cần làm chỉ là tắt giới hạn mạng GMS của PowerKeeper:
+#    A16 có isGmsControlEnabled(), A17 đổi thành updateFrameworkGmsNetStatus(Z)Z
+#    (gọi greeze để đặt limit mạng cho GMS). Cho nó trả false = không đặt limit.
 
 work_dir=$(pwd)
 [ -f "$work_dir/functions.sh" ] && source "$work_dir/functions.sh"
@@ -71,37 +87,33 @@ if ! compgen -G "$TMP/smali/*" >/dev/null; then
 fi
 
 patched=0
+gms_method=""
 
-# ---- 3. MilletConfig: IS_INTERNATIONAL_BUILD -> IS_MIUI --------------------
-# A16 chỉ sửa đúng file MilletConfig.smali. Trên A17 chỗ tham chiếu đó có thể
-# nằm ở class khác (hoặc MilletConfig.smali đổi tên) nên quét TOÀN BỘ smali.
-n_files=$(grep -rl 'Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z' "$TMP/smali" 2>/dev/null | wc -l)
-n_files=${n_files:-0}
-if [ "$n_files" -gt 0 ]; then
-    grep -rl 'Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z' "$TMP/smali" 2>/dev/null \
-        | while IFS= read -r f; do
-            sed -i 's|Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z|Lmiui/os/Build;->IS_MIUI:Z|g' "$f"
-        done
-    patched=1
-    log_msg "Đã vá IS_INTERNATIONAL_BUILD -> IS_MIUI ở $n_files file (PowerKeeper)"
-else
-    log_msg "Cảnh báo: PowerKeeper không tham chiếu IS_INTERNATIONAL_BUILD"
-fi
-
-# ---- 4. GmsObserver: isGmsControlEnabled()Z -> false ----------------------
-# Thay cả thân hàm bằng hằng số: bản A16 chèn lại một thân hàm cụ thể có tham
-# chiếu tới field mContext/mGmsUserConfigure - nếu A17 đổi tên field thì smali
-# không assemble được và mất luôn cả bản vá. Stub thì không phụ thuộc field.
+# ---- 3. tắt giới hạn mạng GMS của PowerKeeper ------------------------------
+# A16: isGmsControlEnabled()Z ; A17: updateFrameworkGmsNetStatus(Z)Z
+# Thay thân hàm bằng hằng số: không phụ thuộc field, không phụ thuộc tham số.
 GMS=$(find "$TMP/smali" -type f -name "GmsObserver.smali" 2>/dev/null | head -n1)
 if [ -n "$GMS" ]; then
-    if python3 "$METHTOOL" "$GMS" isGmsControlEnabled Z 0 >/dev/null 2>&1; then
-        patched=1
-        log_msg "Đã vá thành công GmsObserver (Thả rông GMS)"
-    else
-        log_msg "Cảnh báo: không thấy isGmsControlEnabled()Z trong GmsObserver"
+    for m in isGmsControlEnabled updateFrameworkGmsNetStatus; do
+        if python3 "$METHTOOL" "$GMS" "$m" Z 0 >/dev/null 2>&1; then
+            patched=1
+            gms_method="$m"
+            log_msg "Đã vá GmsObserver.$m -> false (thả GMS, không giới hạn mạng)"
+            break
+        fi
+    done
+    if [ -z "$gms_method" ]; then
+        log_msg "Cảnh báo: GmsObserver không có isGmsControlEnabled/updateFrameworkGmsNetStatus"
     fi
 else
     log_msg "Cảnh báo: không thấy GmsObserver.smali"
+fi
+
+# ---- 4. chỉ ghi nhận, KHÔNG vá IS_INTERNATIONAL_BUILD ----------------------
+n_intl=$(grep -rl 'IS_INTERNATIONAL_BUILD:Z' "$TMP/smali" 2>/dev/null | wc -l)
+n_intl=${n_intl:-0}
+if [ "$n_intl" -gt 0 ]; then
+    log_msg "Ghi chú: $n_intl class còn đọc IS_INTERNATIONAL_BUILD - cố ý không vá (xem đầu file)"
 fi
 
 if [ "$patched" -eq 0 ]; then
@@ -131,24 +143,20 @@ if ! unzip -t "$OUT" >/dev/null 2>&1; then
 fi
 
 # ---- 7. kiểm tra dấu vết bản vá trong APK mới -----------------------------
-ok=0
-if [ "$n_files" -gt 0 ] && grep -aq "IS_MIUI" "$OUT" 2>/dev/null; then
-    ok=1
-fi
-if [ -n "$GMS" ]; then
-    if python3 - "$GMS" <<'PY' >/dev/null 2>&1
+if [ -n "$gms_method" ]; then
+    if python3 - "$GMS" "$gms_method" <<'PY' >/dev/null 2>&1
 import re, sys
 s = open(sys.argv[1], encoding='utf-8').read()
-m = re.search(r'\.method[^\n]*isGmsControlEnabled\([^\n]*\)Z(.*?)\.end method', s, re.S)
+name = re.escape(sys.argv[2])
+m = re.search(r'\.method[^\n]*\b' + name + r'\([^\n]*\)Z(.*?)\.end method', s, re.S)
 sys.exit(0 if m and 'const/4 v0, 0x0' in m.group(1) else 1)
 PY
     then
-        ok=1
+        :
+    else
+        log_msg "Fail: APK mới không chứa dấu vết bản vá, giữ nguyên bản gốc!"
+        exit 0
     fi
-fi
-if [ "$ok" -eq 0 ]; then
-    log_msg "Fail: APK mới không chứa dấu vết bản vá, giữ nguyên bản gốc!"
-    exit 0
 fi
 
 # ---- 8. thay vào ROM, dọn mã biên dịch cũ ---------------------------------
