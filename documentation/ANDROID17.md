@@ -100,3 +100,41 @@ chỉ là trạng thái lock/integrity là thật.
 - [ ] Rollback: `git reset --hard <tag>` + flash lại bản trước
 
 Mốc rollback hiện có: tag `m0-a16-stable-20261027`.
+
+---
+
+## 7. Chuỗi vá thông báo trên Android 17
+
+Ba thành phần, chạy theo thứ tự cố định:
+
+1. **FCM_NotificationFix** (bước UpdateFile) — vá `services.jar` + `miui-services.jar`,
+   engine tự chọn profile Android 16 vì chưa có profile cho SDK 37. Anchor theo tên
+   class/method nên vẫn khớp; log in rõ 4/4 vector.
+2. **COREPATCH** (bước package) — giải nén lại chính các jar trên và vá chữ ký.
+3. **NOTIFICATION_FIX/A17** — `PowerKeeper.apk` + `miui-services.jar` (CN_MODEL,
+   IS_INTERNATIONAL_BUILD).
+
+### Vì sao PowerKeeper không dùng apke.jar nữa
+
+Trên A17, `apke.jar b` không dựng lại được `PowerKeeper.apk`. Bản A16 rơi vào nhánh
+"giữ nguyên bản gốc", nên **bản vá thông báo không được áp** mà build vẫn báo thành
+công. Từ commit `57f1792`, A17 chỉ thay `classes*.dex` bên trong APK
+(`bin/tools/apk_dex_patch.py`); mọi entry khác copy nguyên byte nên không còn bước
+nào có thể hỏng vì resource.
+
+Dex được ghi `STORED` + canh 4 byte; `resources.arsc` và `.so` cũng được canh lại vì
+kích thước dex đổi làm lệch offset của chúng.
+
+### Kiểm tra sau khi flash
+
+```sh
+adb shell dumpsys deviceidle | head -5
+adb shell settings get global device_provisioned
+# app có nhận push khi tắt màn hình không (Zalo/Telegram/Messenger)
+```
+
+Nếu vẫn mất thông báo, lấy log và tìm đúng dòng:
+- `Fail: ...PowerKeeper.apk` → bước thay dex hỏng, gửi log
+- `Cảnh báo: PowerKeeper không tham chiếu IS_INTERNATIONAL_BUILD` → A17 đổi field,
+  cần tên field mới
+- `Cảnh báo: CN_MODEL chỉ được đọc` → chỗ ghi đã đổi cách
