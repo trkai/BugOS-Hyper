@@ -33,11 +33,23 @@ fcm_final_check() {
     region=$(cat "$work_dir/bin/ddevice/device_type.txt" 2>/dev/null | tr -d '\r\n ')
     [ "$region" = "China" ] || return 0
 
+    # grep thẳng lên jar chỉ đúng khi dex được lưu uncompressed (các bước đóng gói
+    # của repo đều dùng 7za -mx=0 nên thường đúng). Nếu jar bị nén lại thì grep
+    # trượt oan, nên fallback: giải nén từng dex rồi tìm.
+    jar_has_fcm() {
+        local jar="$1" d
+        grep -aqm1 FcmWakeFilter "$jar" 2>/dev/null && return 0
+        while IFS= read -r d; do
+            unzip -p "$jar" "$d" 2>/dev/null | grep -aqm1 FcmWakeFilter && return 0
+        done < <(unzip -Z1 "$jar" '*.dex' 2>/dev/null)
+        return 1
+    }
+
     for j in system/system/framework/services.jar system_ext/framework/miui-services.jar; do
         # đường dẫn tuyệt đối: hàm này có thể được gọi khi CWD không phải gốc repo
         rel="$work_dir/build/baserom/images/$j"
         [ -f "$rel" ] || continue
-        if ! grep -aqm1 FcmWakeFilter "$rel" 2>/dev/null; then
+        if ! jar_has_fcm "$rel"; then
             missing="$missing $j"
         fi
     done
