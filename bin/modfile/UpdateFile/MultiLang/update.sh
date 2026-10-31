@@ -60,6 +60,16 @@ if [[ $deviceTYPE == "China" ]]; then
                 -e '/^persist\.sys\.zk\.multi=/d'
             )
             [ "$KEEP_BUILD_REGION" = "true" ] || sed_args+=(-e '/^ro\.miui\.build\.region=/d')
+
+            # Nhớ giá trị build.region TRƯỚC khi sửa. Base XPKCNXM không khai báo
+            # prop này trong system/build.prop, nên "giữ nguyên" có thể = không có
+            # prop nào cả -> IS_INTERNATIONAL_BUILD phụ thuộc giá trị mặc định của
+            # framework, không xác định. Ghi rõ "cn" thì mới chắc.
+            keep_region_val=""
+            if [ "$KEEP_BUILD_REGION" = "true" ]; then
+                keep_region_val=$(grep -m1 '^ro\.miui\.build\.region=' "$prop" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+            fi
+
             sed -i "${sed_args[@]}" "$prop"
 
             # Đảm bảo file kết thúc bằng xuống dòng trước khi thêm
@@ -78,8 +88,47 @@ if [[ $deviceTYPE == "China" ]]; then
                 echo "ro.vendor.audio.spk.clean=true"
                 echo "persist.sys.zk.multi=1"
             } >> "$prop"
+
+            # ROM China: nếu gốc không có build.region thì ghi thẳng "cn" thay vì
+            # bỏ trống. Bỏ trống là để framework tự quyết - và đó chính là chỗ
+            # tính năng chỉ-có-trên-China (vd hiệu ứng xếp chồng trong Gần đây)
+            # có thể bị ẩn.
+            if [ "$KEEP_BUILD_REGION" = "true" ] && [ -z "$keep_region_val" ]; then
+                echo "ro.miui.build.region=cn" >> "$prop"
+            fi
         fi
     done
+
+    # Tổng kết: in ra đúng những prop quyết định "đây là bản China hay quốc tế",
+    # để không phải flash rồi mới biết.
+    region_summary() {
+        local f="$MAIN_FOLDER/system/system/build.prop"
+        [ -f "$f" ] || return 0
+        local br rg cv
+        br=$(grep -m1 '^ro\.miui\.build\.region=' "$f" | cut -d= -f2 | tr -d '\r\n ')
+        rg=$(grep -m1 '^ro\.miui\.region=' "$f" | cut -d= -f2 | tr -d '\r\n ')
+        cv=$(grep -m1 '^ro\.miui\.cust_variant=' "$f" | cut -d= -f2 | tr -d '\r\n ')
+        mods "Region: build.region=${br:-(không có)} | region=${rg:-(không có)} | cust_variant=${cv:-(không có)}"
+
+        # Nếu product/etc/build.prop cũng khai báo build.region mà khác giá trị,
+        # prop nạp trước (system) thắng - nói rõ để không phải đoán khi debug.
+        local p2="$MAIN_FOLDER/product/etc/build.prop" br2
+        if [ -f "$p2" ]; then
+            br2=$(grep -m1 '^ro\.miui\.build\.region=' "$p2" | cut -d= -f2 | tr -d '\r\n ')
+            if [ -n "$br2" ] && [ -n "$br" ] && [ "$br2" != "$br" ]; then
+                # Đồng bộ luôn, đừng để 2 file nói 2 kiểu: system nạp trước nên nó
+                # thắng, nhưng người đọc log sau này sẽ tưởng prop kia có tác dụng.
+                sed -i "s|^ro\.miui\.build\.region=.*|ro.miui.build.region=$br|" "$p2"
+                warn "Region: product/etc/build.prop có build.region=$br2 -> đã đồng bộ thành $br"
+            fi
+        fi
+        if [ "$br" = "global" ]; then
+            mods "Region: build.region=global -> IS_INTERNATIONAL_BUILD=true, tính năng China sẽ bị ẩn"
+        else
+            mods "Region: build.region=${br:-cn} -> IS_INTERNATIONAL_BUILD=false (giữ tính năng China)"
+        fi
+    }
+    region_summary
 
     mods "Done!"
 fi
