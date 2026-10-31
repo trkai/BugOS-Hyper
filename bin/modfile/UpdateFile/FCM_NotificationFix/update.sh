@@ -97,16 +97,26 @@ fi
 mods "FCM: services.jar     -> ${SERVICES#$MAIN_FOLDER/}"
 mods "FCM: miui-services.jar -> ${MIUI_SERVICES#$MAIN_FOLDER/}"
 
-# Already patched (framework dex entries are stored uncompressed, so the class
-# name is greppable straight out of the jar)
-if ! grep -aqm1 FcmWakeFilter "$SERVICES" 2>/dev/null; then
-    STOCK=1
-else
-    STOCK=0
+# Đã patch sẵn chưa? (dex trong jar được lưu uncompressed nên grep thấy class name)
+#
+# Phải kiểm tra CẢ HAI jar. Bản trước chỉ xem services.jar: nếu jar đó đã có
+# FcmWakeFilter mà miui-services.jar thì chưa (hoặc đã bị bước sau làm rơi), script
+# in "đã được patch sẵn" rồi thoát - và miui-services vĩnh viễn không được vá.
+# Engine chèn class vào cả 2 jar trong một lượt, chạy lại sẽ chèn trùng, nên khi
+# trạng thái lệch thì dừng và báo rõ thay vì đoán.
+p_services=0
+p_miui=0
+grep -aqm1 FcmWakeFilter "$SERVICES" 2>/dev/null && p_services=1
+grep -aqm1 FcmWakeFilter "$MIUI_SERVICES" 2>/dev/null && p_miui=1
+
+if [ "$p_services" -eq 1 ] && [ "$p_miui" -eq 1 ]; then
+    mods "FCM: cả 2 jar đã được patch sẵn - bỏ qua"
+    exit 0
 fi
 
-if [ "$STOCK" -eq 0 ]; then
-    mods "FCM: jars đã được patch sẵn - bỏ qua"
+if [ "$p_services" -ne "$p_miui" ]; then
+    warn "FCM: trạng thái lệch - services.jar patched=$p_services, miui-services.jar patched=$p_miui"
+    warn "FCM: không chạy lại engine (sẽ chèn trùng FcmWakeFilter). Cần build lại từ base sạch."
     exit 0
 fi
 
