@@ -769,6 +769,66 @@ apply_a17_extra_framework() {
   log "A17 extra: SigningDetails.hasCommonAncestor -> 1 (CorePatch parity)"
 }
 
+# Màn hình không sáng khi có thông báo.
+#
+# Log thật trên máy (logcat):
+#   E/Java_Reflection: java.lang.reflect.InvocationTargetException
+#     at com.xiaomi.reflect.RefMethod.invoke(RefMethod.java:78)
+#     at NotificationManagerServiceImpl.buzzBeepBlinkForNotification(:289)
+#     at NotificationManagerService$Stub.buzzBeepBlinkForNotification(:8152)
+#   Caused by: java.lang.SecurityException: Disallowed call for uid 10292
+#     at NotificationManagerService.checkCallerIsSystem(NotificationManagerService.java:13469)
+#
+# uid 10292 = android.uid.systemui. NotificationManagerServiceImpl (MIUI) gọi
+# ngược vào phương thức AOSP buzzBeepBlinkForNotification bằng reflection, và
+# phương thức đó chỉ cho SYSTEM_UID/PHONE_UID:
+#   checkCallerIsSystem() -> isCallerSystemOrPhone()
+# SystemUI không phải 2 uid đó nên bị ném SecurityException -> phần "buzz/beep/
+# blink" (kèm bật màn hình) không chạy. Vì vậy push vẫn tới nhưng màn hình không
+# sáng.
+#
+# Bản ROM đã có sẵn isCallerSystemOrSystemUi(): nó chấp nhận SystemUI qua quyền
+# android.permission.STATUS_BAR_SERVICE (đã kiểm tra trên máy: granted=true).
+# Chỉ cần cho checkCallerIsSystem dùng hàm đó.
+#
+# Chỉ sửa BÊN TRONG phương thức checkCallerIsSystem: chuỗi isCallerSystemOrPhone
+# còn xuất hiện ở nhiều phương thức khác, thay toàn file sẽ đổi cả những chỗ
+# không liên quan.
+patch_notification_wake() {
+  local decompile_dir="$1"
+  local f
+  f=$(find "$decompile_dir" -type f -name "NotificationManagerService.smali" 2>/dev/null | head -n 1)
+  if [ -z "$f" ]; then
+    warn "A17 extra: không thấy NotificationManagerService.smali - bỏ qua vá wake"
+    return 0
+  fi
+  python3 - "$f" << 'PYEOF'
+import re, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+s = p.read_text()
+m = re.search(r'(\.method [^\n]*checkCallerIsSystem\(\)V.*?\.end method)', s, re.S)
+if not m:
+    print("khong thay checkCallerIsSystem()V")
+    sys.exit(1)
+body = m.group(1)
+if 'isCallerSystemOrPhone()Z' not in body:
+    print("checkCallerIsSystem khong goi isCallerSystemOrPhone - da va roi?")
+    sys.exit(1)
+body2 = body.replace(
+    'Lcom/android/server/notification/NotificationManagerService;->isCallerSystemOrPhone()Z',
+    'Lcom/android/server/notification/NotificationManagerService;->isCallerSystemOrSystemUi()Z')
+s = s[:m.start(1)] + body2 + s[m.end(1):]
+p.write_text(s)
+print("da doi checkCallerIsSystem -> isCallerSystemOrSystemUi")
+PYEOF
+  if grep -A6 '\.method [^\n]*checkCallerIsSystem()V' "$f" 2>/dev/null | grep -q 'isCallerSystemOrSystemUi'; then
+    log "A17 extra: NotificationManagerService.checkCallerIsSystem -> chấp nhận SystemUI (bật màn hình khi có thông báo)"
+  else
+    warn "A17 extra: không vá được checkCallerIsSystem"
+  fi
+}
+
 apply_a17_extra_services() {
   local decompile_dir="$1"
   local f
@@ -779,6 +839,8 @@ apply_a17_extra_services() {
     patch_return_void_methods_all "assertMinSignatureSchemeIsValid" "$decompile_dir"
     log "A17 extra: ScanPackageUtils.assertMinSignatureSchemeIsValid -> return-void (CorePatch parity)"
   fi
+
+  patch_notification_wake "$decompile_dir"
 }
 
 # Main framework patching function (Android 16)
