@@ -121,6 +121,56 @@ for p in "${my_props[@]}"; do
     } >> "$p"
 done
 
+# ---------------------------------------------------------------------------
+# ro.build.fingerprint PHẢI sạch.
+#
+# Khi ROM không khai báo ro.build.fingerprint tường minh, init tự ghép nó từ
+#   brand/product/device:release/id/incremental:type/tags
+# nên việc brand ro.build.version.incremental ở trên làm fingerprint thành
+#   Redmi/annibale/annibale:17/CP2A.260605.016/4.0.5.0.XPKCNXM | BugOS:user/release-keys
+# Sai định dạng -> Google Play không khớp được với build nào trong danh sách
+# certified -> Cài đặt Play Store báo "Thiết bị chưa được chứng nhận".
+# (Kiểm chứng trên máy: getprop ro.build.fingerprint có đúng chuỗi " | BugOS".)
+#
+# Nên chốt luôn một fingerprint sạch, ghép từ chính các mảnh gốc của ROM.
+# ---------------------------------------------------------------------------
+fp_get() {
+    local key="$1" f v
+    for f in "${my_props[@]}"; do
+        [ -f "$f" ] || continue
+        v=$(grep -m1 "^${key}=" "$f" 2>/dev/null | cut -d= -f2- | tr -d '\r')
+        [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+    done
+    return 1
+}
+
+FP_BRAND=$(fp_get ro.product.brand)
+FP_PROD=$(fp_get ro.product.name)
+FP_DEV=$(fp_get ro.product.device)
+FP_REL=$(fp_get ro.build.version.release)
+FP_ID=$(fp_get ro.build.id)
+FP_INC=$(fp_get ro.build.version.incremental)
+FP_TYPE=$(fp_get ro.build.type)
+FP_TAGS=$(fp_get ro.build.tags)
+
+FP_INC=${FP_INC% | BugOS}
+FP_INC=${FP_INC%|BugOS}
+FP_INC=${FP_INC% }
+
+if [ -n "$FP_BRAND" ] && [ -n "$FP_PROD" ] && [ -n "$FP_DEV" ] && [ -n "$FP_REL" ] \
+   && [ -n "$FP_ID" ] && [ -n "$FP_INC" ] && [ -n "$FP_TYPE" ] && [ -n "$FP_TAGS" ]; then
+    CLEAN_FP="${FP_BRAND}/${FP_PROD}/${FP_DEV}:${FP_REL}/${FP_ID}/${FP_INC}:${FP_TYPE}/${FP_TAGS}"
+    for f in "$MAIN_FOLDER/system/system/build.prop" "$MAIN_FOLDER/system/build.prop"; do
+        [ -f "$f" ] || continue
+        sed -i '/^ro\.build\.fingerprint=/d' "$f"
+        echo "ro.build.fingerprint=${CLEAN_FP}" >> "$f"
+        mods "OS version: fingerprint sạch = ${CLEAN_FP}"
+        break
+    done
+else
+    warn "OS version: thiếu mảnh để ghép fingerprint (brand='$FP_BRAND' prod='$FP_PROD' dev='$FP_DEV' rel='$FP_REL' id='$FP_ID' inc='$FP_INC' type='$FP_TYPE' tags='$FP_TAGS')"
+fi
+
 # ===========================================================================
 # 2. Settings.apk  (logo + OS version)
 # ===========================================================================
