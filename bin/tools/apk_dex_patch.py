@@ -114,6 +114,16 @@ def cmd_repack(apk, workdir, outapk):
             os.unlink(tmp)
             print(f'zip hỏng ở {bad}', file=sys.stderr)
             return 1
+        # Kiểm tra canh lề thật sự: fp.tell() có thể lệch nếu zipfile đổi cách
+        # đệm, và lỗi đó chỉ lộ ra khi ART đọc APK trên máy. Thà biết ngay.
+        for i in z.infolist():
+            if i.compress_type != zipfile.ZIP_STORED:
+                continue
+            want = 4096 if i.filename.endswith('.so') else ALIGN
+            off = i.header_offset + 30 + len(i.filename.encode('utf-8')) + len(i.extra)
+            if off % want:
+                print(f'CẢNH BÁO: {i.filename} lệch canh lề '
+                      f'({off} % {want} != 0)', file=sys.stderr)
     os.replace(tmp, outapk)
     print(f'repacked {replaced} dex -> {outapk}')
     return 0
