@@ -75,9 +75,11 @@ if [ "$SDK" -lt 33 ]; then
 fi
 
 if [ "$SDK" -ge 37 ]; then
-    # Engine chỉ có strategy hyperos/os3/android16/cn. Trên A17 nó sẽ tự reject và
-    # ta giữ nguyên jar gốc (an toàn), nhưng log trước để không ai tưởng là đã vá.
-    warn "FCM: engine chưa có strategy cho SDK $SDK (chỉ có Android 16) - sẽ bỏ qua an toàn"
+    # Engine chỉ có strategy hyperos/os3/android16/cn, nên trên SDK >= 37 nó tự
+    # chọn profile Android 16. Trong log OS4 việc này VẪN chạy và vá đủ 4 vector
+    # (anchor theo tên class/method nên không phụ thuộc API level), nhưng chưa
+    # được kiểm chứng trên máy thật. Log trước để không ai đọc nhầm là đã bỏ qua.
+    warn "FCM: engine chưa có profile riêng cho SDK $SDK - dùng profile Android 16, xem kết quả 4 vector bên dưới"
 fi
 
 if [ "$REGION_TYPE" != "China" ]; then

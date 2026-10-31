@@ -21,7 +21,11 @@ import struct
 import sys
 import zipfile
 
-SCAN_ROOTS = ("app", "priv-app")
+# Thư mục không bao giờ chứa APK -> bỏ qua để khỏi quét thừa
+SKIP_DIRS = {
+    'overlay', 'lib', 'lib64', 'lib32', 'etc', 'framework', 'media', 'fonts',
+    'bin', 'xbin', 'oat', 'usr', 'lost+found', 'config', 'build.prop',
+}
 CHUNK_STRING_POOL = 0x0001
 CHUNK_START_TAG = 0x0102
 TYPE_STRING = 0x03
@@ -53,7 +57,19 @@ def _strings(data, off):
 
 
 def manifest_package(apk):
-    """Trả về package name khai trong thẻ <manifest>, hoặc None."""
+    """Trả về package name khai trong thẻ <manifest>, hoặc None.
+
+    Mọi lỗi (zip hỏng, AXML lạ, struct.error) đều trả None. Trước đây một APK
+    lỗi làm cả script chết giữa đường, stderr bị 2>/dev/null nuốt mất, và kết quả
+    là "KHÔNG thấy package ... trong images" dù app có trong ROM.
+    """
+    try:
+        return _manifest_package(apk)
+    except Exception:
+        return None
+
+
+def _manifest_package(apk):
     try:
         with zipfile.ZipFile(apk) as z:
             data = z.read('AndroidManifest.xml')
@@ -90,22 +106,22 @@ def manifest_package(apk):
 
 
 def candidates(images):
+    """Mọi *.apk trong cây images, trừ các thư mục chắc chắn không có app.
+
+    Trước đây chỉ quét <part>/app và <part>/priv-app, nên app nằm ở
+    <part>/data-app (MIUI xếp Gallery/Weather vào đây ở một số bản) bị bỏ sót
+    hoàn toàn.
+    """
     for part in sorted(os.listdir(images)):
         pdir = os.path.join(images, part)
         if not os.path.isdir(pdir):
             continue
-        for kind in SCAN_ROOTS:
-            kdir = os.path.join(pdir, kind)
-            if not os.path.isdir(kdir):
-                continue
-            for app in sorted(os.listdir(kdir)):
-                adir = os.path.join(kdir, app)
-                if not os.path.isdir(adir):
-                    continue
-                for fn in sorted(os.listdir(adir)):
-                    if fn.endswith(".apk"):
-                        # luôn in bằng '/' để bash xử lý được trên mọi HĐH
-                        yield os.path.join(adir, fn).replace(os.sep, "/")
+        for root, dirs, files in os.walk(pdir):
+            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+            for fn in sorted(files):
+                if fn.endswith('.apk'):
+                    # luôn in bằng '/' để bash xử lý được trên mọi HĐH
+                    yield os.path.join(root, fn).replace(os.sep, "/")
 
 
 def main():
