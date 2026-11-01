@@ -160,13 +160,41 @@ FP_INC=${FP_INC% }
 if [ -n "$FP_BRAND" ] && [ -n "$FP_PROD" ] && [ -n "$FP_DEV" ] && [ -n "$FP_REL" ] \
    && [ -n "$FP_ID" ] && [ -n "$FP_INC" ] && [ -n "$FP_TYPE" ] && [ -n "$FP_TAGS" ]; then
     CLEAN_FP="${FP_BRAND}/${FP_PROD}/${FP_DEV}:${FP_REL}/${FP_ID}/${FP_INC}:${FP_TYPE}/${FP_TAGS}"
-    for f in "$MAIN_FOLDER/system/system/build.prop" "$MAIN_FOLDER/system/build.prop"; do
-        [ -f "$f" ] || continue
+
+    # Ghi vào ĐÚNG file đang khai báo ro.build.version.incremental - tức file mà
+    # init dùng để ghép fingerprint. Không đoán theo layout thư mục: trên ROM
+    # này build.prop nằm ở images/system/build.prop (trên máy là /system/
+    # build.prop), KHÔNG phải system/system/build.prop. Bản trước hard-code
+    # đường dẫn nên ghi vào file không được nạp -> fingerprint vẫn bị ghép từ
+    # incremental đã brand -> dính " | BugOS".
+    #
+    # Đọc bằng -print0: đường dẫn repo có dấu cách ("New folder").
+    FP_DONE=0
+    while IFS= read -r -d '' f; do
+        grep -q '^ro\.build\.version\.incremental=' "$f" 2>/dev/null || continue
         sed -i '/^ro\.build\.fingerprint=/d' "$f"
         echo "ro.build.fingerprint=${CLEAN_FP}" >> "$f"
-        mods "OS version: fingerprint sạch = ${CLEAN_FP}"
-        break
-    done
+        mods "OS version: fingerprint sạch -> $(echo "$f" | sed "s|$MAIN_FOLDER/||")"
+        FP_DONE=$((FP_DONE + 1))
+    done < <(find "$MAIN_FOLDER" -type f -name "build.prop" -print0 2>/dev/null)
+
+    if [ "$FP_DONE" -eq 0 ]; then
+        # Không file nào khai báo incremental: ghi vào build.prop của system nếu có
+        for f in "$MAIN_FOLDER/system/build.prop" "$MAIN_FOLDER/system/system/build.prop"; do
+            [ -f "$f" ] || continue
+            sed -i '/^ro\.build\.fingerprint=/d' "$f"
+            echo "ro.build.fingerprint=${CLEAN_FP}" >> "$f"
+            mods "OS version: fingerprint sạch (fallback) -> $(echo "$f" | sed "s|$MAIN_FOLDER/||")"
+            FP_DONE=1
+            break
+        done
+    fi
+
+    if [ "$FP_DONE" -eq 0 ]; then
+        warn "OS version: không tìm được build.prop nào để ghi fingerprint"
+    else
+        mods "OS version: fingerprint = ${CLEAN_FP}"
+    fi
 else
     warn "OS version: thiếu mảnh để ghép fingerprint (brand='$FP_BRAND' prod='$FP_PROD' dev='$FP_DEV' rel='$FP_REL' id='$FP_ID' inc='$FP_INC' type='$FP_TYPE' tags='$FP_TAGS')"
 fi
