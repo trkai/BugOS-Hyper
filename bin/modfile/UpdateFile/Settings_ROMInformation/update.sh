@@ -81,17 +81,40 @@ rom_version_short=${rom_version_short% }
 rom_version_display="${rom_version_short} | BugOS"
 mods "OS version hiển thị: ${rom_version_display}  <- ${rom_version_src}"
 
+# brand_incremental=false (mặc định): KHÔNG gắn " | BugOS" vào
+#   ro.build.version.incremental.
+#
+# Lý do: ROM này không khai báo ro.build.fingerprint, nên init tự ghép nó từ
+# ro.build.version.incremental. Gắn brand vào prop đó là fingerprint thành
+#   Redmi/annibale/annibale:17/CP2A.../4.0.5.0.XPKCNXM | BugOS:user/release-keys
+# -> sai định dạng, Play không nhận. Mà muốn ghi fingerprint đè lên thì phải biết
+# brand/product/device thật - ba giá trị này KHÔNG nằm trong build.prop nào của
+# ROM (init lấy từ ro.product.<partition>.* theo ro.product.property_source_order),
+# nên mọi lần tự ghép đều ra danh tính vendor chung "Xiaomi/mivendor/mivendor".
+#
+# Tắt brand ở incremental thì init tự ghép fingerprint ĐÚNG, không cần đoán.
+# Đổi lại: dòng "Phiên bản OS" mất chữ " | BugOS" nếu nó đọc prop này.
+# Đặt brand_incremental=true trong config.env nếu ưu tiên hiển thị hơn.
+BRAND_INC=$(grep -m1 '^brand_incremental=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+[ -z "$BRAND_INC" ] && BRAND_INC=false
+
 for p in "${my_props[@]}"; do
     [ -f "$p" ] || continue
-    sed -i \
-        -e '/^ro\.bugos\.version=/d' \
-        -e '/^ro\.bugos\.incremental=/d' \
-        -e '/^ro\.bugos\.simposcode=/d' \
-        -e '/^ro\.bugos\.osversion=/d' \
-        -e '/^ro\.mi\.os\.version\.incremental=/d' \
-        -e '/^ro\.build\.version\.incremental=/d' \
-        -e '/^ro\.system\.build\.version\.incremental=/d' \
-        -e '/^ro\.product\.build\.version\.incremental=/d' "$p"
+    sed_args=(
+        -e '/^ro\.bugos\.version=/d'
+        -e '/^ro\.bugos\.incremental=/d'
+        -e '/^ro\.bugos\.simposcode=/d'
+        -e '/^ro\.bugos\.osversion=/d'
+        -e '/^ro\.mi\.os\.version\.incremental=/d'
+    )
+    if [ "$BRAND_INC" = "true" ]; then
+        sed_args+=(
+            -e '/^ro\.build\.version\.incremental=/d'
+            -e '/^ro\.system\.build\.version\.incremental=/d'
+            -e '/^ro\.product\.build\.version\.incremental=/d'
+        )
+    fi
+    sed -i "${sed_args[@]}" "$p"
 
     [ -n "$(tail -c1 "$p")" ] && echo "" >> "$p"
 
@@ -115,9 +138,11 @@ for p in "${my_props[@]}"; do
         echo "ro.bugos.osversion=${build_date}"
         # Các prop gốc mà Settings đọc cho dòng "OS version"
         echo "ro.mi.os.version.incremental=${rom_version_display}"
-        echo "ro.build.version.incremental=${rom_version_display}"
-        echo "ro.system.build.version.incremental=${rom_version_display}"
-        echo "ro.product.build.version.incremental=${rom_version_display}"
+        if [ "$BRAND_INC" = "true" ]; then
+            echo "ro.build.version.incremental=${rom_version_display}"
+            echo "ro.system.build.version.incremental=${rom_version_display}"
+            echo "ro.product.build.version.incremental=${rom_version_display}"
+        fi
     } >> "$p"
 done
 
@@ -140,6 +165,11 @@ done
 # tức ro.product.brand / ro.product.name / ro.product.device không nằm trong 6
 # đường dẫn đó (chúng ở file khác, ví dụ vendor/build.prop hay odm). Nên quét
 # thật, thay vì đoán.
+if [ "$BRAND_INC" != "true" ]; then
+    # Không brand incremental thì fingerprint không thể hỏng: init ghép nó từ
+    # chính các prop thật của máy. Không cần đoán brand/product/device nữa.
+    mods "OS version: không brand incremental -> ro.build.fingerprint do init tự ghép, luôn đúng định dạng"
+else
 ALL_PROPS=()
 while IFS= read -r -d '' _bp; do
     ALL_PROPS+=("$_bp")
@@ -261,6 +291,7 @@ else
                -e 's/^\(ro\.build\.version\.incremental=.*\)| BugOS$/\1/' "$_f"
         mods "OS version: gỡ brand khỏi incremental -> $(echo "$_f" | sed "s|$MAIN_FOLDER/||")"
     done < <(find "$MAIN_FOLDER" -type f -name "build.prop" -print0 2>/dev/null)
+fi
 fi
 
 # ===========================================================================
