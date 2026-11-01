@@ -213,9 +213,21 @@ def main():
     if not os.path.isdir(args.base_dir):
         sys.exit(1)
 
-    patches = list(PATCHES)
+    # --services là để vá services.jar, KHÔNG phải vá thêm vào framework.jar.
+    #
+    # Bản trước làm `patches.append(SERVICES_PATCH)` rồi chạy cả danh sách, tức là
+    # áp 5 patch của framework.jar (Instrumentation, ApplicationPackageManager,
+    # AndroidKeyStoreSpi, AndroidKeyStoreKeyPairGeneratorSpi, Settings$NameValueCache)
+    # lên cây smali của services.jar. Năm class đó không tồn tại trong services.jar
+    # -> find_smali_file() trả None -> apply_patch() trả False -> sys.exit(1) ngay
+    # patch đầu tiên, nên services.jar LUÔN bị báo "không vá được" và bị khôi phục
+    # từ backup. Đó là lý do log build ra
+    #   "Fail: toolbox.py không vá được services.jar - giữ nguyên jar gốc"
+    # dù framework.jar vá thành công.
     if args.services:
-        patches.append(SERVICES_PATCH)
+        patches = [SERVICES_PATCH]
+    else:
+        patches = list(PATCHES)
 
     for patch in patches:
         if not apply_patch(patch, args.base_dir):
