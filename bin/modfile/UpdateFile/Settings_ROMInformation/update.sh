@@ -134,9 +134,20 @@ done
 #
 # Nên chốt luôn một fingerprint sạch, ghép từ chính các mảnh gốc của ROM.
 # ---------------------------------------------------------------------------
+# Danh sách build.prop thực có trong images. my_props ở trên là danh sách đoán
+# theo layout, và trên ROM này nó KHÔNG đủ: log build ra
+#   thiếu mảnh để ghép fingerprint (brand='' prod='' dev='' ...)
+# tức ro.product.brand / ro.product.name / ro.product.device không nằm trong 6
+# đường dẫn đó (chúng ở file khác, ví dụ vendor/build.prop hay odm). Nên quét
+# thật, thay vì đoán.
+ALL_PROPS=()
+while IFS= read -r -d '' _bp; do
+    ALL_PROPS+=("$_bp")
+done < <(find "$MAIN_FOLDER" -type f -name "build.prop" -print0 2>/dev/null)
+
 fp_get() {
     local key="$1" f v
-    for f in "${my_props[@]}"; do
+    for f in "${my_props[@]}" "${ALL_PROPS[@]}"; do
         [ -f "$f" ] || continue
         v=$(grep -m1 "^${key}=" "$f" 2>/dev/null | cut -d= -f2- | tr -d '\r')
         [ -n "$v" ] && { printf '%s' "$v"; return 0; }
@@ -144,9 +155,20 @@ fp_get() {
     return 1
 }
 
-FP_BRAND=$(fp_get ro.product.brand)
-FP_PROD=$(fp_get ro.product.name)
-FP_DEV=$(fp_get ro.product.device)
+# Bản thân brand/product/device có thể nằm ở biến thể khác (ro.product.vendor.*,
+# ro.product.system.*, ro.product.odm.*) tuỳ partition khai báo. Thử lần lượt.
+fp_get_any() {
+    local k v
+    for k in "$@"; do
+        v=$(fp_get "$k")
+        [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+    done
+    return 1
+}
+
+FP_BRAND=$(fp_get_any ro.product.brand ro.product.vendor.brand ro.product.system.brand ro.product.odm.brand ro.product.product.brand)
+FP_PROD=$(fp_get_any ro.product.name ro.product.vendor.name ro.product.system.name ro.product.odm.name ro.product.product.name)
+FP_DEV=$(fp_get_any ro.product.device ro.product.vendor.device ro.product.system.device ro.product.odm.device ro.product.product.device)
 FP_REL=$(fp_get ro.build.version.release)
 FP_ID=$(fp_get ro.build.id)
 FP_INC=$(fp_get ro.build.version.incremental)
@@ -197,6 +219,17 @@ if [ -n "$FP_BRAND" ] && [ -n "$FP_PROD" ] && [ -n "$FP_DEV" ] && [ -n "$FP_REL"
     fi
 else
     warn "OS version: thiếu mảnh để ghép fingerprint (brand='$FP_BRAND' prod='$FP_PROD' dev='$FP_DEV' rel='$FP_REL' id='$FP_ID' inc='$FP_INC' type='$FP_TYPE' tags='$FP_TAGS')"
+
+    # Lưới an toàn: không ghép được fingerprint thì ít nhất đừng để nó hỏng.
+    # init tự ghép ro.build.fingerprint từ ro.build.version.incremental khi prop
+    # này trống, nên gỡ hậu tố brand khỏi incremental là fingerprint tự hợp lệ
+    # trở lại. Mất chữ " | BugOS" ở dòng Phiên bản OS, nhưng đúng định dạng.
+    while IFS= read -r -d '' _f; do
+        grep -q '^ro\.build\.version\.incremental=' "$_f" 2>/dev/null || continue
+        sed -i -e 's/^\(ro\.build\.version\.incremental=.*\) | BugOS$/\1/' \
+               -e 's/^\(ro\.build\.version\.incremental=.*\)| BugOS$/\1/' "$_f"
+        mods "OS version: gỡ brand khỏi incremental -> $(echo "$_f" | sed "s|$MAIN_FOLDER/||")"
+    done < <(find "$MAIN_FOLDER" -type f -name "build.prop" -print0 2>/dev/null)
 fi
 
 # ===========================================================================
