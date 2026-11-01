@@ -45,7 +45,7 @@ if [[ $deviceTYPE == "China" ]]; then
 
     # 3. Xóa cấu hình ngôn ngữ China và kích hoạt Tiếng Việt mặc định trong build.prop
     mods "Configuring default locale for Vietnamese..."
-    for prop in "$MAIN_FOLDER/system/system/build.prop" "$MAIN_FOLDER/product/etc/build.prop"; do
+    for prop in "$MAIN_FOLDER/system/build.prop" "$MAIN_FOLDER/system/system/build.prop" "$MAIN_FOLDER/product/etc/build.prop"; do
         if [ -f "$prop" ]; then
             # Dọn sạch các biến ngôn ngữ/khu vực cũ tránh xung đột
             sed_args=(
@@ -102,8 +102,16 @@ if [[ $deviceTYPE == "China" ]]; then
     # Tổng kết: in ra đúng những prop quyết định "đây là bản China hay quốc tế",
     # để không phải flash rồi mới biết.
     region_summary() {
-        local f="$MAIN_FOLDER/system/system/build.prop"
-        [ -f "$f" ] || return 0
+        # ROM này đặt build.prop ở images/system/build.prop (trên máy là
+        # /system/build.prop), KHÔNG phải system/system/build.prop. Trước đây chỉ
+        # đọc đường dẫn sau nên hàm này im lặng không in gì, còn prop region/locale
+        # cũng chỉ được ghi vào product/etc (nếu có) -> máy vẫn báo region=CN.
+        local f=""
+        local cand
+        for cand in "$MAIN_FOLDER/system/build.prop" "$MAIN_FOLDER/system/system/build.prop"; do
+            [ -f "$cand" ] && { f="$cand"; break; }
+        done
+        [ -n "$f" ] || return 0
         local br rg cv
         br=$(grep -m1 '^ro\.miui\.build\.region=' "$f" | cut -d= -f2 | tr -d '\r\n ')
         rg=$(grep -m1 '^ro\.miui\.region=' "$f" | cut -d= -f2 | tr -d '\r\n ')

@@ -52,5 +52,12 @@ if { [[ "$androidVER" == "13" ]] || [[ "$androidVER" == "14" ]] || [[ "$androidV
     rm -rf $WORK_DIR/apk_temp
 	mods "Done"
 else
-    mods "This Android version is not supported"
+    # Hai lý do rất khác nhau nhưng trước đây dùng chung một câu "This Android
+    # version is not supported", nên log build của ROM China trông như thể bản
+    # Android không được hỗ trợ - trong khi thực ra mod này chỉ áp cho ROM Global.
+    if [[ "$regionTYPE" != *"Global"* ]]; then
+        mods "Fix theme: bỏ qua - ROM không phải Global (region=$regionTYPE), mod này chỉ dành cho ROM Global"
+    else
+        mods "Fix theme: bỏ qua - Android $androidVER không nằm trong 13-17"
+    fi
 fi
