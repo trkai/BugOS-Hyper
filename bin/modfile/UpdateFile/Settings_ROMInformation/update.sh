@@ -145,9 +145,27 @@ while IFS= read -r -d '' _bp; do
     ALL_PROPS+=("$_bp")
 done < <(find "$MAIN_FOLDER" -type f -name "build.prop" -print0 2>/dev/null)
 
+# Thứ tự ưu tiên khi tra các mảnh fingerprint.
+#
+# KHÔNG dùng thứ tự find: trên ROM này odm/etc/build.prop khai báo danh tính
+# vendor chung (ro.product.brand=Xiaomi, ro.product.name/device=mivendor), và
+# init nạp nó TRƯỚC system/product nên giá trị thật (Redmi/annibale) thắng.
+# Quét theo find nên bản trước ghép ra "Xiaomi/mivendor/mivendor" - sai, và tệ
+# hơn là sai một cách âm thầm.
+#
+# Vì vậy ưu tiên đúng thứ tự init: product và system trước, odm sau cùng.
+FP_SEARCH=(
+    "$MAIN_FOLDER/product/etc/build.prop"
+    "$MAIN_FOLDER/system/build.prop"
+    "$MAIN_FOLDER/system/system/build.prop"
+    "$MAIN_FOLDER/system_ext/etc/build.prop"
+    "$MAIN_FOLDER/vendor/build.prop"
+    "$MAIN_FOLDER/odm/etc/build.prop"
+)
+
 fp_get() {
     local key="$1" f v
-    for f in "${my_props[@]}" "${ALL_PROPS[@]}"; do
+    for f in "${FP_SEARCH[@]}" "${ALL_PROPS[@]}"; do
         [ -f "$f" ] || continue
         v=$(grep -m1 "^${key}=" "$f" 2>/dev/null | cut -d= -f2- | tr -d '\r')
         [ -n "$v" ] && { printf '%s' "$v"; return 0; }
@@ -179,8 +197,17 @@ FP_INC=${FP_INC% | BugOS}
 FP_INC=${FP_INC%|BugOS}
 FP_INC=${FP_INC% }
 
+# Danh tính vendor chung (Xiaomi/mivendor) không phải danh tính thiết bị. Nếu
+# chỉ tra ra được nó thì thà KHÔNG ghi fingerprint mà để init tự ghép (nhánh
+# else gỡ brand khỏi incremental), còn hơn ghi một fingerprint sai thiết bị.
+FP_GENERIC=0
+case "$FP_BRAND/$FP_PROD/$FP_DEV" in
+    *mivendor*|*generic*|*unknown*) FP_GENERIC=1 ;;
+esac
+
 if [ -n "$FP_BRAND" ] && [ -n "$FP_PROD" ] && [ -n "$FP_DEV" ] && [ -n "$FP_REL" ] \
-   && [ -n "$FP_ID" ] && [ -n "$FP_INC" ] && [ -n "$FP_TYPE" ] && [ -n "$FP_TAGS" ]; then
+   && [ -n "$FP_ID" ] && [ -n "$FP_INC" ] && [ -n "$FP_TYPE" ] && [ -n "$FP_TAGS" ] \
+   && [ "$FP_GENERIC" -eq 0 ]; then
     CLEAN_FP="${FP_BRAND}/${FP_PROD}/${FP_DEV}:${FP_REL}/${FP_ID}/${FP_INC}:${FP_TYPE}/${FP_TAGS}"
 
     # Ghi vào ĐÚNG file đang khai báo ro.build.version.incremental - tức file mà
@@ -218,7 +245,11 @@ if [ -n "$FP_BRAND" ] && [ -n "$FP_PROD" ] && [ -n "$FP_DEV" ] && [ -n "$FP_REL"
         mods "OS version: fingerprint = ${CLEAN_FP}"
     fi
 else
-    warn "OS version: thiếu mảnh để ghép fingerprint (brand='$FP_BRAND' prod='$FP_PROD' dev='$FP_DEV' rel='$FP_REL' id='$FP_ID' inc='$FP_INC' type='$FP_TYPE' tags='$FP_TAGS')"
+    if [ "$FP_GENERIC" -eq 1 ]; then
+        warn "OS version: chỉ tra ra danh tính vendor chung ($FP_BRAND/$FP_PROD/$FP_DEV) - không ghi fingerprint sai, để init tự ghép"
+    else
+        warn "OS version: thiếu mảnh để ghép fingerprint (brand='$FP_BRAND' prod='$FP_PROD' dev='$FP_DEV' rel='$FP_REL' id='$FP_ID' inc='$FP_INC' type='$FP_TYPE' tags='$FP_TAGS')"
+    fi
 
     # Lưới an toàn: không ghép được fingerprint thì ít nhất đừng để nó hỏng.
     # init tự ghép ro.build.fingerprint từ ro.build.version.incremental khi prop
