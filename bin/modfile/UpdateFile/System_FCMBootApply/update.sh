@@ -20,6 +20,13 @@ source "$work_dir/functions.sh"
 # services.jar lẫn miui-services.jar, triggerGMSLimitAction = return-void.
 #
 # Bật/tắt bằng fcm_boot_apply trong config.env.
+#
+# LƯU Ý: script phía máy đặt tên bugos_fcm_boot.src (KHÔNG phải .sh). Vì
+# UpdateFile/insupdate.sh chạy `bash` mọi file *.sh trong cây UpdateFile, nên nếu
+# để .sh thì chính script dành-cho-điện-thoại này bị chạy trên máy build - log
+# build sẽ in "log: command not found" 6 lần (hàm log của Android không có trên
+# Linux) và các lệnh cmd/settings/content/iptables chạy vào khoảng không. Đừng
+# đổi lại đuôi .sh.
 # ---------------------------------------------------------------------------
 
 ENABLE=$(grep -m1 '^fcm_boot_apply=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
@@ -38,7 +45,7 @@ if [ ! -d "$MAIN_FOLDER/system_ext" ]; then
     exit 0
 fi
 
-if [ ! -f "$SRC_DIR/init.bugos.fcm.rc" ] || [ ! -f "$SRC_DIR/bugos_fcm_boot.sh" ]; then
+if [ ! -f "$SRC_DIR/init.bugos.fcm.rc" ] || [ ! -f "$SRC_DIR/bugos_fcm_boot.src" ]; then
     warn "FCMBoot: thiếu file nguồn trong $SRC_DIR - bỏ qua"
     exit 0
 fi
@@ -47,7 +54,7 @@ mkdir -p "$MAIN_FOLDER/system_ext/etc/init"
 
 cp -f "$SRC_DIR/init.bugos.fcm.rc" "$DEST_RC" || {
     warn "FCMBoot: copy rc thất bại - bỏ qua"; exit 0; }
-cp -f "$SRC_DIR/bugos_fcm_boot.sh" "$DEST_SH" || {
+cp -f "$SRC_DIR/bugos_fcm_boot.src" "$DEST_SH" || {
     warn "FCMBoot: copy script thất bại - bỏ qua"; exit 0; }
 
 chmod 0644 "$DEST_RC"
