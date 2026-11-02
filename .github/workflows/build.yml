@@ -79,6 +79,19 @@ jobs:
           python notify.py upload "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
           sudo -E bash uploadROM.sh
 
+      # Đường tải không phụ thuộc secret nào. Drive cần RCLONE_CONF, Gofile cần
+      # GOFILE_TOKEN và API của họ hay từ chối; artifact thì luôn có, miễn là job
+      # chạy xong. Đặt trước 2 bước kia để dù chúng fail vẫn còn link.
+      - name: Upload ROM artifact
+        if: success()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: BugOS-ROM-${{ github.run_number }}
+          path: out/*.zip
+          compression-level: 0
+          retention-days: 7
+
       - name: Upload ROM to Google Drive
         id: drive
         if: success()
