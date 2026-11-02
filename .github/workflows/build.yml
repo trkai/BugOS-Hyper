@@ -64,6 +64,33 @@ jobs:
         run: |
           sudo chmod 777 -R *
 
+      - name: Build prop-fix helper
+        run: |
+          set -e
+          SRC="bin/package/BugOSPropFix/bugos_propfix.c"
+          OUT="bin/package/BugOSPropFix/bugos_propfix"
+          if [ ! -f "$SRC" ]; then
+            echo "Không có $SRC - bỏ qua"
+            exit 0
+          fi
+
+          NDK_VER="android-ndk-r27c"
+          NDK_DIR="$RUNNER_TEMP/ndk"
+          CC="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+
+          if [ ! -x "$CC" ]; then
+            echo "Tải NDK $NDK_VER ..."
+            curl -sSL -o "$RUNNER_TEMP/ndk.zip" "https://dl.google.com/android/repository/${NDK_VER}-linux.zip"
+            unzip -q "$RUNNER_TEMP/ndk.zip" -d "$RUNNER_TEMP"
+            rm -rf "$NDK_DIR"
+            mv "$RUNNER_TEMP/$NDK_VER" "$NDK_DIR"
+            rm -f "$RUNNER_TEMP/ndk.zip"
+          fi
+
+          "$CC" -O2 -Wall -static -o "$OUT" "$SRC"
+          file "$OUT"
+          ls -la "$OUT"
+
       - name: Build ROM...
         env:
           INPUT_URL: ${{ inputs.input_url }}
