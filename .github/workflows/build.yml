@@ -115,9 +115,11 @@ jobs:
 
       - name: Upload ROM to Gofile.io
         if: success() && steps.drive.outcome != 'success'
+        continue-on-error: true
         env:
           GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
         run: |
+          set +e
           ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
           if [ ! -f "$ROM_ZIP_PATH" ]; then
             echo "Không thấy file ROM: $ROM_ZIP_PATH"
