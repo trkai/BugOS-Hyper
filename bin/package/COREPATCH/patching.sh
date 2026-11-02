@@ -186,10 +186,7 @@ patch_return_void_methods_all() {
 
   # Find all files containing the method
   local files
-  # grep -rl thay cho "find -exec {} +": tren mot so moi truong (MSYS/Git Bash) dang
-  # sau co dau cach lam find bao "cannot fit single argument within argument list
-  # size limit" -> files rong -> patch bi bo qua TRONG IM LANG. grep -rl khong bi.
-  files=$(grep -rls --include="*.smali" "^[[:space:]]*\\.method.*${method_name}" "$decompile_dir" 2> /dev/null || true)
+  files=$(find "$decompile_dir" -type f -name "*.smali" -exec grep -s -l "^[[:space:]]*\\.method.*${method_name}" {} + 2> /dev/null || true)
 
   [ -z "$files" ] && {
     warn "No occurrences of ${method_name} found in $decompile_dir"

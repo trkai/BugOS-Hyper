@@ -6,19 +6,8 @@ magiskboot="$work_dir/bin/magiskboot"
 prop="$work_dir/bin/package/KouseiPatcher/prop"
 SEARCH_DIR="build/baserom/images"
 
-# fake_lock=false -> KHÔNG giả trạng thái bootloader. Hai phần bị bỏ là (1) nhét
-# cờ androidboot vào cmdline vendor_boot và (3) nối prop/build.prop
-# (ro.boot.verifiedbootstate=green ...). Phần (4) whitelist cust.prop vẫn giữ:
-# nó chỉ khai báo prop nào được đọc, không làm sai giá trị.
-# Cờ này tách khỏi install_toolbox để vẫn cài được app KaoriosToolbox.
-FAKE_LOCK=$(grep -m1 '^fake_lock=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
-[ -z "$FAKE_LOCK" ] && FAKE_LOCK=true
-if [ "$FAKE_LOCK" != "true" ]; then
-  echo "[IMGPATCH] - fake_lock=false: bỏ qua cmdline vendor_boot và prop fake lock"
-fi
-
 # 1. Patch vendor_boot.img (chỉ bổ sung cờ fake lock vào cuối cmdline)
-if [ "$FAKE_LOCK" = "true" ] && [ -f "$work_dir/$SEARCH_DIR/vendor_boot.img" ]; then 
+if [ -f "$work_dir/$SEARCH_DIR/vendor_boot.img" ]; then 
   echo "[IMGPATCH] - PATCHING vendor_boot.img"
   mkdir -p "$work_dir/temp_boot"
 
@@ -64,8 +53,8 @@ if [ -n "$BUILD_PROP" ]; then
   fi
 fi
 
-# 3. Nối build.prop (chỉ khi fake_lock=true)
-if [ "$FAKE_LOCK" = "true" ] && [ -f "$prop/build.prop" ]; then
+# 3. Nối build.prop
+if [ -f "$prop/build.prop" ]; then
   cat "$prop/build.prop" >> "$work_dir/$SEARCH_DIR/system/system/build.prop"
 fi
 

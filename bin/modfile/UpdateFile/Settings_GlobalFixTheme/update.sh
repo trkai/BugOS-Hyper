@@ -5,12 +5,7 @@ androidVER=$(cat $WORK_DIR/bin/ddevice/androidver.txt)
 APKEDITOR="java -jar $WORK_DIR/bin/apktool/apke.jar"
 regionTYPE=$(cat $WORK_DIR/bin/ddevice/device_type.txt)
 
-# && và || có cùng độ ưu tiên và kết hợp trái->phải, nên điều kiện cũ thực chất là
-#   (A13 || A14 || A15 || A16 || A17) && Global
-# Viết lại tường minh cho dễ đọc, hành vi không đổi: chỉ chạy trên ROM Global.
-if { [[ "$androidVER" == "13" ]] || [[ "$androidVER" == "14" ]] || [[ "$androidVER" == "15" ]] \
-     || [[ "$androidVER" == "16" ]] || [[ "$androidVER" == "17" ]]; } \
-   && [[ "$regionTYPE" == *"Global"* ]]; then
+if [[ $androidVER == "16" || $androidVER == "15" || $androidVER == "14" || $androidVER == "13" && $regionTYPE == *"Global"* ]];then
     #ready for patch
 	mods "Fixing Theme Issues"
     mkdir -p $WORK_DIR/apk_temp
@@ -52,12 +47,5 @@ if { [[ "$androidVER" == "13" ]] || [[ "$androidVER" == "14" ]] || [[ "$androidV
     rm -rf $WORK_DIR/apk_temp
 	mods "Done"
 else
-    # Hai lý do rất khác nhau nhưng trước đây dùng chung một câu "This Android
-    # version is not supported", nên log build của ROM China trông như thể bản
-    # Android không được hỗ trợ - trong khi thực ra mod này chỉ áp cho ROM Global.
-    if [[ "$regionTYPE" != *"Global"* ]]; then
-        mods "Fix theme: bỏ qua - ROM không phải Global (region=$regionTYPE), mod này chỉ dành cho ROM Global"
-    else
-        mods "Fix theme: bỏ qua - Android $androidVER không nằm trong 13-17"
-    fi
+    mods "This Android version is not supported"
 fi

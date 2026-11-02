@@ -172,16 +172,9 @@ class SparseChunkHeader(object):
 class LpMetadataBase:
     _fmt = None
 
-    # @classmethod + @property không còn hoạt động từ Python 3.11: truy cập
-    # LpMetadataGeometry.size trả về chính đối tượng property chứ không phải int,
-    # nên buffer[0:self.size] ném TypeError. Tách thành property (instance) và
-    # csize() (class-level).
-    @property
-    def size(self) -> int:
-        return struct.calcsize(self._fmt)
-
     @classmethod
-    def csize(cls) -> int:
+    @property
+    def size(cls) -> int:
         return struct.calcsize(cls._fmt)
 
 
@@ -734,11 +727,11 @@ class LpUnpack(object):
         offsets = metadata.get_offsets()
         for index, offset in enumerate(offsets):
             self._fd.seek(offset, io.SEEK_SET)
-            header = LpMetadataHeader(self._fd.read(LpMetadataHeader.csize()))
-            header.partitions = LpMetadataTableDescriptor(self._fd.read(LpMetadataTableDescriptor.csize()))
-            header.extents = LpMetadataTableDescriptor(self._fd.read(LpMetadataTableDescriptor.csize()))
-            header.groups = LpMetadataTableDescriptor(self._fd.read(LpMetadataTableDescriptor.csize()))
-            header.block_devices = LpMetadataTableDescriptor(self._fd.read(LpMetadataTableDescriptor.csize()))
+            header = LpMetadataHeader(self._fd.read(cast(int, LpMetadataHeader.size)))
+            header.partitions = LpMetadataTableDescriptor(self._fd.read(cast(int, LpMetadataTableDescriptor.size)))
+            header.extents = LpMetadataTableDescriptor(self._fd.read(cast(int, LpMetadataTableDescriptor.size)))
+            header.groups = LpMetadataTableDescriptor(self._fd.read(cast(int, LpMetadataTableDescriptor.size)))
+            header.block_devices = LpMetadataTableDescriptor(self._fd.read(cast(int, LpMetadataTableDescriptor.size)))
 
             if header.magic != LP_METADATA_HEADER_MAGIC:
                 check_index = index + 1
@@ -874,7 +867,7 @@ def create_parser():
         '-p',
         '--partition',
         dest='NAME',
-        type=lambda x: re.split(r"\W+", x),
+        type=lambda x: re.split("\W+", x),
         help='Extract the named partition. This can be specified multiple times or through the delimiter [","  ":"]'
     )
     _parser.add_argument(

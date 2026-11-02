@@ -1,4 +1,4 @@
-trap 'rc=$?; echo "[TRAP] build.sh kết thúc, mã thoát $rc"' EXIT
+trap 'rc=$?; echo "[TRAP] build.sh kết thúc tại dòng $LINENO, mã thoát $rc"' EXIT
 
 baserom="$1"
 repo_name="$2"
@@ -25,7 +25,7 @@ fi
 # Fix lỗi cấu hình gói apt/dpkg và cài đặt các phụ thuộc cần thiết
 sudo dpkg --configure -a 2>/dev/null || true
 sudo apt-get update -y
-sudo apt-get install -y xmlstarlet aapt libc++1 libc++abi1 erofs-utils
+sudo apt-get install -y xmlstarlet aapt libc++1 libc++abi1 libsparse-tools erofs-utils
 
 check unzip aria2c 7z zip java zipalign python3 zstd bc xmlstarlet aapt
 
@@ -34,14 +34,7 @@ rm -rf $work_dir/out
 rm -rf $work_dir/build
 mkdir -p $work_dir/out
 
-# Kiểm tra dung lượng trước khi tải/extract ROM
-df -h / "$work_dir"
-avail_gb=$(df -BG --output=avail "$work_dir" | tail -n 1 | tr -dc "0-9")
-if [ "${avail_gb:-0}" -lt 25 ]; then
-    error "Workspace chỉ còn ${avail_gb}GB, cần >= 25GB. Kiểm tra bước Maximize build space trong workflow."
-    exit 1
-fi
-
+python3 $work_dir/notify.py download "$repo_name" "$baserom" "$prefix_id" "$builder_name" "$builder_id"
 source "$work_dir/bin/ddevice/getROM.sh" "$baserom"
 
 # ==================== CHUẨN HÓA TÊN FILE ZIP ====================
@@ -65,6 +58,7 @@ if [[ ! -f "$baserom" ]]; then
 fi
 # ================================================================
 
+python3 $work_dir/notify.py unpack "$repo_name" "$baserom" "$prefix_id" "$builder_name" "$builder_id"
 if unzip -l "${baserom}" | grep -q "payload.bin"; then
     baserom_type="payload"
     echo $baserom_type > $work_dir/bin/ddevice/romtype.txt
@@ -95,24 +89,22 @@ mkdir -p build/baserom/images/
 # Extract partitions
 if [[ ${baserom_type} == 'payload' ]]; then
     unpack "Unpacking payload.bin"
-    df -h / "$work_dir"
+    df -h /
 
     # Lấy payload.bin ra khỏi file zip (nếu chưa có)
     if [[ ! -f build/baserom/payload.bin ]]; then
         unzip -o "${baserom}" payload.bin -d build/baserom/ || { error "Không giải nén được payload.bin từ zip"; exit 1; }
     fi
 
-    # Xoá ZIP ngay sau khi tách payload.bin: giữ lại sẽ hết chỗ khi extract 47 phân vùng
-    rm -f "${baserom}"
-
     payload-extract extract -o build/baserom/images/ build/baserom/payload.bin || { error "Unpacking payload.bin failed"; exit 1; }
 
-    # Giải phóng dung lượng ngay: payload.bin không cần nữa
+    # Giải phóng dung lượng ngay: zip gốc và payload.bin không cần nữa
     rm -f build/baserom/payload.bin
+    rm -f "${baserom}"
 
     echo "===== Sau khi payload-extract ====="
     ls -la build/baserom/images/
-    df -h / "$work_dir"
+    df -h /
 
     # ---> FIX LỖI MẤT PHÂN VÙNG TRÊN PAYLOAD.BIN (A/B DEVICE) <---
     for i in build/baserom/images/*_a.img; do
@@ -190,7 +182,7 @@ done
 
 echo "===== Sau khi extract các partition ====="
 ls -la $work_dir/build/baserom/images/
-df -h / "$work_dir"
+df -h /
 
 # Bắt buộc phải có các partition chính, nếu không thì dừng luôn (không "giả thành công")
 for must in vendor system product; do
@@ -203,33 +195,33 @@ done
 # ==================== FIX TÊN CODENAME THIẾT BỊ ====================
 detected_codename=""
 
-# 1. Ưu tiên codename thật lấy từ tên file ROM (khớp devices_data.txt)
-clean_rom_name=$(basename "$baserom" | tr '[:upper:]' '[:lower:]')
-if [ -f "$work_dir/bin/ddevice/data/devices_data.txt" ]; then
-    while read -r code; do
-        code_clean=$(echo "$code" | tr '[:upper:]' '[:lower:]' | tr -d '\r\n ')
-        if [ -n "$code_clean" ] && [[ "$clean_rom_name" =~ (^|[^a-z0-9])${code_clean}([^a-z0-9]|$) ]]; then
-            detected_codename="$code_clean"
+# 1. Quét tìm codename trong các file build.prop thực tế
+for prop in \
+    "$work_dir/build/baserom/images/product/etc/build.prop" \
+    "$work_dir/build/baserom/images/vendor/build.prop" \
+    "$work_dir/build/baserom/images/system/system/build.prop" \
+    "$work_dir/build/baserom/images/odm/etc/build.prop"; do
+    if [ -f "$prop" ]; then
+        val=$(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device|ro\.build\.product)=" "$prop" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
+        if [ -n "$val" ] && [ "$val" != "missi" ]; then
+            detected_codename="$val"
             break
         fi
-    done < "$work_dir/bin/ddevice/data/devices_data.txt"
-fi
+    fi
+done
 
-# 2. Fallback: đọc build.prop, bỏ qua các giá trị chung chung (miproduct, missi...)
-if [ -z "$detected_codename" ]; then
-    for prop in \
-        "$work_dir/build/baserom/images/product/etc/build.prop" \
-        "$work_dir/build/baserom/images/vendor/build.prop" \
-        "$work_dir/build/baserom/images/system/system/build.prop" \
-        "$work_dir/build/baserom/images/odm/etc/build.prop"; do
-        if [ -f "$prop" ]; then
-            val=$(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device|ro\.build\.product)=" "$prop" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
-            case "$val" in
-                ""|missi|miproduct|product|generic|unknown|xiaomi|device|phone) ;;
-                *) detected_codename="$val"; break ;;
-            esac
-        fi
-    done
+# 2. Nếu chưa tìm được từ prop, thử đối soát tên file ROM với cơ sở dữ liệu thiết bị
+if [ -z "$detected_codename" ] || [ "$detected_codename" = "missi" ]; then
+    clean_rom_name=$(basename "$baserom" | tr '[:upper:]' '[:lower:]')
+    if [ -f "$work_dir/bin/ddevice/data/devices_data.txt" ]; then
+        while read -r code; do
+            code_clean=$(echo "$code" | tr '[:upper:]' '[:lower:]' | tr -d '\r\n ')
+            if [ -n "$code_clean" ] && [[ "$clean_rom_name" =~ (^|[^a-z0-9])${code_clean}([^a-z0-9]|$) ]]; then
+                detected_codename="$code_clean"
+                break
+            fi
+        done < "$work_dir/bin/ddevice/data/devices_data.txt"
+    fi
 fi
 
 if [ -n "$detected_codename" ]; then
@@ -257,10 +249,7 @@ mods "Gathering Devices Infomations"
 bash $work_dir/bin/ddevice/getname.sh "$getvar"
 bash $work_dir/bin/ddevice/fetchINFO.sh
 
-# Cổng chặn version: dừng NGAY nếu Android của ROM chưa có đủ bộ patch.
-# Không có bước này thì một ROM A17 thiếu jar_patcher_a17.sh sẽ build ra
-# framework.jar không được bypass verify chữ ký -> không boot được.
-bash $work_dir/bin/ddevice/target_check.sh || { error "Dừng: Android target chưa được hỗ trợ đầy đủ"; exit 1; }
+python3 $work_dir/notify.py build "$repo_name" "$baserom" "$prefix_id" "$builder_name" "$builder_id"
 
 bash $work_dir/bin/ddevice/DEBLOAT/debloat.sh
 info "Done"

@@ -53,6 +53,7 @@ MiBrowser
 MIUIMusic
 Email
 MIFinance
+MIUINewHome
 mab
 MiuiMusic
 MIUIReporter
@@ -89,6 +90,7 @@ MIService
 facebook-services
 MIUIYoupin
 MIUIVipAccount
+MIUINewHome_Removable
 Health
 MIUIMusicT
 facebook-appmanager
@@ -112,30 +114,8 @@ QuickSearchBoxPadMIUI15
 MIUIPersonalAssistantPadOS3
 MIUISecurityCenterPad
 MIUIPackageInstallerVariants
+CAJLauncher
 Creation
 MiuiPassword
 Padapp
 MIUIThemeManagerPad
-Mi Cion
-Mi Video
-
-# --- Debloat theo package (khớp AXML, không phụ thuộc tên thư mục) ---
-pkg:com.miui.video
-pkg:com.xiaomi.vipaccount
-pkg:com.xiaomi.payment
-pkg:com.miui.carlink
-pkg:com.miui.newhome
-pkg:com.xiaomi.aiasst.vision
-pkg:com.xiaomi.digitalkey
-pkg:com.miui.greenguard
-pkg:com.xiaomi.migameservice
-pkg:com.xiaomi.ab
-pkg:com.xiaomi.macro
-pkg:com.miui.bugreport
-pkg:com.miui.touchassistant
-pkg:com.miui.contentextension
-pkg:com.xiaomi.minigame
-pkg:com.xiaomi.gamecenter.sdk.service
-pkg:com.xiaomi.mis
-pkg:com.xiaomi.type
-pkg:com.unionpay.tsmservice.mi

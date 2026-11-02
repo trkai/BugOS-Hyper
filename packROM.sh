@@ -63,8 +63,8 @@ fi
 repack "A/B device: $is_ab_device"
 
 #Generate Super.img
-repack "Super size codename: [$getvar] (device_f.txt=[$(cat $work_dir/bin/ddevice/device_f.txt 2>/dev/null)])"
 superSize=$(bash $work_dir/bin/getSuperSize.sh $getvar)
+repack $superSize
 repack "Super image size: ${superSize}"
 repack "Packing super.img"
 for pname in ${super_list}; do
@@ -117,30 +117,10 @@ for pname in ${super_list}; do
     fi
 done
 
-# Xoá cây thư mục gốc sau khi đã đóng thành .img: nhường chỗ cho super.img + ZIP
-for pname in ${super_list}; do
-    if [ -f "$IMG_DIR/${pname}.img" ]; then
-        rm -rf "$IMG_DIR/${pname}"
-    fi
-done
-
 # Chốt chặn: phải có ít nhất 1 file .img mới đóng super
 if ! ls $IMG_DIR/*.img >/dev/null 2>&1; then
     error "Không có partition .img nào để đóng vào super. Kiểm tra fstype/mkfs.erofs và thư mục config."
     exit 1
-fi
-
-# Bảng super size có thể thiếu codename -> nâng lên đúng bằng tổng .img + 128MB margin
-neededSize=0
-for pname in ${super_list}; do
-    if [ -f "$IMG_DIR/${pname}.img" ]; then
-        neededSize=$((neededSize + $(stat -c%s "$IMG_DIR/${pname}.img")))
-    fi
-done
-neededSize=$((neededSize + 134217728))
-if [ "$superSize" -lt "$neededSize" ]; then
-    repack "Super size $superSize quá nhỏ (cần $neededSize) -> nâng lên"
-    superSize=$neededSize
 fi
 
 # Pack super.img
@@ -177,8 +157,8 @@ else
     done
 fi
 
-# Run lpmake (lọc warning "Invalid sparse file format" vô hại khi đọc image raw)
-lpmake $lpargs 2> >(grep -v "Invalid sparse file format at header magic" >&2)
+# Run lpmake
+lpmake $lpargs
 
 if [ -f "$IMG_DIR/super.img" ]; then
     repack "Successfully packed super.img."

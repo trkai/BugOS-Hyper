@@ -16,34 +16,22 @@ jobs:
       BUILDER_NAME: "iabi"
       BUILDER_ID: ${{ secrets.TELEGRAM_OWNER_ID }}
     steps:
-      - name: Free runner space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-                      /usr/local/share/boost /usr/share/swift /opt/microsoft /usr/local/.ghcup \
-                      /usr/lib/mono /opt/az
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-          df -h /
-
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
         with:
-          swap-size-mb: 1024
-          root-reserve-mb: 6144
+          swap-size-mb: 4096
+          root-reserve-mb: 4096
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
-          remove-codeql: 'true'
-          remove-docker-images: 'true'
 
       - name: Checkout repository
         uses: actions/checkout@main
 
-      - name: Show disk space
+      - name: Start Notify
         run: |
-          df -h
-          df -h "$GITHUB_WORKSPACE"
-          lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
+          pip install requests
+          python notify.py start "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Set up Time
         run: |
@@ -72,104 +60,57 @@ jobs:
 
       - name: Pack ROM...
         run: |
+          python notify.py pack "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
           sudo bash packROM.sh
 
       - name: Upload ROM...
         run: |
+          python notify.py upload "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
           sudo -E bash uploadROM.sh
 
-      - name: Upload ROM to Google Drive
-        id: drive
+      - name: Upload ROM to Gofile.io
         if: success()
         continue-on-error: true
-        env:
-          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
-          GDRIVE_DIR: ${{ secrets.GDRIVE_DIR }}
-        run: |
-          if [ -z "$RCLONE_CONF" ]; then
-            echo "Chưa cấu hình RCLONE_CONF -> bỏ qua Google Drive"
-            exit 1
-          fi
-
-          ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
-          if [ ! -f "$ROM_ZIP_PATH" ]; then
-            echo "Không thấy file ROM: $ROM_ZIP_PATH"
-            exit 1
-          fi
-
-          DEST="${GDRIVE_DIR:-gdrive:BugOS}"
-          mkdir -p "$HOME/.config/rclone"
-          printf '%s\n' "$RCLONE_CONF" > "$HOME/.config/rclone/rclone.conf"
-
-          echo "Upload lên Google Drive: $DEST"
-          rclone copy "$ROM_ZIP_PATH" "$DEST" --drive-chunk-size 256M --retries 3 --low-level-retries 10 --stats 30s --stats-one-line
-
-          LINK=$(rclone link "$DEST/$(basename "$ROM_ZIP_PATH")" 2>/dev/null || true)
-          if [ -z "$LINK" ]; then
-            echo "Upload xong nhưng không tạo được link chia sẻ"
-            exit 1
-          fi
-
-          echo "Download link (Drive): $LINK"
-          echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
-
-      - name: Upload ROM to Gofile.io
-        if: success() && steps.drive.outcome != 'success'
         env:
           GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
         run: |
           ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
           if [ ! -f "$ROM_ZIP_PATH" ]; then
             echo "Không thấy file ROM: $ROM_ZIP_PATH"
-            exit 1
+            exit 0
           fi
 
           df -h /
           free -h
 
-          # Gofile: lấy store server rồi mới upload (endpoint upload.gofile.io đã bỏ)
-          SERVER=$(curl -fsS --max-time 60 https://api.gofile.io/servers | jq -r '.data.servers[0].name')
-          if [ -z "$SERVER" ] || [ "$SERVER" = "null" ]; then
-            echo "Không lấy được Gofile server"
-            exit 1
-          fi
-          echo "Gofile server: $SERVER"
-
           AUTH=()
-          if [ -n "$GOFILE_TOKEN" ]; then
-            AUTH=(-F "token=${GOFILE_TOKEN}")
-          fi
+          [ -n "$GOFILE_TOKEN" ] && AUTH=(-H "Authorization: Bearer $GOFILE_TOKEN")
 
           LINK=""
           for i in 1 2 3; do
             RES=$(curl -sS --max-time 3600 "${AUTH[@]}" \
-                  -F "file=@${ROM_ZIP_PATH}" "https://${SERVER}.gofile.io/contents/uploadfile") || RES=""
+                  -F "file=@${ROM_ZIP_PATH}" https://upload.gofile.io/uploadfile) || RES=""
             echo "Lần $i: status=$(echo "$RES" | jq -r '.status' 2>/dev/null)"
             LINK=$(echo "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
-            if [ -n "$LINK" ]; then
-              break
-            fi
+            [ -n "$LINK" ] && break
             sleep 10
           done
 
-          if [ -z "$LINK" ]; then
+          if [ -n "$LINK" ]; then
+            echo "Upload thành công! Link tải: $LINK"
+            echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
+          else
             echo "Upload Gofile thất bại"
-            exit 1
           fi
-
-          echo "Upload thành công! Link tải: $LINK"
-          echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
 
       - name: Success Notification
         if: success()
         run: |
-          pip install requests
           python notify.py success "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Failure Notification
         if: failure()
         run: |
-          pip install requests
           python notify.py fail "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Cleanup

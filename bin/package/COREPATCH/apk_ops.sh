@@ -111,8 +111,7 @@ decompile_jar() {
       smali_dir="$output_dir/smali_${dex_name}"
     fi
 
-    # BAKSMALI_OPTS: cờ phụ, vd "--debug-info false" (xem jar_patcher_a17.sh)
-  java -jar "${BAKSMALI_JAR:-$TOOLS_DIR/baksmaliv2.jar}" d $api_flag $BAKSMALI_OPTS "$dex" -o "$smali_dir" || {
+    java -jar "$TOOLS_DIR/baksmaliv2.jar" d $api_flag "$dex" -o "$smali_dir" || {
       err "baksmali failed to disassemble $(basename "$dex")"
       return 1
     }
@@ -172,7 +171,7 @@ recompile_jar() {
       dex_name="${dir_name#smali_}.dex"
     fi
 
-    java -jar "${SMALI_JAR:-$TOOLS_DIR/smaliv2.jar}" a $api_flag "$smali_dir" -o "$output_dir/$dex_name" || {
+    java -jar "$TOOLS_DIR/smaliv2.jar" a $api_flag "$smali_dir" -o "$output_dir/$dex_name" || {
       err "smali failed to assemble $dir_name"
       return 1
     }
