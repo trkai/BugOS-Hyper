@@ -843,6 +843,208 @@ apply_a17_extra_services() {
   patch_notification_wake "$decompile_dir"
 }
 
+# ---------------------------------------------------------------------------
+# Giả trạng thái bootloader ở tầng Java (android.os.SystemProperties).
+#
+# VÌ SAO PHẢI LÀM Ở ĐÂY, KHÔNG PHẢI Ở CMDLINE/BUILD.PROP:
+#   Đã kiểm chứng trên máy thật (annibale, OS4.0.5.0.XPKCNXM):
+#     /proc/cmdline  có "androidboot.verifiedbootstate=green" (vá vendor_boot)
+#     getprop        vẫn trả "orange"
+#   Nguyên nhân: bootloader truyền androidboot.verifiedbootstate và
+#   androidboot.vbmeta.device_state qua BOOTCONFIG, không qua cmdline. init áp
+#   bootconfig TRƯỚC cmdline, mà ro.* là prop ghi-một-lần -> giá trị của mình
+#   đến sau nên bị bỏ. build.prop cũng thua vì lý do y hệt.
+#   Hệ quả: chỉ prop nào bootloader KHÔNG đặt thì mới giả được (ví dụ
+#   ro.boot.realme.lockstate=1 có mặt trên máy, chứng minh phần nối build.prop
+#   vẫn chạy đúng).
+#
+#   Play Store và VNeID đều đọc prop này từ tầng Java, nên hook vào
+#   SystemProperties.get() chặn được cả hai. Hook chỉ khớp đúng 6 key dưới đây,
+#   mọi key khác đi tiếp xuống native như cũ, nên fs_mgr/init (đọc bằng native)
+#   không bị ảnh hưởng.
+#
+# Bật/tắt bằng boot_state_spoof trong config.env (mặc định bật).
+apply_boot_state_spoof() {
+  local decompile_dir="$1"
+
+  local spoof
+  spoof=$(grep -m1 '^boot_state_spoof=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+  if [ "$spoof" = "false" ]; then
+    log "BootStateSpoof: boot_state_spoof=false - bỏ qua"
+    return 0
+  fi
+
+  local sp
+  sp=$(find "$decompile_dir" -type f -name "SystemProperties.smali" 2>/dev/null | head -n 1)
+  if [ -z "$sp" ]; then
+    warn "BootStateSpoof: không thấy android/os/SystemProperties.smali - bỏ qua"
+    return 0
+  fi
+
+  # Chọn thư mục smali để đặt class mới (ưu tiên classes.dex)
+  local smali_root="$decompile_dir/smali"
+  [ -d "$smali_root" ] || smali_root=$(find "$decompile_dir" -maxdepth 1 -type d -name "smali*" | sort | head -n 1)
+  if [ -z "$smali_root" ] || [ ! -d "$smali_root" ]; then
+    warn "BootStateSpoof: không thấy thư mục smali - bỏ qua"
+    return 0
+  fi
+
+  mkdir -p "$smali_root/com/bugos/spoof"
+  cat > "$smali_root/com/bugos/spoof/BootState.smali" << 'SMALIEOF'
+.class public final Lcom/bugos/spoof/BootState;
+.super Ljava/lang/Object;
+.source "BootState.java"
+
+
+# static fields
+.field private static final MAP:Ljava/util/HashMap;
+
+
+# direct methods
+.method static constructor <clinit>()V
+    .locals 3
+
+    new-instance v0, Ljava/util/HashMap;
+
+    invoke-direct {v0}, Ljava/util/HashMap;-><init>()V
+
+    sput-object v0, Lcom/bugos/spoof/BootState;->MAP:Ljava/util/HashMap;
+
+    const-string v1, "ro.boot.verifiedbootstate"
+
+    const-string v2, "green"
+
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "ro.boot.vbmeta.device_state"
+
+    const-string v2, "locked"
+
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "ro.secureboot.lockstate"
+
+    const-string v2, "locked"
+
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "vendor.boot.verifiedbootstate"
+
+    const-string v2, "green"
+
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "vendor.boot.vbmeta.device_state"
+
+    const-string v2, "locked"
+
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "ro.boot.flash.locked"
+
+    const-string v2, "1"
+
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    return-void
+.end method
+
+
+.method public static map(Ljava/lang/String;)Ljava/lang/String;
+    .locals 1
+
+    if-nez p0, :cond_0
+
+    const/4 v0, 0x0
+
+    return-object v0
+
+    :cond_0
+    sget-object v0, Lcom/bugos/spoof/BootState;->MAP:Ljava/util/HashMap;
+
+    invoke-virtual {v0, p0}, Ljava/util/HashMap;->get(Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Ljava/lang/String;
+
+    return-object v0
+.end method
+SMALIEOF
+
+  python3 - "$sp" << 'PYEOF'
+import re, sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+s = path.read_text()
+
+SIGS = [
+    "get(Ljava/lang/String;)Ljava/lang/String;",
+    "get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+]
+MARK = "bugos_bootstate_orig"
+GUARD = (
+    "    invoke-static {p0}, Lcom/bugos/spoof/BootState;->map(Ljava/lang/String;)Ljava/lang/String;\n"
+    "\n"
+    "    move-result-object v0\n"
+    "\n"
+    "    if-eqz v0, :" + MARK + "\n"
+    "\n"
+    "    return-object v0\n"
+    "\n"
+    "    :" + MARK + "\n"
+)
+
+patched = 0
+for sig in SIGS:
+    m = re.search(r"\.method [^\n]*" + re.escape(sig) + r"\n(.*?)\.end method", s, re.S)
+    if not m:
+        print("khong thay method: " + sig)
+        continue
+    body = m.group(1)
+    if MARK in body:
+        print("da va roi: " + sig)
+        continue
+
+    # cần ít nhất 1 thanh ghi local (v0)
+    lm = re.search(r"^(\s*)\.locals (\d+)\s*$", body, re.M)
+    rm = re.search(r"^(\s*)\.registers (\d+)\s*$", body, re.M)
+    if lm:
+        indent, n = lm.group(1), int(lm.group(2))
+        if n < 1:
+            body = body[:lm.start()] + f"{indent}.locals 1" + body[lm.end():]
+            lm = re.search(r"^(\s*)\.locals (\d+)\s*$", body, re.M)
+        anchor_end = lm.end()
+    elif rm:
+        indent, n = rm.group(1), int(rm.group(2))
+        body = body[:rm.start()] + f"{indent}.registers {n + 1}" + body[rm.end():]
+        rm = re.search(r"^(\s*)\.registers (\d+)\s*$", body, re.M)
+        anchor_end = rm.end()
+    else:
+        print("khong thay .locals/.registers: " + sig)
+        continue
+
+    body = body[:anchor_end] + "\n\n" + GUARD + body[anchor_end:]
+    s = s[:m.start(1)] + body + s[m.end(1):]
+    patched += 1
+
+if patched == 0:
+    if MARK in s:
+        print("da va truoc do - bo qua")
+        sys.exit(0)
+    sys.exit(1)
+path.write_text(s)
+print(f"da va {patched} method")
+PYEOF
+
+  if grep -q "$MARK" "$sp" 2>/dev/null; then
+    log "BootStateSpoof: SystemProperties.get -> green/locked cho 6 prop boot (chỉ tầng Java)"
+  else
+    warn "BootStateSpoof: KHÔNG vá được SystemProperties - prop vẫn là giá trị thật"
+  fi
+}
+
 # Main framework patching function (Android 16)
 patch_framework() {
   local framework_path="$work_dir/build/baserom/images/system/system/framework/framework.jar"
@@ -859,6 +1061,7 @@ patch_framework() {
   # Apply feature-specific patches based on flags
   apply_framework_signature_patches "$decompile_dir"
   apply_a17_extra_framework "$decompile_dir"
+  apply_boot_state_spoof "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
   # modify_invoke_custom_methods "$decompile_dir"
