@@ -117,6 +117,20 @@ for pname in ${super_list}; do
     fi
 done
 
+# Xoá cây thư mục gốc sau khi đã đóng thành .img: nhường chỗ cho super.img + ZIP.
+#
+# Không có bước này thì lúc đóng super, đĩa phải chứa ĐỒNG THỜI:
+#   cây đã giải nén (~11.5 GB) + các .img vừa tạo (~11.5 GB) = ~23 GB
+#   + super.img 8.5 GB  = ~31.5 GB
+#   + ZIP thành phẩm ~7.5 GB = ~39 GB
+# Volume của runner chỉ có 38 GB -> chết giữa lúc đóng system_ext, log dừng ngay
+# sau "Packing [product.img] success" mà không in lỗi gì (mkfs.erofs bị kill).
+for pname in ${super_list}; do
+    if [ -f "$IMG_DIR/${pname}.img" ]; then
+        rm -rf "$IMG_DIR/${pname}"
+    fi
+done
+
 # Chốt chặn: phải có ít nhất 1 file .img mới đóng super
 if ! ls $IMG_DIR/*.img >/dev/null 2>&1; then
     error "Không có partition .img nào để đóng vào super. Kiểm tra fstype/mkfs.erofs và thư mục config."
@@ -124,6 +138,20 @@ if ! ls $IMG_DIR/*.img >/dev/null 2>&1; then
 fi
 
 # Pack super.img
+# Bảng super size có thể thiếu codename -> nâng lên đúng bằng tổng .img + 128MB.
+# Không có bước này, lpmake báo "not enough space" khi tổng .img lớn hơn bảng.
+neededSize=0
+for pname in ${super_list}; do
+    if [ -f "$IMG_DIR/${pname}.img" ]; then
+        neededSize=$((neededSize + $(stat -c%s "$IMG_DIR/${pname}.img")))
+    fi
+done
+neededSize=$((neededSize + 134217728))
+if [ "$superSize" -lt "$neededSize" ]; then
+    repack "Super size $superSize quá nhỏ (cần $neededSize) -> nâng lên"
+    superSize=$neededSize
+fi
+
 if [[ "$is_ab_device" == false ]]; then
     repack "Packing super.img for A-only device"
     GROUP_SIZE=$((superSize - 134217728))
