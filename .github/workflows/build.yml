@@ -79,15 +79,52 @@ jobs:
           python notify.py upload "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
           sudo -E bash uploadROM.sh
 
+      - name: Upload ROM to Google Drive
+        id: drive
+        if: success()
+        continue-on-error: true
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+          GDRIVE_DIR: ${{ secrets.GDRIVE_DIR }}
+        run: |
+          if [ -z "$RCLONE_CONF" ]; then
+            echo "Chưa cấu hình RCLONE_CONF -> bỏ qua Google Drive"
+            exit 0
+          fi
+
+          ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
+          if [ ! -f "$ROM_ZIP_PATH" ]; then
+            echo "Không thấy file ROM: $ROM_ZIP_PATH"
+            exit 1
+          fi
+
+          DEST="${GDRIVE_DIR:-gdrive:BugOS}"
+          mkdir -p "$HOME/.config/rclone"
+          printf '%s\n' "$RCLONE_CONF" > "$HOME/.config/rclone/rclone.conf"
+
+          echo "Upload lên Google Drive: $DEST"
+          rclone copy "$ROM_ZIP_PATH" "$DEST" --drive-chunk-size 256M --retries 3 --low-level-retries 10 --stats 30s --stats-one-line
+
+          LINK=$(rclone link "$DEST/$(basename "$ROM_ZIP_PATH")" 2>/dev/null || true)
+          if [ -z "$LINK" ]; then
+            echo "Upload xong nhưng không tạo được link chia sẻ"
+            exit 1
+          fi
+
+          echo "Download link (Drive): $LINK"
+          echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
+
       - name: Upload ROM to Gofile.io
         if: success()
         continue-on-error: true
         env:
           GOFILE_TOKEN: ${{ secrets.GOFILE_TOKEN }}
         run: |
-          ROM_ZIP_PATH="out/$(cat bin/ddevice/output_zip.txt)"
-          if [ ! -f "$ROM_ZIP_PATH" ]; then
-            echo "Không thấy file ROM: $ROM_ZIP_PATH"
+          set +e
+          ZIP_NAME=$(cat bin/ddevice/output_zip.txt 2>/dev/null)
+          ROM_ZIP_PATH="out/${ZIP_NAME}"
+          if [ -z "$ZIP_NAME" ] || [ ! -f "$ROM_ZIP_PATH" ]; then
+            echo "Không thấy file ROM ('$ROM_ZIP_PATH') - bỏ qua Gofile"
             exit 0
           fi
 
@@ -100,10 +137,18 @@ jobs:
           LINK=""
           for i in 1 2 3; do
             RES=$(curl -sS --max-time 3600 "${AUTH[@]}" \
-                  -F "file=@${ROM_ZIP_PATH}" https://upload.gofile.io/uploadfile) || RES=""
-            echo "Lần $i: status=$(echo "$RES" | jq -r '.status' 2>/dev/null)"
-            LINK=$(echo "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
+                  -F "file=@${ROM_ZIP_PATH}" https://upload.gofile.io/uploadfile)
+            RC=$?
+            echo "Lần $i: curl exit=$RC, phản hồi ${#RES} byte"
+            if [ "$RC" -ne 0 ] || [ -z "$RES" ]; then
+              echo "  -> không có phản hồi (mạng, hoặc API từ chối)"
+              sleep 10
+              continue
+            fi
+            echo "  status=$(printf '%s' "$RES" | jq -r '.status // "?"' 2>/dev/null)"
+            LINK=$(printf '%s' "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
             [ -n "$LINK" ] && break
+            echo "  -> $(printf '%s' "$RES" | head -c 300)"
             sleep 10
           done
 
@@ -111,7 +156,7 @@ jobs:
             echo "Upload thành công! Link tải: $LINK"
             echo "DOWNLOAD_LINK=$LINK" >> "$GITHUB_ENV"
           else
-            echo "Upload Gofile thất bại"
+            echo "Upload Gofile thất bại (ROM đã build xong, chỉ thiếu link dự phòng)"
           fi
 
       - name: Success Notification
