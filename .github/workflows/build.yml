@@ -87,7 +87,10 @@ jobs:
             rm -f "$RUNNER_TEMP/ndk.zip"
           fi
 
-          "$CC" -O2 -Wall -static -o "$OUT" "$SRC"
+          "$CC" -O2 -Wall -static -o "$OUT" "$SRC" || {
+            echo "Link static thất bại - thử dynamic"
+            "$CC" -O2 -Wall -o "$OUT" "$SRC"
+          }
           file "$OUT"
           ls -la "$OUT"
 
