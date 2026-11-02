@@ -253,7 +253,24 @@ Patch_services () {
 
 FAILED=0
 Patch_Framework || { FAILED=1; restore_jar "$(get_file_dir framework.jar)"; }
-Patch_services  || { FAILED=1; restore_jar "$(get_file_dir services.jar)"; }
+
+# kaorios_services_hook=false: bỏ vá services.jar (hook SystemServer).
+#
+# VÌ SAO CÓ CỜ NÀY:
+#   Bản OS4 từng pass VNeID dùng code KouseiPatcher tháng 4. Ở bản đó toolbox.py
+#   có lỗi `patches.append(SERVICES_PATCH)` -> áp cả 5 patch framework lên cây
+#   smali của services.jar -> patch đầu tiên không tìm thấy class -> sys.exit(1)
+#   -> services.jar LUÔN bị khôi phục từ backup, tức KHÔNG hề được vá.
+#   Commit 0a3ae19 (02/11) sửa lỗi đó, nên từ đó services.jar mới thật sự được
+#   vá bằng SERVICES_PATCH (KaoriosHook->initSystemServer trong SystemServer.run).
+#   Đây là khác biệt chức năng duy nhất trong chuỗi fake lock giữa bản chạy được
+#   và bản hiện tại, nên để false sẽ tái lập đúng cấu hình cũ.
+SERVICES_HOOK=$(grep -m1 '^kaorios_services_hook=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+if [ "$SERVICES_HOOK" = "false" ]; then
+    patch "Bỏ qua services.jar (kaorios_services_hook=false) - giống bản build cũ"
+else
+    Patch_services  || { FAILED=1; restore_jar "$(get_file_dir services.jar)"; }
+fi
 
 if [ "$FAILED" -ne 0 ]; then
     patch "CẢNH BÁO: Fake Lock KHÔNG được áp đầy đủ. ROM vẫn boot bình thường nhưng"
@@ -261,5 +278,9 @@ if [ "$FAILED" -ne 0 ]; then
     exit 0
 fi
 
-patch "Fake Lock: đã áp framework.jar + services.jar"
+if [ "$SERVICES_HOOK" = "false" ]; then
+    patch "Fake Lock: đã áp framework.jar (services.jar bị bỏ qua theo cờ)"
+else
+    patch "Fake Lock: đã áp framework.jar + services.jar"
+fi
 exit 0
