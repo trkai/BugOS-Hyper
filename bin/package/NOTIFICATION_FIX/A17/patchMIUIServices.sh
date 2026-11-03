@@ -105,9 +105,13 @@ find_and_replace() {
 #       const-string "CN"
 #       Build.getRegion()  -> equals -> sput-boolean sCnModel
 #
-# Nên "CN model" giờ chỉ là  so sánh region với "CN". ROM này đặt
-# ro.miui.region=VN nên sCnModel đã là false sẵn - không cần vá, và log cũ
-# ("không vá được CN_MODEL") chỉ là báo động sai.
+# Build.getRegion() đọc ro.miui.region (chuỗi này có trong miui-framework.jar).
+#
+# LƯU Ý: build.prop KHÔNG phải nguồn đúng của ro.miui.region. Lúc boot,
+# /system_ext/etc/cust/<variant>/cust.prop được nạp SAU và ghi đè. Trên annibale
+# OS4.0.5.0: build.prop ghi ro.miui.cust_variant=vn + ro.miui.region=VN, nhưng
+# không có cust/vn - chỉ có cust/cn*, và getprop thực tế trả cn/CN. Đọc build.prop
+# là đọc sai và bỏ qua luôn bước vá.
 #
 # Ở đây: nếu còn field CN_MODEL thì vá như A16; nếu không, đọc cấu trúc mới và
 # chỉ vá khi region thực sự là CN.
@@ -150,8 +154,25 @@ patch_cn_model() {
         return 0
     fi
 
-    region=$(grep -m1 '^ro\.miui\.region=' "$MAIN_FOLDER/system/system/build.prop" 2>/dev/null \
-        | cut -d= -f2 | tr -d '\r\n ')
+    # region thật: cust.prop của biến thể thắng build.prop lúc boot.
+    local variant cust_prop
+    variant=$(grep -rh -m1 '^ro\.miui\.cust_variant=' \
+        "$MAIN_FOLDER/system/system/build.prop" "$MAIN_FOLDER"/product/etc/build.prop 2>/dev/null \
+        | head -n1 | cut -d= -f2 | tr -d '\r\n ')
+    # variant trỏ vào thư mục không tồn tại thì boot rơi về biến thể có sẵn đầu tiên
+    if [[ -z $variant || ! -d "$MAIN_FOLDER/system_ext/etc/cust/$variant" ]]; then
+        variant=$(find "$MAIN_FOLDER/system_ext/etc/cust" -mindepth 1 -maxdepth 1 -type d \
+            -name 'cn*' 2>/dev/null | sort | head -n1 | sed 's|.*/||')
+        [[ -n $variant ]] && patch "CN policy: variant build.prop không có cust dir -> dùng '$variant'"
+    fi
+    cust_prop="$MAIN_FOLDER/system_ext/etc/cust/${variant:-vn}/cust.prop"
+    if [[ -f $cust_prop ]]; then
+        region=$(grep -m1 '^ro\.miui\.region=' "$cust_prop" | cut -d= -f2 | tr -d '\r\n ')
+    fi
+    if [[ -z $region ]]; then
+        region=$(grep -m1 '^ro\.miui\.region=' "$MAIN_FOLDER/system/system/build.prop" 2>/dev/null \
+            | cut -d= -f2 | tr -d '\r\n ')
+    fi
     if [[ -z $region ]]; then
         region=$(grep -rh -m1 '^ro\.miui\.region=' "$MAIN_FOLDER"/product/etc/build.prop 2>/dev/null \
             | cut -d= -f2 | tr -d '\r\n ')
