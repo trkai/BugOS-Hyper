@@ -135,6 +135,31 @@ decompile_jar() {
   echo "$output_dir"
 }
 
+# sed trên MỌI thư mục smali của một jar đã decompile.
+#
+# Vì sao cần: decompile_jar đặt classes.dex vào smali/, classes2.dex vào
+# smali_classes2/, classes3.dex vào smali_classes3/... Patch nào chỉ trỏ
+# "$dir/smali/<path>" thì:
+#   - hụt im lặng mọi class nằm trong classes2+ (không báo gì, ROM vẫn build),
+#   - hoặc in "sed: can't read ... No such file" khi class không có ở dex đầu.
+# Cả hai đều là "vá không có tác dụng" chứ không phải lỗi build.
+#
+# Dùng: sed_all_smali "$decompile_dir" 's/cu/moi/g' "com/example/Foo.smali"
+# Trả 0 nếu vá được ít nhất 1 file, 1 nếu không tìm thấy ở đâu (đã warn).
+sed_all_smali() {
+  local decompile_dir="$1" expr="$2" rel="$3"
+  local hits=0 d
+  for d in "$decompile_dir"/smali "$decompile_dir"/smali_classes*; do
+    [ -f "$d/$rel" ] || continue
+    sed -i "$expr" "$d/$rel" && hits=$((hits + 1))
+  done
+  if [ "$hits" -eq 0 ]; then
+    warn "không có $rel trong $decompile_dir - bỏ qua (class có thể đã bị gỡ ở bản ROM này)"
+    return 1
+  fi
+  return 0
+}
+
 # Recompile JAR using smali v2
 # Uses API_LEVEL if set (e.g. API_LEVEL=33 for Android 13)
 recompile_jar() {

@@ -1282,14 +1282,17 @@ apply_miui_services_disable_secure_flag() {
 # Apply Gboard patches
 apply_miui_services_gboard() {
   local decompile_dir="$1"
+  local expr='s/com.baidu.input_mi/com.google.android.inputmethod.latin/g'
 
-  # Add Gboard
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/android/server/devicepolicy/DevicePolicyManagerServiceStubImpl.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/android/server/input/InputManagerServiceStubImpl.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/android/server/inputmethod/InputMethodManagerServiceImpl.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/android/server/wm/ActivityTaskSupervisorImpl.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/android/server/wm/MiuiSplitInputMethodImpl.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/miui/server/security/AppBehaviorService.smali"
+  # sed_all_smali: quét cả smali/, smali_classes2/, ... - xem apk_ops.sh.
+  # Bản cũ chỉ trỏ smali/ nên AppBehaviorService (nằm ở dex khác, hoặc đã bị
+  # gỡ khỏi bản ROM này) in "sed: can't read" và patch mất tác dụng.
+  sed_all_smali "$decompile_dir" "$expr" "com/android/server/devicepolicy/DevicePolicyManagerServiceStubImpl.smali"
+  sed_all_smali "$decompile_dir" "$expr" "com/android/server/input/InputManagerServiceStubImpl.smali"
+  sed_all_smali "$decompile_dir" "$expr" "com/android/server/inputmethod/InputMethodManagerServiceImpl.smali"
+  sed_all_smali "$decompile_dir" "$expr" "com/android/server/wm/ActivityTaskSupervisorImpl.smali"
+  sed_all_smali "$decompile_dir" "$expr" "com/android/server/wm/MiuiSplitInputMethodImpl.smali"
+  sed_all_smali "$decompile_dir" "$expr" "com/miui/server/security/AppBehaviorService.smali"
 
   echo "Gboard patches applied to miui-services.jar"
 }
@@ -1364,12 +1367,13 @@ patch_miui_services() {
 # Apply Gboard patches
 apply_miui_framework_gboard() {
   local decompile_dir="$1"
+  local expr='s/com.baidu.input_mi/com.google.android.inputmethod.latin/g'
 
-  # Add Gboard
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/android/inputmethodservice/InputMethodServiceInjector.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/android/view/inputmethod/InputMethodManagerStubImpl.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/android/internal/os/AnrEnhanceImpl.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/miui/util/HapticFeedbackUtil.smali"
+  # sed_all_smali: quét cả smali/, smali_classes2/, ... - xem apk_ops.sh
+  sed_all_smali "$decompile_dir" "$expr" "android/inputmethodservice/InputMethodServiceInjector.smali"
+  sed_all_smali "$decompile_dir" "$expr" "android/view/inputmethod/InputMethodManagerStubImpl.smali"
+  sed_all_smali "$decompile_dir" "$expr" "com/android/internal/os/AnrEnhanceImpl.smali"
+  sed_all_smali "$decompile_dir" "$expr" "miui/util/HapticFeedbackUtil.smali"
 
   echo "Gboard patches applied to miui-framework.jar"
 }
