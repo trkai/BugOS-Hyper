@@ -203,10 +203,10 @@ for prop in \
     "$work_dir/build/baserom/images/odm/etc/build.prop"; do
     if [ -f "$prop" ]; then
         val=$(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device|ro\.build\.product)=" "$prop" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
-        if [ -n "$val" ] && [ "$val" != "missi" ]; then
-            detected_codename="$val"
-            break
-        fi
+        case "$val" in
+            ""|missi|miproduct|product|generic|unknown|xiaomi|device|phone) ;;
+            *) detected_codename="$val"; break ;;
+        esac
     fi
 done
 
@@ -274,10 +274,10 @@ if [ -z "$CURRENT_CODENAME" ] || [ "$CURRENT_CODENAME" = "missi" ]; then
         "$work_dir/build/baserom/images/system/system/build.prop"; do
         if [ -f "$prop" ]; then
             val=$(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device)=" "$prop" | head -n 1 | cut -d'=' -f2 | tr -d '\r\n ')
-            if [ -n "$val" ] && [ "$val" != "missi" ]; then
-                CURRENT_CODENAME="$val"
-                break
-            fi
+            case "$(echo "$val" | tr '[:upper:]' '[:lower:]')" in
+                ""|missi|miproduct|product|generic|unknown|xiaomi|device|phone) ;;
+                *) CURRENT_CODENAME="$val"; break ;;
+            esac
         fi
     done
 fi

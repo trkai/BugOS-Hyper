@@ -11,7 +11,7 @@ baserom_type=$(cat $work_dir/bin/ddevice/romtype.txt 2>/dev/null | tr -d '\r\n')
 
 # ƯU TIÊN LẤY CODENAME CHUẨN ĐÃ ĐƯỢC XỬ LÝ
 device_f=$(cat $work_dir/bin/ddevice/device_f.txt 2>/dev/null | tr -d '\r\n')
-if [[ -z "$device_f" || "$device_f" == "missi" ]]; then
+if [[ -z "$device_f" || "$device_f" == "missi" || "$device_f" == "miproduct" || "$device_f" == "product" || "$device_f" == "devicecode" ]]; then
     device_f=$(cat $work_dir/bin/ddevice/device_code.txt 2>/dev/null | tr -d '\r\n')
 fi
 device_code="$device_f"
