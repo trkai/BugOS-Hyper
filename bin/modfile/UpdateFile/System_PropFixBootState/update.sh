@@ -1,9 +1,8 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0
 #
-# Ghi de trang thai bootloader o tang VUNG PROPERTY, bang mot init service chay
-# duoi quyen root ngay trong ROM - khong can Magisk/KernelSU, khong can nguoi
-# dung root may.
+# Ghi de trang thai bootloader o tang VUNG PROPERTY, chay bang init `exec` ngay
+# trong ROM - khong can Magisk/KernelSU, khong can nguoi dung root may.
 #
 # VI SAO CAN TANG NAY
 #   Tren base OS4, bootloader cong bo androidboot.verifiedbootstate=orange truoc
@@ -25,15 +24,20 @@
 #   compiler cross). Function doc thang dinh dang /dev/__properties__/*, khong
 #   dung bionic, nen build bang aarch64-linux-gnu-gcc -static la du - khong can
 #   NDK ~5GB (runner tung het dia ngay luc unzip NDK).
-#   Mod nay chi copy binary vao /system/bin va them init service.
+#   Mod nay copy binary vao /system/bin, them init `exec`, va patch SELinux
+#   policy cho phep init exec binary do.
 #
-#   Service chay 2 lan: post-fs-data (som) va boot_completed (du phong). Binary
-#   idempotent nen chay lai khong sao.
+#   Vi sao phai patch policy: root KHONG du. Doc plat_sepolicy.cil tren may:
+#     (allow init property_data_file (file (... write ... map ...)))  <- co
+#     (allow su   property_data_file ...)                            <- khong co
+#   Nen service seclabel su:s0 chay duoc nhung ghi prop that bai. Chi init ghi
+#   duoc, vi init la chu vung property. Muon binary chay trong domain init thi
+#   phai `exec` khong transition - va policy phai cho init exec system_file
+#   (mac dinh bi chan: avc denied { execute_no_trans }).
 #
-#   Ba duong vao, deu duoc thu moi lan chay: `exec` tu init (khong transition
-#   domain -> o lai u:r:init:s0, domain duy nhat duoc ghi vung property), roi
-#   den hai service seclabel su:s0 va init:s0. Duong nao SELinux chan thi init
-#   chi log loi roi di tiep, KHONG anh huong boot.
+#   Binary chay 2 lan: post-fs-data (som) va boot_completed (du phong).
+#   Idempotent nen chay lai khong sao. Loi thi chi ghi log roi thoat, KHONG
+#   boot loop.
 #
 # Bat/tat bang prop_fix_boot_state trong config.env.
 
@@ -71,49 +75,80 @@ mkdir -p "$(dirname "$DEST_BIN")" "$(dirname "$DEST_RC")" || {
 cp -f "$SRC" "$DEST_BIN" || { warn "PropFix: copy binary thất bại - bỏ qua"; exit 0; }
 chmod 0755 "$DEST_BIN" || { warn "PropFix: chmod binary thất bại - bỏ qua"; exit 0; }
 
+# ---------------------------------------------------------------------------
+# SELinux: init bị cấm exec file system_file
+#
+# Log thật trên máy (annibale):
+#   avc: denied { execute_no_trans } for comm="init"
+#        path="/system/bin/bugos_propfix"
+#        scontext=u:r:init:s0 tcontext=u:object_r:system_file:s0
+#
+# Và trong policy chỉ có:
+#   (allow init property_data_file (file (... write ... map ...)))
+#   (allow su   property_data_file ...)   <- KHÔNG có
+#
+# Nên: chạy bằng root/su KHÔNG ghi được vùng property. Chỉ domain init ghi
+# được. Vì vậy phải cho init exec binary của mod (exec không transition domain
+# -> con ở lại u:r:init:s0), rồi binary tự ghi vùng property.
+#
+# ROM này KHÔNG có precompiled_sepolicy và KHÔNG có /sepolicy ở ramdisk - init
+# biên dịch policy từ các file .cil text mỗi lần boot, nên thêm một dòng vào
+# plat_sepolicy.cil là có hiệu lực. Kiểm tra lại bằng:
+#   adb shell ls /system/etc/selinux/precompiled_sepolicy   -> phải không tồn tại
+# ---------------------------------------------------------------------------
+CIL="$IMG/system/system/etc/selinux/plat_sepolicy.cil"
+CIL_MARK="bugos_propfix_exec"
+
+if [ -f "$CIL" ]; then
+    if grep -q "$CIL_MARK" "$CIL"; then
+        mods "SELinux: plat_sepolicy.cil đã patch trước đó - bỏ qua"
+    else
+        cat >> "$CIL" << 'CILEOF'
+
+; BugOS propfix - cho init exec binary cua mod.
+; Thieu rule nay: avc denied { execute_no_trans } init -> system_file,
+; binary khong bao gio duoc nap, prop giu nguyen orange.
+(allow init system_file (file (execute execute_no_trans)))
+CILEOF
+        if grep -q "$CIL_MARK" "$CIL"; then
+            mods "SELinux: đã cho init exec /system/bin/bugos_propfix"
+        else
+            warn "SELinux: ghi plat_sepolicy.cil thất bại - propfix sẽ không chạy"
+        fi
+    fi
+else
+    warn "SELinux: không thấy $CIL - propfix sẽ bị chặn exec"
+fi
+
 cat > "$DEST_RC" << 'RCEOF'
 # BugOS - ghi de trang thai bootloader o tang vung property.
 # Xem bin/modfile/UpdateFile/System_PropFixBootState/update.sh
 #
-# Ba duong, chay het, cai nao duoc SELinux cho phep thi ghi duoc:
-#   1. exec  -> init fork roi exec thang binary, KHONG transition domain, nen
-#               process chay trong u:r:init:s0 - domain duy nhat duoc ghi vung
-#               property. Day la duong nhieu kha nang thang nhat.
-#   2. service seclabel su:s0   -> dung neu policy ROM co domain su.
-#   3. service seclabel init:s0 -> du phong khi (1) bi chan vi ly do khac.
-# Ca ba deu oneshot + idempotent, loi chi log roi thoat, khong boot loop.
+# Chi dung `exec`, KHONG dung service. Ly do, do tu policy tren may:
+#   (allow init property_data_file (file (... write ... map ...)))   <- co
+#   (allow su   property_data_file ...)                            <- khong co
+# Nen service seclabel su:s0 (root) van KHONG ghi duoc vung property. Chi con
+# cach de init exec truc tiep: exec khong transition domain, process o lai
+# u:r:init:s0, va init la chu vung property nen ghi duoc.
+#
+# De exec duoc thi policy phai co rule cho init exec system_file - update.sh
+# patch plat_sepolicy.cil. Thieu rule do thi se thay:
+#   avc: denied { execute_no_trans } comm="init" ... tcontext=u:object_r:system_file:s0
+#
+# Chay 2 lan (post-fs-data + boot_completed) vi binary idempotent; lan sau chi
+# ghi lai neu co gi do ghi de.
 
 on post-fs-data
     exec -- /system/bin/bugos_propfix
-    start bugos_propfix_su
-    start bugos_propfix_init
 
 on property:sys.boot_completed=1
     exec -- /system/bin/bugos_propfix
-    start bugos_propfix_su
-    start bugos_propfix_init
-
-service bugos_propfix_su /system/bin/bugos_propfix
-    class late_start
-    user root
-    group root system
-    oneshot
-    seclabel u:r:su:s0
-    disabled
-
-service bugos_propfix_init /system/bin/bugos_propfix
-    class late_start
-    user root
-    group root system
-    oneshot
-    seclabel u:r:init:s0
-    disabled
 RCEOF
 
 chmod 0644 "$DEST_RC"
 
-if grep -q "start bugos_propfix_su" "$DEST_RC" && [ -x "$DEST_BIN" ]; then
-    mods "PropFix: /system/bin/bugos_propfix + init service (ghi thẳng kho prop, không cần root)"
+if grep -q "exec -- /system/bin/bugos_propfix" "$DEST_RC" && [ -x "$DEST_BIN" ]; then
+    mods "PropFix: /system/bin/bugos_propfix + exec từ init (ghi thẳng kho prop)"
 else
     warn "PropFix: cài đặt không như mong đợi - kiểm tra $DEST_RC"
 fi

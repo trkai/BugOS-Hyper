@@ -16,6 +16,17 @@
  *   Ban OS3 pass duoc vi bootloader base do KHONG cong bo prop nay, nen
  *   build.prop cua mod dien vao -> green. Base OS4 thi da biet truoc.
  *
+ * VI SAO PHAI CHAY TRONG DOMAIN init
+ *   Khong phai root la du. Doc policy tren may (plat_sepolicy.cil):
+ *
+ *     (allow init property_data_file (file (... write ... map ...)))   <- CO
+ *     (allow su   property_data_file ...)                             <- KHONG CO
+ *
+ *   Nghia la domain su (root shell) VAN KHONG ghi duoc vung property. Chi init
+ *   ghi duoc, vi init la chu cua vung do. Nen binary phai duoc init exec truc
+ *   tiep (khong transition domain) - va vi vay update.sh patch them mot rule
+ *   cho init exec file system_file, xem System_PropFixBootState/update.sh.
+ *
  * CACH LAM
  *   Doc/ghi thang dinh dang vung property trong /dev/__properties__/, khong qua
  *   bionic. Moi prop nam trong mot file (mmap MAP_SHARED) theo layout:
@@ -37,8 +48,10 @@
  *     truoc do phai la value sach (NUL-terminated, toan ky tu in duoc) -> khong
  *     ghi nham vao giua value cua prop khac
  *   - gia tri deu ngan hon PROP_VALUE_MAX (92)
- *   - chay tu init: loi thi chi in log roi thoat, khong anh huong boot, khong
+ *   - chay tu init: loi thi chi ghi log roi thoat, khong anh huong boot, khong
  *     boot loop. Chay lai nhieu lan vo hai (idempotent).
+ *   - moi ket qua ghi ra /dev/kmsg voi tien to BUGOS_PROP, doc lai bang
+ *     `adb shell dmesg | grep BUGOS_PROP` (shell doc duoc dmesg tren ROM nay).
  *
  * Build: aarch64-linux-gnu-gcc -Os -static -no-pie (xem .github/workflows/build.yml
  *        buoc "Build prop-fix helper").
@@ -47,6 +60,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdarg.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -55,6 +70,8 @@
 
 #define PROP_VALUE_MAX 92
 #define PROP_DIR "/dev/__properties__"
+#define KMSG "/dev/kmsg"
+#define TAG "BUGOS_PROP: "
 
 static const struct {
     const char *key;
@@ -69,6 +86,43 @@ static const struct {
 };
 
 #define TARGET_COUNT ((int)(sizeof(TARGETS) / sizeof(TARGETS[0])))
+
+/* Danh sach dang hoat dong: mac dinh la TARGETS, hoac mot cap tu argv. */
+static const char *g_key[TARGET_COUNT];
+static const char *g_val[TARGET_COUNT];
+static size_t g_klen[TARGET_COUNT];
+static size_t g_vlen[TARGET_COUNT];
+static int g_hits[TARGET_COUNT];
+static int g_n;
+
+/* Log ra /dev/kmsg. Loi thi im lang, khong duoc lam chet binary. */
+static void klog(const char *fmt, ...)
+{
+    static int fd = -2;
+    char buf[256];
+    va_list ap;
+    int n;
+
+    if (fd == -2) {
+        fd = open(KMSG, O_WRONLY | O_CLOEXEC);
+    }
+    if (fd < 0) {
+        return;
+    }
+
+    n = snprintf(buf, sizeof(buf), "<6>" TAG);
+    if (n < 0 || (size_t)n >= sizeof(buf)) {
+        return;
+    }
+    va_start(ap, fmt);
+    n += vsnprintf(buf + n, sizeof(buf) - (size_t)n, fmt, ap);
+    va_end(ap);
+    if (n > 0) {
+        if (write(fd, buf, (size_t)n) < 0) {
+            /* bo qua */
+        }
+    }
+}
 
 /*
  * Value cu co hop le khong: phai co NUL trong 92 byte va truoc NUL toan ky tu
@@ -91,110 +145,130 @@ static int value_sane(const char *v)
     return 0;
 }
 
-/*
- * Quet mot file vung property, ghi de moi lan xuat hien cua key.
- * Tra ve so lan da ghi.
- */
-static int patch_file(const char *path, const char *key, const char *val)
+/* Ghi de mot prop tai vi tri ten da tim thay. */
+static void poke(char *name_at)
 {
-    struct stat st;
-    const char *base;
-    const char *end;
-    const char *p;
-    char *serialp;
-    size_t size;
-    size_t klen = strlen(key);
-    size_t vlen = strlen(val);
+    char *value_start = name_at - PROP_VALUE_MAX;
+    char *serialp = name_at - PROP_VALUE_MAX - 4;
     uint32_t serial;
     uint32_t next;
-    int hits = 0;
+    int t;
+
+    for (t = 0; t < g_n; t++) {
+        if (strncmp(name_at, g_key[t], g_klen[t]) != 0) {
+            continue;
+        }
+        if (name_at[g_klen[t]] != '\0') {
+            continue;
+        }
+        if (!value_sane(value_start)) {
+            continue;
+        }
+
+        memcpy(&serial, serialp, sizeof(serial));
+
+        /* dirty -> value -> clean, y nhu bionic */
+        next = serial | 1u;
+        memcpy(serialp, &next, sizeof(next));
+        memcpy(value_start, g_val[t], g_vlen[t]);
+        value_start[g_vlen[t]] = '\0';
+        __sync_synchronize();
+        next = (serial | 1u) + 1u;
+        memcpy(serialp, &next, sizeof(next));
+
+        g_hits[t]++;
+    }
+}
+
+/*
+ * Quet mot file vung property mot lan, ghi de moi target tim thay.
+ * *err duoc dat khi khong mo duoc file.
+ */
+static void patch_file(const char *path, int *err)
+{
+    struct stat st;
+    char *base;
+    char *p;
+    size_t size;
     int fd;
 
-    if (vlen >= PROP_VALUE_MAX) {
-        return 0;
-    }
+    *err = 0;
 
     fd = open(path, O_RDWR | O_CLOEXEC);
     if (fd < 0) {
-        return 0;
+        *err = errno;
+        return;
     }
     if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size < 128) {
         close(fd);
-        return 0;
+        return;
     }
 
     size = (size_t)st.st_size;
     base = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
     if (base == MAP_FAILED) {
-        return 0;
+        *err = errno;
+        return;
     }
 
-    end = base + size;
-    for (p = base; (size_t)(end - p) > klen; p++) {
-        char *value_start;
-
-        if (memcmp(p, key, klen) != 0) {
+    for (p = base; (size_t)(base + size - p) > 96; p++) {
+        /* Moi key deu bat dau bang 'r' hoac 'v' - loc nhanh */
+        if (*p != 'r' && *p != 'v') {
             continue;
         }
-        /* Ten phai ket thuc ngay tai day */
-        if (p[klen] != '\0') {
-            continue;
-        }
-        /* Phai con du cho phia truoc: serial(4) + value(92) */
+        /* Phai con du phia truoc: serial(4) + value(92) */
         if ((size_t)(p - base) < (size_t)(4 + PROP_VALUE_MAX)) {
             continue;
         }
-
-        value_start = (char *)p - PROP_VALUE_MAX;
-        if (!value_sane(value_start)) {
-            continue;
-        }
-
-        serialp = (char *)p - PROP_VALUE_MAX - 4;
-        memcpy(&serial, serialp, sizeof(serial));
-
-        /* dirty -> value -> clean, y nhu bionic */
-        next = serial | 1u;
-        memcpy(serialp, &next, sizeof(next));
-        memcpy(value_start, val, vlen);
-        value_start[vlen] = '\0';
-        __sync_synchronize();
-        next = (serial | 1u) + 1u;
-        memcpy(serialp, &next, sizeof(next));
-
-        hits++;
-        p += klen;
+        poke(p);
     }
 
-    munmap((void *)base, size);
-    return hits;
+    munmap(base, size);
 }
 
-/* Ghi mot cap key/value tren toan bo vung property. Tra ve so lan ghi duoc. */
-static int write_one(const char *key, const char *val)
+/* Quet toan bo vung property mot lan cho g_n target dang hoat dong. */
+static void patch_all(void)
 {
     DIR *d;
     struct dirent *de;
     char path[512];
-    int hits = 0;
+    int files = 0;
+    int failed = 0;
+    int first_err = 0;
+    int t;
 
     d = opendir(PROP_DIR);
     if (d == NULL) {
-        printf("bugos_propfix: khong mo duoc %s\n", PROP_DIR);
-        return 0;
+        klog("khong mo duoc " PROP_DIR " errno=%d", errno);
+        printf("bugos_propfix: khong mo duoc " PROP_DIR " (errno=%d)\n", errno);
+        return;
     }
 
     while ((de = readdir(d)) != NULL) {
+        int err = 0;
+
         if (de->d_name[0] == '.') {
             continue;
         }
         snprintf(path, sizeof(path), "%s/%s", PROP_DIR, de->d_name);
-        hits += patch_file(path, key, val);
+        patch_file(path, &err);
+        if (err != 0) {
+            failed++;
+            if (first_err == 0) {
+                first_err = err;
+            }
+        } else {
+            files++;
+        }
     }
-
     closedir(d);
-    return hits;
+
+    for (t = 0; t < g_n; t++) {
+        klog("%s=%s -> hits=%d", g_key[t], g_val[t], g_hits[t]);
+    }
+    klog("quét: files=%d open_fail=%d first_errno=%d uids=%d",
+         files, failed, first_err, (int)getuid());
 }
 
 int main(int argc, char **argv)
@@ -205,22 +279,43 @@ int main(int argc, char **argv)
 
     /* Cho phep go tay: bugos_propfix <key> <value> */
     if (argc == 3) {
-        int n = write_one(argv[1], argv[2]);
+        g_n = 1;
+        g_key[0] = argv[1];
+        g_val[0] = argv[2];
+        g_klen[0] = strlen(argv[1]);
+        g_vlen[0] = strlen(argv[2]);
 
-        printf("bugos_propfix: %s=%s -> %d lan ghi\n", argv[1], argv[2], n);
-        return n > 0 ? 0 : 1;
+        if (g_vlen[0] >= PROP_VALUE_MAX) {
+            printf("bugos_propfix: value qua dai\n");
+            return 1;
+        }
+
+        patch_all();
+        printf("bugos_propfix: %s=%s -> %d lan ghi\n",
+               argv[1], argv[2], g_hits[0]);
+        return g_hits[0] > 0 ? 0 : 1;
     }
 
+    g_n = TARGET_COUNT;
+    for (i = 0; i < TARGET_COUNT; i++) {
+        g_key[i] = TARGETS[i].key;
+        g_val[i] = TARGETS[i].val;
+        g_klen[i] = strlen(TARGETS[i].key);
+        g_vlen[i] = strlen(TARGETS[i].val);
+    }
+
+    klog("bat dau uid=%d pid=%d", (int)getuid(), (int)getpid());
     printf("bugos_propfix: bat dau (uid=%d)\n", (int)getuid());
 
-    for (i = 0; i < TARGET_COUNT; i++) {
-        int n = write_one(TARGETS[i].key, TARGETS[i].val);
+    patch_all();
 
-        if (n > 0) {
-            printf("bugos_propfix: %s=%s (%d)\n", TARGETS[i].key, TARGETS[i].val, n);
+    for (i = 0; i < TARGET_COUNT; i++) {
+        if (g_hits[i] > 0) {
+            printf("bugos_propfix: %s=%s (%d)\n",
+                   g_key[i], g_val[i], g_hits[i]);
             ok++;
         } else {
-            printf("bugos_propfix: %s: khong ghi duoc\n", TARGETS[i].key);
+            printf("bugos_propfix: %s: khong ghi duoc\n", g_key[i]);
             bad++;
         }
     }
