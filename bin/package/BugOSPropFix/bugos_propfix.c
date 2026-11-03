@@ -17,7 +17,7 @@
  *   build.prop cua mod dien vao -> green. Base OS4 thi da biet truoc.
  *
  * CACH LAM
- *   Doc/ghi thang dinh dang vung property trong /dev/__properties__/*, khong qua
+ *   Doc/ghi thang dinh dang vung property trong /dev/__properties__/, khong qua
  *   bionic. Moi prop nam trong mot file (mmap MAP_SHARED) theo layout:
  *
  *     struct prop_info { uint32_t serial; char value[92]; char name[]; };

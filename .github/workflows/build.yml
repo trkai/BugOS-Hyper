@@ -77,13 +77,19 @@ jobs:
           # Không dùng NDK: zip r27c giải nén ~5GB, runner hết đĩa giữa lúc unzip
           # (ENOSPC trong liblldb.so) và chết cả job. Binary chỉ cần libc chuẩn,
           # nên cross-gcc của Ubuntu (~120MB) là đủ và không phụ thuộc bionic.
+          #
+          # Phải kèm libc6-dev-arm64-cross: nếu thiếu, gcc không thấy sysroot
+          # arm64 và lấy nhầm /usr/include của host -> "bits/libc-header-start.h:
+          # No such file". `--no-install-recommends` KHÔNG cài kèm gói này.
           CC=aarch64-linux-gnu-gcc
           if ! command -v "$CC" >/dev/null 2>&1; then
             echo "Cài cross-compiler aarch64 ..."
             sudo apt-get update -qq
-            sudo apt-get install -y -qq --no-install-recommends gcc-aarch64-linux-gnu
+            sudo apt-get install -y -qq \
+              gcc-aarch64-linux-gnu libc6-dev-arm64-cross
           fi
           "$CC" --version | head -1
+          echo "sysroot: $(aarch64-linux-gnu-gcc -print-sysroot)"
 
           # -static + -no-pie: ELF tĩnh không cần loader động, chạy được trên
           # Android (kernel Linux, không đụng bionic).
