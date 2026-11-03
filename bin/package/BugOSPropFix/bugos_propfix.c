@@ -250,18 +250,29 @@ static void poke(char *name_at)
 
         /*
          * Thu tu y nhu bionic SystemProperties::Update():
-         *   serial |= dirty -> copy value + NUL -> serial = (len<<24)|(cook+1)
+         *   serial |= dirty -> copy value + NUL -> serial = (len<<24)|((serial|1)+1)
          *
-         * PHAI ghi lai ca byte do dai. Ban cu dung `(serial|1)+1`, giu nguyen
-         * byte cao cu -> ghi "green" (5) de len "orange" (6) thi serial thanh
-         * 0x06000001, bionic doc lai value dai 6 byte -> hong gia tri.
+         * Ba cho deu phai dung:
+         *  1. Ghi lai byte do dai (bit 24..31). Ban cu giu byte cu -> ghi
+         *     "green"(5) de len "orange"(6) thi bionic doc lai 6 byte.
+         *  2. Cookie tinh tu serial DA bat dirty, khong phai serial goc. Dirty
+         *     bit nam trong cookie (bit 0 cua &0xffffff), nen:
+         *        serial   = 0x06000000
+         *        serial|1 = 0x06000001
+         *        +1       = 0x06000002  -> cook = 2, bit0 = 0 (sach)
+         *     Tinh tu serial goc: 0x06000000+1 = 1 -> bit0 = 1, dirty con bat,
+         *     reader coi prop luon "dang ghi do" va khong bao gio doc.
+         *  3. Wake futex ca hai lan nhu AOSP.
          */
         next = serial | 1u;
         memcpy(serialp, &next, sizeof(next));
+        futex_wake_serial((uint32_t *)serialp);
+
         memcpy(value_start, g_val[t], g_vlen[t]);
         value_start[g_vlen[t]] = '\0';
         __sync_synchronize();
-        next = SERIAL_MAKE(g_vlen[t], serial + 1u);
+
+        next = SERIAL_MAKE(g_vlen[t], next + 1u);
         memcpy(serialp, &next, sizeof(next));
         futex_wake_serial((uint32_t *)serialp);
 
@@ -434,7 +445,6 @@ static int selftest(void)
         return 1;
     }
     close(fd);
-    unlink(path);
 
     memcpy(&serial, b + ST_SERIAL_OFF, 4);
 
@@ -465,6 +475,46 @@ static int selftest(void)
         printf("selftest FAIL ten bi ghi de: '%s'\n", (char *)b + ST_NAME_OFF);
         fails++;
     }
+
+    /*
+     * 5b. ghi LAN HAI (init chay binary 2 lan: post-fs-data + boot_completed).
+     * Cookie da khac 0 nen day la duong de tinh sai: neu cookie chi cong tu
+     * serial goc thi sau lan 2 dirty bit van con bat.
+     */
+    free(b);
+    g_hits[0] = 0;
+    patch_file(path, &err);
+
+    b = calloc(1, ST_SIZE);
+    fd = open(path, O_RDONLY);
+    if (fd < 0 || read(fd, b, ST_SIZE) != ST_SIZE) {
+        printf("selftest: doc lai lan 2 loi errno=%d\n", errno);
+        if (fd >= 0) close(fd);
+        unlink(path);
+        free(b);
+        return 1;
+    }
+    close(fd);
+
+    memcpy(&serial, b + ST_SERIAL_OFF, 4);
+
+    if (g_hits[0] != 1) {
+        printf("selftest FAIL lan 2 hits=%d (mong 1)\n", g_hits[0]);
+        fails++;
+    }
+    if (SERIAL_DIRTY(serial)) {
+        printf("selftest FAIL lan 2 dirty con bat, serial=0x%08x\n", serial);
+        fails++;
+    }
+    if (SERIAL_LEN(serial) != 5) {
+        printf("selftest FAIL lan 2 len=%u (mong 5)\n", SERIAL_LEN(serial));
+        fails++;
+    }
+    if (strcmp((char *)b + ST_VALUE_OFF, "green") != 0) {
+        printf("selftest FAIL lan 2 value='%s'\n", (char *)b + ST_VALUE_OFF);
+        fails++;
+    }
+
     /* 6. file gia lap khong ton tai thi patch_file phai bao loi, khong crash */
     g_hits[0] = 0;
     patch_file("/tmp/bugos_propfix_khong_ton_tai", &err);
@@ -473,6 +523,7 @@ static int selftest(void)
         fails++;
     }
 
+    unlink(path);
     free(b);
 
     if (fails == 0) {
