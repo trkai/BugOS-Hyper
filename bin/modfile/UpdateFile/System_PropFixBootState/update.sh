@@ -21,7 +21,10 @@
 #
 # CACH LAM
 #   bin/package/BugOSPropFix/bugos_propfix.c duoc bien dich san thanh binary
-#   arm64 o buoc "Build prop-fix helper" trong workflow (may build khong co NDK).
+#   arm64 o buoc "Build prop-fix helper" trong workflow (may build khong co
+#   compiler cross). Function doc thang dinh dang /dev/__properties__/*, khong
+#   dung bionic, nen build bang aarch64-linux-gnu-gcc -static la du - khong can
+#   NDK ~5GB (runner tung het dia ngay luc unzip NDK).
 #   Mod nay chi copy binary vao /system/bin va them init service.
 #
 #   Service chay 2 lan: post-fs-data (som) va boot_completed (du phong). Binary

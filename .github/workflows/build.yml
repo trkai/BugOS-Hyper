@@ -74,23 +74,20 @@ jobs:
             exit 0
           fi
 
-          NDK_VER="android-ndk-r27c"
-          NDK_DIR="$RUNNER_TEMP/ndk"
-          CC="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
-
-          if [ ! -x "$CC" ]; then
-            echo "Tải NDK $NDK_VER ..."
-            curl -sSL -o "$RUNNER_TEMP/ndk.zip" "https://dl.google.com/android/repository/${NDK_VER}-linux.zip"
-            unzip -q "$RUNNER_TEMP/ndk.zip" -d "$RUNNER_TEMP"
-            rm -rf "$NDK_DIR"
-            mv "$RUNNER_TEMP/$NDK_VER" "$NDK_DIR"
-            rm -f "$RUNNER_TEMP/ndk.zip"
+          # Không dùng NDK: zip r27c giải nén ~5GB, runner hết đĩa giữa lúc unzip
+          # (ENOSPC trong liblldb.so) và chết cả job. Binary chỉ cần libc chuẩn,
+          # nên cross-gcc của Ubuntu (~120MB) là đủ và không phụ thuộc bionic.
+          CC=aarch64-linux-gnu-gcc
+          if ! command -v "$CC" >/dev/null 2>&1; then
+            echo "Cài cross-compiler aarch64 ..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends gcc-aarch64-linux-gnu
           fi
+          "$CC" --version | head -1
 
-          # Dynamic only: bionic không hỗ trợ static link. Binary link tĩnh được
-          # nhưng có thể chết lúc chạy (__system_property_find cần linker stub),
-          # và lỗi đó chỉ lộ ra sau khi flash - đắt hơn nhiều so với 40 phút build.
-          "$CC" -O2 -Wall -o "$OUT" "$SRC"
+          # -static + -no-pie: ELF tĩnh không cần loader động, chạy được trên
+          # Android (kernel Linux, không đụng bionic).
+          "$CC" -Os -Wall -fno-stack-protector -static -no-pie -s -o "$OUT" "$SRC"
           file "$OUT"
           ls -la "$OUT"
 
