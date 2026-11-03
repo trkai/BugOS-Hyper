@@ -87,10 +87,10 @@ jobs:
             rm -f "$RUNNER_TEMP/ndk.zip"
           fi
 
-          "$CC" -O2 -Wall -static -o "$OUT" "$SRC" || {
-            echo "Link static thất bại - thử dynamic"
-            "$CC" -O2 -Wall -o "$OUT" "$SRC"
-          }
+          # Dynamic only: bionic không hỗ trợ static link. Binary link tĩnh được
+          # nhưng có thể chết lúc chạy (__system_property_find cần linker stub),
+          # và lỗi đó chỉ lộ ra sau khi flash - đắt hơn nhiều so với 40 phút build.
+          "$CC" -O2 -Wall -o "$OUT" "$SRC"
           file "$OUT"
           ls -la "$OUT"
 

@@ -27,10 +27,10 @@
 #   Service chay 2 lan: post-fs-data (som) va boot_completed (du phong). Binary
 #   idempotent nen chay lai khong sao.
 #
-#   Hai service cung tro ve mot binary, khac seclabel: u:r:su:s0 va u:r:init:s0.
-#   Ly do: khong biet chac domain nao duoc phep vua exec binary vua ghi vung
-#   property. Cai nao chay duoc thi thang; cai con lai chi log loi SELinux roi
-#   thoat, KHONG anh huong boot.
+#   Ba duong vao, deu duoc thu moi lan chay: `exec` tu init (khong transition
+#   domain -> o lai u:r:init:s0, domain duy nhat duoc ghi vung property), roi
+#   den hai service seclabel su:s0 va init:s0. Duong nao SELinux chan thi init
+#   chi log loi roi di tiep, KHONG anh huong boot.
 #
 # Bat/tat bang prop_fix_boot_state trong config.env.
 
@@ -72,9 +72,23 @@ cat > "$DEST_RC" << 'RCEOF'
 # BugOS - ghi de trang thai bootloader o tang vung property.
 # Xem bin/modfile/UpdateFile/System_PropFixBootState/update.sh
 #
-# Hai service cung mot binary, khac seclabel. Cai nao duoc SELinux cho phep thi
-# chay; cai con lai init se log loi va bo qua, may van boot binh thuong.
-# Binary oneshot + idempotent nen chay lai nhieu lan khong sao.
+# Ba duong, chay het, cai nao duoc SELinux cho phep thi ghi duoc:
+#   1. exec  -> init fork roi exec thang binary, KHONG transition domain, nen
+#               process chay trong u:r:init:s0 - domain duy nhat duoc ghi vung
+#               property. Day la duong nhieu kha nang thang nhat.
+#   2. service seclabel su:s0   -> dung neu policy ROM co domain su.
+#   3. service seclabel init:s0 -> du phong khi (1) bi chan vi ly do khac.
+# Ca ba deu oneshot + idempotent, loi chi log roi thoat, khong boot loop.
+
+on post-fs-data
+    exec -- /system/bin/bugos_propfix
+    start bugos_propfix_su
+    start bugos_propfix_init
+
+on property:sys.boot_completed=1
+    exec -- /system/bin/bugos_propfix
+    start bugos_propfix_su
+    start bugos_propfix_init
 
 service bugos_propfix_su /system/bin/bugos_propfix
     class late_start
@@ -91,14 +105,6 @@ service bugos_propfix_init /system/bin/bugos_propfix
     oneshot
     seclabel u:r:init:s0
     disabled
-
-on post-fs-data
-    start bugos_propfix_su
-    start bugos_propfix_init
-
-on property:sys.boot_completed=1
-    start bugos_propfix_su
-    start bugos_propfix_init
 RCEOF
 
 chmod 0644 "$DEST_RC"
