@@ -413,9 +413,10 @@ patch_services() {
 apply_miui_services_gboard() {
   local decompile_dir="$1"
 
-  # Add Gboard
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/android/server/input/InputManagerServiceStubImpl.smali"
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/com/android/server/inputmethod/InputMethodManagerServiceImpl.smali"
+  local expr='s/com.baidu.input_mi/com.google.android.inputmethod.latin/g'
+  # sed_all_smali quet moi dex (smali, smali_classes2..) - xem apk_ops.sh
+  sed_all_smali "$decompile_dir" "$expr" "com/android/server/input/InputManagerServiceStubImpl.smali"
+  sed_all_smali "$decompile_dir" "$expr" "com/android/server/inputmethod/InputMethodManagerServiceImpl.smali"
 
   echo "Gboard patches applied to miui-services.jar"
 }
@@ -472,8 +473,9 @@ patch_miui_services() {
 apply_miui_framework_gboard() {
   local decompile_dir="$1"
 
-  # Add Gboard
-  sed -i 's/com.baidu.input_mi/com.google.android.inputmethod.latin/g' "$decompile_dir/smali/android/inputmethodservice/InputMethodServiceInjector.smali"
+  local expr='s/com.baidu.input_mi/com.google.android.inputmethod.latin/g'
+  # sed_all_smali quet moi dex (smali, smali_classes2..) - xem apk_ops.sh
+  sed_all_smali "$decompile_dir" "$expr" "android/inputmethodservice/InputMethodServiceInjector.smali"
 
   echo "Gboard patches applied to miui-framework.jar"
 }

@@ -135,6 +135,57 @@ decompile_jar() {
   echo "$output_dir"
 }
 
+# In ra cung mot file smali o cac thu muc dex KHAC (smali_classes2..).
+#
+# decompile_jar dat classes.dex -> smali/, classes2.dex -> smali_classes2/ ...
+# Nhung moi call site trong jar_patcher_*.sh deu truyen "$dir/smali/<path>".
+# Class nam o dex khac thi patch im lang khong chay - khong loi, khong canh bao,
+# chi la ROM ra khong co tac dung do. Ham nay cho cac helper trong patching.sh
+# thu tiep cac dex con lai khi duong dan goc khong ton tai.
+#
+# Chi tra ve khi duong dan TRUYEN VAO dang o dang .../smali/... . Neu file da
+# ton tai thi khong tra gi (helper dung ban goc, khong patch 2 lan).
+smali_other_variants() {
+  local file="$1" base rel d
+
+  case "$file" in
+    */smali/*) ;;
+    *) return 0 ;;
+  esac
+
+  rel="${file#*/smali/}"
+  base="${file%/smali/*}"
+  for d in "$base"/smali_classes*; do
+    [ -f "$d/$rel" ] && printf '%s\n' "$d/$rel"
+  done
+  return 0
+}
+
+# Chay lai mot ham patch tren MOI dex khac co chua file.
+#
+# Dung trong cac helper cua patching.sh: khi "$file" khong ton tai o smali/,
+# thu lai chinh ham do voi duong dan o smali_classes2/, smali_classes3/...
+# Tat ca cac ham do deu nhan duong dan file la tham so CUOI, nen chi can:
+#     smali_run_variants "patch_method_in_file" "$file" "$method" "$ret_val"
+# va ham se duoc goi lai thanh patch_method_in_file "$method" "$ret_val" "$v".
+#
+# Tra 0 neu da chay duoc it nhat 1 lan (caller return luon),
+# tra 1 neu khong co dex nao chua file (caller in canh bao nhu cu).
+smali_run_variants() {
+  local fn="$1"
+  shift
+  local file="$1"
+  shift
+  local v found=0
+
+  while IFS= read -r v; do
+    found=1
+    "$fn" "$@" "$v"
+  done < <(smali_other_variants "$file")
+
+  [ "$found" -eq 1 ]
+}
+
 # sed trên MỌI thư mục smali của một jar đã decompile.
 #
 # Vì sao cần: decompile_jar đặt classes.dex vào smali/, classes2.dex vào

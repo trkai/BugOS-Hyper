@@ -246,6 +246,8 @@ patch_method_in_file() {
 
   # Check if file exists
   if [ ! -f "$file" ]; then
+    # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
+    smali_run_variants "patch_method_in_file" "$file" "${@:1:$#-1}" && return
     echo "⚠ File not found: $(basename "$file")"
     return
   fi
@@ -293,6 +295,8 @@ patch_return_void_in_file() {
 
   # Check if file exists
   if [ ! -f "$file" ]; then
+    # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
+    smali_run_variants "patch_return_void_in_file" "$file" "${@:1:$#-1}" && return
     echo "⚠ File not found: $(basename "$file")"
     return
   fi
@@ -338,10 +342,12 @@ patch_smali_method_in_file() {
   local inject_code="$2"
   local file="$3"
 
-  [ ! -f "$file" ] && {
-    echo "⚠️ File not found: $(basename "$file")"
+  if [ ! -f "$file" ]; then
+    # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
+    smali_run_variants "patch_smali_method_in_file" "$file" "${@:1:$#-1}" && return
+    echo "⚠ File not found: $(basename "$file")"
     return
-  }
+  fi
 
   # find method
   local start
@@ -395,10 +401,12 @@ replace_line_contains_in_smali_method() {
   local replace_line="$3"
   local file="$4"
 
-  [ ! -f "$file" ] && {
+  if [ ! -f "$file" ]; then
+    # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
+    smali_run_variants "replace_line_contains_in_smali_method" "$file" "${@:1:$#-1}" && return 0
     echo "⚠️ File not found: $(basename "$file")"
     return 1
-  }
+  fi
 
   # find method start
   local start
@@ -449,10 +457,12 @@ patch_smali_after_keyword() {
   local inject_code="$3"
   local file="$4"
 
-  [ ! -f "$file" ] && {
-    echo "⚠️ File not found: $(basename "$file")"
+  if [ ! -f "$file" ]; then
+    # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
+    smali_run_variants "patch_smali_after_keyword" "$file" "${@:1:$#-1}" && return
+    echo "⚠ File not found: $(basename "$file")"
     return
-  }
+  fi
 
   # 1️⃣ Tìm dòng bắt đầu method
   local start
@@ -509,10 +519,12 @@ delete_lines_in_smali_method() {
   local to_line="$3"
   local file="$4"
 
-  [ ! -f "$file" ] && {
+  if [ ! -f "$file" ]; then
+    # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
+    smali_run_variants "delete_lines_in_smali_method" "$file" "${@:1:$#-1}" && return 0
     echo "⚠️ File not found: $(basename "$file")"
     return 1
-  }
+  fi
 
   # Tìm dòng bắt đầu method
   local start
