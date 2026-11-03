@@ -104,12 +104,14 @@ jobs:
           ls -la "$OUT"
 
       - name: Build ROM...
+        timeout-minutes: 90
         env:
           INPUT_URL: ${{ inputs.input_url }}
         run: |
           sudo -E bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Pack ROM...
+        timeout-minutes: 40
         run: |
           sudo bash packROM.sh
 

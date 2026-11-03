@@ -6,7 +6,15 @@ source $work_dir/functions.sh
 # Check whether it is a local package or a link
 if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     info "Download link detected, starting a download..."
-    aria2c --max-download-limit=1024M --file-allocation=none -s10 -x10 -j10 --content-disposition -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${baserom}"
+    # -c: resume. Thieu no thi moi lan retry (va moi lan re-run job) tai lai
+    #     tu byte 0, mat ca chuc phut da tai.
+    # --timeout/--connect-timeout/--max-tries: mac dinh aria2 khong co gioi han
+    #     tong, gap CDN tra cham la treo im lang khong bao gio ket thuc.
+    # --summary-interval=10: in tien do moi 10s, de log CI thay no con chay.
+    aria2c -c --max-tries=20 --retry-wait=5 \
+        --timeout=60 --connect-timeout=30 --lowest-speed-limit=100K \
+        --summary-interval=10 --console-log-level=warn \
+        --max-download-limit=1024M --file-allocation=none -s10 -x10 -j10 --content-disposition -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${baserom}"
     baserom=$(basename ${baserom} | sed 's/\?t.*//')
     if [ -f $work_dir/topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip ]; then
         baserom="topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip"
