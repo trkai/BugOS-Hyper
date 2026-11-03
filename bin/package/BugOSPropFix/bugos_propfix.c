@@ -36,17 +36,26 @@
  *   Nen: thay ten prop o offset X  ->  value o X-92, serial o X-96.
  *
  *   Ghi theo dung thu tu cua bionic: bat dirty bit (serial|1) -> copy value ->
- *   tang serial (serial+1). Moi process dang map cung file se thay gia tri moi
- *   ngay lap tuc, khong can restart, khong can reboot.
+ *   serial = (do dai << 24) | ((cook + 1) & 0xffffff) -> futex wake. Moi process
+ *   dang map cung file se thay gia tri moi ngay, khong can restart.
+ *
+ *   Byte cao cua serial la DO DAI value (SERIAL_VALUE_LEN trong bionic). Phai
+ *   ghi lai no moi lan doi value: ghi "green" (5) de len "orange" (6) ma giu
+ *   byte cu thi bionic doc lai 6 byte -> sai gia tri.
  *
  *   Co y KHONG dung __system_property_find(): phai co NDK ~5GB de build (runner
  *   het dia, build fail) va khoa binary vao mot minh bionic. Doc thang dinh dang
  *   thi chi can mot compiler C cross bat ky.
  *
+ *   Co y KHONG dung opendir/readdir tren /dev/__properties__/: policy khong cho
+ *   init `read` tren thu muc (chi getattr + search), nen readdir() tra rong.
+ *   Thay bang danh sach 3 file da do that tren may - xem CANDIDATES.
+ *
  * AN TOAN
  *   - chi ghi khi ten khop TUYET DOI: byte ngay sau key phai la '\0', va 92 byte
  *     truoc do phai la value sach (NUL-terminated, toan ky tu in duoc) -> khong
  *     ghi nham vao giua value cua prop khac
+ *   - prop co kLongFlag (value > 92 byte) bi bo qua, layout khac han
  *   - gia tri deu ngan hon PROP_VALUE_MAX (92)
  *   - chay tu init: loi thi chi ghi log roi thoat, khong anh huong boot, khong
  *     boot loop. Chay lai nhieu lan vo hai (idempotent).
@@ -55,23 +64,60 @@
  *
  * Build: aarch64-linux-gnu-gcc -Os -static -no-pie (xem .github/workflows/build.yml
  *        buoc "Build prop-fix helper").
+ * Test:  gcc -DBUGOS_SELFTEST -o /tmp/pf bugos_propfix.c && /tmp/pf --selftest
+ *        (workflow chay buoc nay truoc khi dong binary vao ROM)
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <dirent.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 
 #define PROP_VALUE_MAX 92
 #define PROP_DIR "/dev/__properties__"
 #define KMSG "/dev/kmsg"
 #define TAG "BUGOS_PROP: "
+
+/* serial: bit0 = dirty, bit16 = kLongFlag, byte cao = do dai value. */
+#define SERIAL_DIRTY(s)       ((s) & 1u)
+#define SERIAL_IS_LONG(s)     ((s) & (1u << 16))
+#define SERIAL_LEN(s)         ((s) >> 24)
+#define SERIAL_COOK(s)        ((s) & 0x00ffffffu)
+#define SERIAL_MAKE(l, cook)  (((uint32_t)(l) << 24) | SERIAL_COOK(cook))
+
+/*
+ * Danh sach file vung property CAN quet.
+ *
+ * KHONG doc thu muc bang opendir/readdir: policy chi cho init
+ *   (allow domain properties_device (dir (getattr search)))
+ *   (allow init   properties_device (dir (relabelto)))
+ * -> khong co `read` tren thu muc, readdir() bi EACCES va tra ve rong.
+ * Mo truc tiep tung file thi duoc:
+ *   (allow init property_type (file (read write ... map ... open)))
+ *
+ * 3 ten duoi day la ket qua do THAT tren may (annibale, OS4.0.5.0):
+ *   for k in <6 prop>; do strings /dev/__properties__/u:* | grep -qx $k; done
+ * -> bootloader_prop (verifiedbootstate, vbmeta.device_state, flash.locked)
+ * -> default_prop          (ro.secureboot.lockstate)
+ * -> vendor_default_prop   (vendor.boot.*)
+ *
+ * ponytail: danh sach cung, du cho annibale. Neu sau nay prop doi context thi
+ * them ten vao day - hoac mo lai opendir khi policy co `read` tren thu muc.
+ */
+static const char *CANDIDATES[] = {
+    PROP_DIR "/u:object_r:bootloader_prop:s0",
+    PROP_DIR "/u:object_r:default_prop:s0",
+    PROP_DIR "/u:object_r:vendor_default_prop:s0",
+};
+
+#define CANDIDATE_COUNT ((int)(sizeof(CANDIDATES) / sizeof(CANDIDATES[0])))
 
 static const struct {
     const char *key;
@@ -101,7 +147,9 @@ static void klog(const char *fmt, ...)
     static int fd = -2;
     char buf[256];
     va_list ap;
+    size_t used;
     int n;
+    int m;
 
     if (fd == -2) {
         fd = open(KMSG, O_WRONLY | O_CLOEXEC);
@@ -114,13 +162,23 @@ static void klog(const char *fmt, ...)
     if (n < 0 || (size_t)n >= sizeof(buf)) {
         return;
     }
+    used = (size_t)n;
+
     va_start(ap, fmt);
-    n += vsnprintf(buf + n, sizeof(buf) - (size_t)n, fmt, ap);
+    m = vsnprintf(buf + used, sizeof(buf) - used, fmt, ap);
     va_end(ap);
-    if (n > 0) {
-        if (write(fd, buf, (size_t)n) < 0) {
-            /* bo qua */
-        }
+    if (m < 0) {
+        return;
+    }
+
+    /* vsnprintf tra ve so byte NEU du cho, co the > phan con lai -> phai cat */
+    used += (size_t)m;
+    if (used >= sizeof(buf)) {
+        used = sizeof(buf) - 1;
+    }
+
+    if (write(fd, buf, used) < 0) {
+        /* bo qua */
     }
 }
 
@@ -145,6 +203,24 @@ static int value_sane(const char *v)
     return 0;
 }
 
+/*
+ * Danh thuc thread dang futex-wait tren serial.
+ *
+ * Bionic doc prop kieu: doc serial -> neu dirty thi __futex_wait(&serial, serial).
+ * Thread da kip ngu voi gia tri CU se ngu mai neu khong ai wake, du ta da doi
+ * serial. resetprop cung wake vi ly do nay. FUTEX_WAKE = 1, INT_MAX waiter.
+ */
+static void futex_wake_serial(uint32_t *addr)
+{
+#ifdef SYS_futex
+    if (syscall(SYS_futex, addr, 1, 2147483647, NULL, NULL, 0) < 0) {
+        /* khong wake duoc cung khong sao: reader co vong lap kiem tra lai */
+    }
+#else
+    (void)addr;
+#endif
+}
+
 /* Ghi de mot prop tai vi tri ten da tim thay. */
 static void poke(char *name_at)
 {
@@ -167,14 +243,27 @@ static void poke(char *name_at)
 
         memcpy(&serial, serialp, sizeof(serial));
 
-        /* dirty -> value -> clean, y nhu bionic */
+        /* prop dai (value > 92 byte) dung layout khac - khong dung vao */
+        if (SERIAL_IS_LONG(serial)) {
+            continue;
+        }
+
+        /*
+         * Thu tu y nhu bionic SystemProperties::Update():
+         *   serial |= dirty -> copy value + NUL -> serial = (len<<24)|(cook+1)
+         *
+         * PHAI ghi lai ca byte do dai. Ban cu dung `(serial|1)+1`, giu nguyen
+         * byte cao cu -> ghi "green" (5) de len "orange" (6) thi serial thanh
+         * 0x06000001, bionic doc lai value dai 6 byte -> hong gia tri.
+         */
         next = serial | 1u;
         memcpy(serialp, &next, sizeof(next));
         memcpy(value_start, g_val[t], g_vlen[t]);
         value_start[g_vlen[t]] = '\0';
         __sync_synchronize();
-        next = (serial | 1u) + 1u;
+        next = SERIAL_MAKE(g_vlen[t], serial + 1u);
         memcpy(serialp, &next, sizeof(next));
+        futex_wake_serial((uint32_t *)serialp);
 
         g_hits[t]++;
     }
@@ -227,55 +316,185 @@ static void patch_file(const char *path, int *err)
     munmap(base, size);
 }
 
-/* Quet toan bo vung property mot lan cho g_n target dang hoat dong. */
+/* Quet cac file vung property da biet cho g_n target dang hoat dong. */
 static void patch_all(void)
 {
-    DIR *d;
-    struct dirent *de;
-    char path[512];
     int files = 0;
     int failed = 0;
     int first_err = 0;
+    int i;
     int t;
 
-    d = opendir(PROP_DIR);
-    if (d == NULL) {
-        klog("khong mo duoc " PROP_DIR " errno=%d", errno);
-        printf("bugos_propfix: khong mo duoc " PROP_DIR " (errno=%d)\n", errno);
-        return;
-    }
-
-    while ((de = readdir(d)) != NULL) {
+    for (i = 0; i < CANDIDATE_COUNT; i++) {
         int err = 0;
 
-        if (de->d_name[0] == '.') {
-            continue;
-        }
-        snprintf(path, sizeof(path), "%s/%s", PROP_DIR, de->d_name);
-        patch_file(path, &err);
+        patch_file(CANDIDATES[i], &err);
         if (err != 0) {
             failed++;
             if (first_err == 0) {
                 first_err = err;
             }
+            klog("mo that bai %s errno=%d", CANDIDATES[i], err);
         } else {
             files++;
         }
     }
-    closedir(d);
 
     for (t = 0; t < g_n; t++) {
         klog("%s=%s -> hits=%d", g_key[t], g_val[t], g_hits[t]);
     }
-    klog("quét: files=%d open_fail=%d first_errno=%d uids=%d",
+    klog("quet: files=%d open_fail=%d first_errno=%d uid=%d",
          files, failed, first_err, (int)getuid());
 }
+
+/* Nap TARGETS vao mang dang hoat dong. */
+static void load_targets(void)
+{
+    int i;
+
+    g_n = TARGET_COUNT;
+    for (i = 0; i < TARGET_COUNT; i++) {
+        g_key[i] = TARGETS[i].key;
+        g_val[i] = TARGETS[i].val;
+        g_klen[i] = strlen(TARGETS[i].key);
+        g_vlen[i] = strlen(TARGETS[i].val);
+    }
+}
+
+/*
+ * Tu kiem tra phan ghi serial - phan duy nhat tung sai ma KHONG bao loi.
+ * Dung file gia lap theo dung layout prop_info, chay patch_file() that, doc lai.
+ *
+ *   gcc -DBUGOS_SELFTEST -o /tmp/pf bugos_propfix.c && /tmp/pf --selftest
+ *
+ * (chi build khi test tren may build; binary trong ROM khong co nhanh nay)
+ */
+#ifdef BUGOS_SELFTEST
+
+#define ST_SERIAL_OFF 128        /* prop_area header 124 -> can 4 byte align */
+#define ST_VALUE_OFF  (ST_SERIAL_OFF + 4)
+#define ST_NAME_OFF   (ST_VALUE_OFF + PROP_VALUE_MAX)
+#define ST_SIZE       4096
+
+static int selftest(void)
+{
+    char path[] = "/tmp/bugos_propfix_XXXXXX";
+    unsigned char *b;
+    uint32_t serial;
+    int fd;
+    int err = 0;
+    int fails = 0;
+
+    fd = mkstemp(path);
+    if (fd < 0) {
+        printf("selftest: mkstemp loi errno=%d\n", errno);
+        return 1;
+    }
+    b = calloc(1, ST_SIZE);
+    if (b == NULL) {
+        close(fd);
+        unlink(path);
+        return 1;
+    }
+
+    /* header prop_area toi thieu + 1 prop_info: "orange" dai 6, cook 0 */
+    ((uint32_t *)b)[1] = 0x504f5250u;      /* magic "PROP" */
+    ((uint32_t *)b)[2] = 0xfc6ed0abu;      /* version */
+    serial = SERIAL_MAKE(6, 0);
+    memcpy(b + ST_SERIAL_OFF, &serial, 4);
+    memcpy(b + ST_VALUE_OFF, "orange", 7);
+    memcpy(b + ST_NAME_OFF, "ro.boot.verifiedbootstate", 26);
+
+    if (write(fd, b, ST_SIZE) != ST_SIZE) {
+        printf("selftest: ghi file gia lap loi\n");
+        close(fd);
+        unlink(path);
+        free(b);
+        return 1;
+    }
+    close(fd);
+    free(b);
+
+    g_n = 1;
+    g_key[0] = "ro.boot.verifiedbootstate";
+    g_val[0] = "green";
+    g_klen[0] = strlen(g_key[0]);
+    g_vlen[0] = strlen(g_val[0]);
+    g_hits[0] = 0;
+
+    patch_file(path, &err);
+
+    b = calloc(1, ST_SIZE);
+    fd = open(path, O_RDONLY);
+    if (fd < 0 || read(fd, b, ST_SIZE) != ST_SIZE) {
+        printf("selftest: doc lai loi errno=%d\n", errno);
+        if (fd >= 0) close(fd);
+        unlink(path);
+        free(b);
+        return 1;
+    }
+    close(fd);
+    unlink(path);
+
+    memcpy(&serial, b + ST_SERIAL_OFF, 4);
+
+    /* 1. phai ghi dung 1 lan */
+    if (g_hits[0] != 1) {
+        printf("selftest FAIL hits=%d (mong 1)\n", g_hits[0]);
+        fails++;
+    }
+    /* 2. serial moi phai mang do dai MOI (5), stale length la loi cu */
+    if (SERIAL_LEN(serial) != 5) {
+        printf("selftest FAIL len=%u (mong 5) serial=0x%08x\n",
+               SERIAL_LEN(serial), serial);
+        fails++;
+    }
+    /* 3. phai sach dirty bit */
+    if (SERIAL_DIRTY(serial)) {
+        printf("selftest FAIL dirty bit con, serial=0x%08x\n", serial);
+        fails++;
+    }
+    /* 4. value doc lai phai dung */
+    if (strcmp((char *)b + ST_VALUE_OFF, "green") != 0) {
+        printf("selftest FAIL value='%s' (mong 'green')\n",
+               (char *)b + ST_VALUE_OFF);
+        fails++;
+    }
+    /* 5. khong duoc cham vao ten */
+    if (strcmp((char *)b + ST_NAME_OFF, "ro.boot.verifiedbootstate") != 0) {
+        printf("selftest FAIL ten bi ghi de: '%s'\n", (char *)b + ST_NAME_OFF);
+        fails++;
+    }
+    /* 6. file gia lap khong ton tai thi patch_file phai bao loi, khong crash */
+    g_hits[0] = 0;
+    patch_file("/tmp/bugos_propfix_khong_ton_tai", &err);
+    if (err == 0 || g_hits[0] != 0) {
+        printf("selftest FAIL file thieu ma khong bao loi\n");
+        fails++;
+    }
+
+    free(b);
+
+    if (fails == 0) {
+        printf("selftest OK: orange(6) -> green(5), serial=0x%08x\n", serial);
+        return 0;
+    }
+    printf("selftest: %d loi\n", fails);
+    return 1;
+}
+#endif /* BUGOS_SELFTEST */
 
 int main(int argc, char **argv)
 {
     int i;
     int ok = 0;
     int bad = 0;
+
+#ifdef BUGOS_SELFTEST
+    if (argc == 2 && strcmp(argv[1], "--selftest") == 0) {
+        return selftest();
+    }
+#endif
 
     /* Cho phep go tay: bugos_propfix <key> <value> */
     if (argc == 3) {
@@ -296,13 +515,7 @@ int main(int argc, char **argv)
         return g_hits[0] > 0 ? 0 : 1;
     }
 
-    g_n = TARGET_COUNT;
-    for (i = 0; i < TARGET_COUNT; i++) {
-        g_key[i] = TARGETS[i].key;
-        g_val[i] = TARGETS[i].val;
-        g_klen[i] = strlen(TARGETS[i].key);
-        g_vlen[i] = strlen(TARGETS[i].val);
-    }
+    load_targets();
 
     klog("bat dau uid=%d pid=%d", (int)getuid(), (int)getpid());
     printf("bugos_propfix: bat dau (uid=%d)\n", (int)getuid());

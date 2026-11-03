@@ -91,6 +91,12 @@ jobs:
           "$CC" --version | head -1
           echo "sysroot: $(aarch64-linux-gnu-gcc -print-sysroot)"
 
+          # Tự kiểm tra phần ghi serial bằng gcc của máy build TRƯỚC khi đóng
+          # binary vào ROM. Đây là chỗ từng sai mà không báo lỗi: serial giữ
+          # byte độ dài cũ -> bionic đọc lại value sai độ dài.
+          gcc -O1 -Wall -DBUGOS_SELFTEST -o /tmp/propfix_selftest "$SRC"
+          /tmp/propfix_selftest --selftest
+
           # -static + -no-pie: ELF tĩnh không cần loader động, chạy được trên
           # Android (kernel Linux, không đụng bionic).
           "$CC" -Os -Wall -fno-stack-protector -static -no-pie -s -o "$OUT" "$SRC"

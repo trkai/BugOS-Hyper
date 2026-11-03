@@ -97,10 +97,13 @@ chmod 0755 "$DEST_BIN" || { warn "PropFix: chmod binary thất bại - bỏ qua"
 #   adb shell ls /system/etc/selinux/precompiled_sepolicy   -> phải không tồn tại
 # ---------------------------------------------------------------------------
 CIL="$IMG/system/system/etc/selinux/plat_sepolicy.cil"
-CIL_MARK="bugos_propfix_exec"
+# Mốc phải là chính dòng rule, không phải tên gợi nhớ: bản trước dùng
+# "bugos_propfix_exec" nhưng chuỗi đó không có trong phần được chèn, nên lần
+# build nào cũng chèn lại và luôn báo "ghi thất bại".
+CIL_MARK='(allow init system_file (file (execute execute_no_trans)))'
 
 if [ -f "$CIL" ]; then
-    if grep -q "$CIL_MARK" "$CIL"; then
+    if grep -Fq "$CIL_MARK" "$CIL"; then
         mods "SELinux: plat_sepolicy.cil đã patch trước đó - bỏ qua"
     else
         cat >> "$CIL" << 'CILEOF'
@@ -110,7 +113,7 @@ if [ -f "$CIL" ]; then
 ; binary khong bao gio duoc nap, prop giu nguyen orange.
 (allow init system_file (file (execute execute_no_trans)))
 CILEOF
-        if grep -q "$CIL_MARK" "$CIL"; then
+        if grep -Fq "$CIL_MARK" "$CIL"; then
             mods "SELinux: đã cho init exec /system/bin/bugos_propfix"
         else
             warn "SELinux: ghi plat_sepolicy.cil thất bại - propfix sẽ không chạy"
