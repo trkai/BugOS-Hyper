@@ -1,25 +1,19 @@
-.class public abstract Lcom/kousei/framework/a6;
+.class public interface abstract Lcom/kousei/framework/a6;
 .super Ljava/lang/Object;
-.source "r8-map-id-ec70a54ac4dd249b58de3765a20c96801dd38a23bdb543e33a18faed5ec9684e"
 
 
-# static fields
-.field public static final a:Ljava/util/concurrent/ConcurrentHashMap;
+# virtual methods
+.method public abstract a()Ljava/lang/String;
+.end method
 
+.method public abstract b()I
+.end method
 
-# direct methods
-.method static constructor <clinit>()V
-    .registers 1
+.method public abstract c(I[B)I
+.end method
 
-    .line 1
-    new-instance v0, Ljava/util/concurrent/ConcurrentHashMap;
+.method public abstract d(B)V
+.end method
 
-    .line 3
-    invoke-direct {v0}, Ljava/util/concurrent/ConcurrentHashMap;-><init>()V
-
-    .line 6
-    sput-object v0, Lcom/kousei/framework/a6;->a:Ljava/util/concurrent/ConcurrentHashMap;
-
-    .line 8
-    return-void
+.method public abstract update([BII)V
 .end method

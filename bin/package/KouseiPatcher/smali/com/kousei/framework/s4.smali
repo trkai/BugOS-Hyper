@@ -1,994 +1,2275 @@
 .class public final Lcom/kousei/framework/s4;
-.super Ljava/lang/Object;
-.source "r8-map-id-ec70a54ac4dd249b58de3765a20c96801dd38a23bdb543e33a18faed5ec9684e"
-
-
-# static fields
-.field public static d:Lcom/kousei/framework/s4;
+.super Lcom/kousei/framework/e0;
 
 
 # instance fields
-.field public final a:Ljava/util/concurrent/ConcurrentHashMap;
+.field public final synthetic N:I
 
-.field public final b:Ljava/util/concurrent/ConcurrentHashMap;
-
-.field public volatile c:Z
+.field public O:I
 
 
 # direct methods
-.method public constructor <init>()V
+.method public synthetic constructor <init>()V
     .registers 2
 
-    .line 1
-    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+    .line 24
+    const/4 v0, 0x1
 
-    .line 4
-    new-instance v0, Ljava/util/concurrent/ConcurrentHashMap;
+    iput v0, p0, Lcom/kousei/framework/s4;->N:I
 
-    .line 6
-    invoke-direct {v0}, Ljava/util/concurrent/ConcurrentHashMap;-><init>()V
+    invoke-direct {p0}, Lcom/kousei/framework/e0;-><init>()V
 
-    .line 9
-    iput-object v0, p0, Lcom/kousei/framework/s4;->a:Ljava/util/concurrent/ConcurrentHashMap;
-
-    .line 11
-    new-instance v0, Ljava/util/concurrent/ConcurrentHashMap;
-
-    .line 13
-    invoke-direct {v0}, Ljava/util/concurrent/ConcurrentHashMap;-><init>()V
-
-    .line 16
-    iput-object v0, p0, Lcom/kousei/framework/s4;->b:Ljava/util/concurrent/ConcurrentHashMap;
-
-    .line 18
-    const/4 v0, 0x0
-
-    .line 19
-    iput-boolean v0, p0, Lcom/kousei/framework/s4;->c:Z
-
-    .line 21
     return-void
 .end method
 
-.method public static declared-synchronized a(Landroid/content/Context;)Lcom/kousei/framework/s4;
-    .registers 5
+.method public synthetic constructor <init>(Lcom/kousei/framework/l;)V
+    .registers 3
 
-    .line 1
-    const-class v0, Lcom/kousei/framework/s4;
+    .line 21
+    const/4 v0, 0x1
 
-    .line 3
-    monitor-enter v0
+    iput v0, p0, Lcom/kousei/framework/s4;->N:I
 
-    .line 4
-    :try_start_3
-    sget-object v1, Lcom/kousei/framework/s4;->d:Lcom/kousei/framework/s4;
+    invoke-direct {p0, p1}, Lcom/kousei/framework/e0;-><init>(Lcom/kousei/framework/l;)V
 
-    .line 6
-    if-nez v1, :cond_3e
-
-    .line 8
-    new-instance v1, Lcom/kousei/framework/s4;
-
-    .line 10
-    invoke-direct {v1}, Lcom/kousei/framework/s4;-><init>()V
-
-    .line 13
-    sput-object v1, Lcom/kousei/framework/s4;->d:Lcom/kousei/framework/s4;
-
-    .line 15
-    iget-object v2, v1, Lcom/kousei/framework/s4;->a:Ljava/util/concurrent/ConcurrentHashMap;
-
-    .line 17
-    invoke-virtual {v2}, Ljava/util/concurrent/ConcurrentHashMap;->clear()V
-
-    .line 20
-    iget-object v2, v1, Lcom/kousei/framework/s4;->b:Ljava/util/concurrent/ConcurrentHashMap;
-
-    .line 22
-    invoke-virtual {v2}, Ljava/util/concurrent/ConcurrentHashMap;->clear()V
-
-    .line 25
-    invoke-static {p0}, Lcom/kousei/framework/s4;->b(Landroid/content/Context;)Landroid/content/ContentResolver;
-
-    .line 28
-    move-result-object p0
-
-    .line 29
-    const/4 v2, 0x0
-
-    .line 30
-    if-nez p0, :cond_22
-
-    .line 32
-    iput-boolean v2, v1, Lcom/kousei/framework/s4;->c:Z
-    :try_end_21
-    .catchall {:try_start_3 .. :try_end_21} :catchall_3c
-
-    .line 34
-    goto :goto_3e
-
-    .line 35
-    :cond_22
-    :try_start_22
-    invoke-static {p0}, Lcom/kousei/framework/KaoriosFramework;->readGamePropsJsonString(Landroid/content/ContentResolver;)Ljava/lang/String;
-
-    .line 38
-    move-result-object p0
-
-    .line 39
-    if-eqz p0, :cond_36
-
-    .line 41
-    invoke-virtual {p0}, Ljava/lang/String;->isEmpty()Z
-
-    .line 44
-    move-result v3
-
-    .line 45
-    if-eqz v3, :cond_2f
-
-    .line 47
-    goto :goto_36
-
-    .line 48
-    :cond_2f
-    invoke-virtual {v1, p0}, Lcom/kousei/framework/s4;->e(Ljava/lang/String;)V
-
-    .line 51
-    const/4 p0, 0x1
-
-    .line 52
-    iput-boolean p0, v1, Lcom/kousei/framework/s4;->c:Z
-
-    .line 54
-    goto :goto_3e
-
-    .line 55
-    :cond_36
-    :goto_36
-    iput-boolean v2, v1, Lcom/kousei/framework/s4;->c:Z
-    :try_end_38
-    .catch Ljava/lang/Exception; {:try_start_22 .. :try_end_38} :catch_39
-    .catchall {:try_start_22 .. :try_end_38} :catchall_3c
-
-    .line 57
-    goto :goto_3e
-
-    .line 58
-    :catch_39
-    :try_start_39
-    iput-boolean v2, v1, Lcom/kousei/framework/s4;->c:Z
-
-    .line 60
-    goto :goto_3e
-
-    .line 61
-    :catchall_3c
-    move-exception p0
-
-    .line 62
-    goto :goto_42
-
-    .line 63
-    :cond_3e
-    :goto_3e
-    sget-object p0, Lcom/kousei/framework/s4;->d:Lcom/kousei/framework/s4;
-    :try_end_40
-    .catchall {:try_start_39 .. :try_end_40} :catchall_3c
-
-    .line 65
-    monitor-exit v0
-
-    .line 66
-    return-object p0
-
-    .line 67
-    :goto_42
-    :try_start_42
-    monitor-exit v0
-    :try_end_43
-    .catchall {:try_start_42 .. :try_end_43} :catchall_3c
-
-    .line 68
-    throw p0
+    return-void
 .end method
 
-.method public static b(Landroid/content/Context;)Landroid/content/ContentResolver;
+.method public synthetic constructor <init>(Lcom/kousei/framework/p0;)V
+    .registers 3
+
+    .line 22
+    const/4 v0, 0x0
+
+    iput v0, p0, Lcom/kousei/framework/s4;->N:I
+
+    invoke-direct {p0, p1}, Lcom/kousei/framework/e0;-><init>(Lcom/kousei/framework/p0;)V
+
+    return-void
+.end method
+
+.method public synthetic constructor <init>(Z[Lcom/kousei/framework/k;)V
+    .registers 4
+
+    .line 23
+    const/4 v0, 0x0
+
+    iput v0, p0, Lcom/kousei/framework/s4;->N:I
+
+    invoke-direct {p0, p1, p2}, Lcom/kousei/framework/e0;-><init>(Z[Lcom/kousei/framework/k;)V
+
+    return-void
+.end method
+
+.method public constructor <init>([Lcom/kousei/framework/k;I)V
     .registers 4
 
     .line 1
-    if-eqz p0, :cond_7
+    iput p2, p0, Lcom/kousei/framework/s4;->N:I
 
+    .line 2
     .line 3
-    invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
+    const/4 v0, -0x1
 
+    .line 4
+    packed-switch p2, :pswitch_data_14
+
+    .line 5
     .line 6
-    move-result-object p0
-
     .line 7
-    return-object p0
+    invoke-direct {p0, p1}, Lcom/kousei/framework/e0;-><init>([Lcom/kousei/framework/k;)V
 
     .line 8
-    :cond_7
-    invoke-static {}, Landroid/app/ActivityThread;->currentApplication()Landroid/app/Application;
+    .line 9
+    .line 10
+    iput v0, p0, Lcom/kousei/framework/s4;->O:I
 
     .line 11
-    move-result-object p0
-
     .line 12
-    if-nez p0, :cond_2f
+    return-void
+
+    .line 13
+    :pswitch_c
+    const/4 p2, 0x0
 
     .line 14
-    invoke-static {}, Landroid/app/ActivityThread;->currentActivityThread()Landroid/app/ActivityThread;
+    invoke-direct {p0, p2, p1}, Lcom/kousei/framework/e0;-><init>(Z[Lcom/kousei/framework/k;)V
 
+    .line 15
+    .line 16
     .line 17
-    move-result-object v0
+    iput v0, p0, Lcom/kousei/framework/s4;->O:I
 
     .line 18
-    if-eqz v0, :cond_2f
+    .line 19
+    return-void
 
     .line 20
-    :try_start_13
-    invoke-static {}, Landroid/app/ActivityThread;->currentPackageName()Ljava/lang/String;
+    nop
 
+    .line 21
+    :pswitch_data_14
+    .packed-switch 0x1
+        :pswitch_c
+    .end packed-switch
+    .line 22
     .line 23
-    move-result-object p0
-
     .line 24
-    invoke-virtual {v0}, Landroid/app/ActivityThread;->getSystemContext()Landroid/app/ContextImpl;
-
+    .line 25
+    .line 26
     .line 27
-    move-result-object v1
-
     .line 28
-    if-eqz p0, :cond_29
-
+    .line 29
     .line 30
-    invoke-virtual {p0}, Ljava/lang/String;->isEmpty()Z
-
+    .line 31
+    .line 32
     .line 33
-    move-result v2
-
     .line 34
-    if-nez v2, :cond_29
-
+    .line 35
     .line 36
-    const/4 v2, 0x0
-
     .line 37
-    invoke-virtual {v1, p0, v2}, Landroid/content/Context;->createPackageContext(Ljava/lang/String;I)Landroid/content/Context;
-
+    .line 38
+    .line 39
     .line 40
-    move-result-object p0
-    :try_end_28
-    .catch Ljava/lang/Exception; {:try_start_13 .. :try_end_28} :catch_2b
-
     .line 41
-    goto :goto_2f
-
     .line 42
-    :cond_29
-    move-object p0, v1
-
     .line 43
-    goto :goto_2f
-
     .line 44
-    :catch_2b
-    invoke-virtual {v0}, Landroid/app/ActivityThread;->getSystemContext()Landroid/app/ContextImpl;
-
+    .line 45
+    .line 46
     .line 47
-    move-result-object p0
-
     .line 48
-    :cond_2f
-    :goto_2f
-    if-nez p0, :cond_33
-
+    .line 49
     .line 50
-    const/4 p0, 0x0
-
     .line 51
-    return-object p0
-
     .line 52
-    :cond_33
-    invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
-
+    .line 53
+    .line 54
     .line 55
-    move-result-object p0
-
     .line 56
-    return-object p0
+    .line 57
+    .line 58
+    .line 59
+    .line 60
+    .line 61
+    .line 62
+    .line 63
+    .line 64
+    .line 65
+    .line 66
+    .line 67
+    .line 68
+    .line 69
+    .line 70
+    .line 71
+    .line 72
+    .line 73
+    .line 74
+    .line 75
+    .line 76
+    .line 77
+    .line 78
+    .line 79
+    .line 80
+    .line 81
+    .line 82
+    .line 83
+    .line 84
+    .line 85
+    .line 86
+    .line 87
+    .line 88
+    .line 89
+    .line 90
+    .line 91
+    .line 92
+    .line 93
+    .line 94
+    .line 95
+    .line 96
+    .line 97
+    .line 98
+    .line 99
+    .line 100
+    .line 101
+    .line 102
+    .line 103
+    .line 104
+    .line 105
+    .line 106
+    .line 107
+    .line 108
+    .line 109
+    .line 110
+    .line 111
+    .line 112
+    .line 113
+    .line 114
+    .line 115
+    .line 116
+    .line 117
+    .line 118
+    .line 119
+    .line 120
+    .line 121
+    .line 122
+    .line 123
+    .line 124
+    .line 125
+    .line 126
+    .line 127
+    .line 128
+    .line 129
+    .line 130
+    .line 131
+    .line 132
+    .line 133
+    .line 134
+    .line 135
+    .line 136
+    .line 137
+    .line 138
+    .line 139
+    .line 140
+    .line 141
+    .line 142
+    .line 143
+    .line 144
+    .line 145
+    .line 146
+    .line 147
+    .line 148
+    .line 149
+    .line 150
+    .line 151
+    .line 152
+    .line 153
+    .line 154
+    .line 155
+    .line 156
+    .line 157
+    .line 158
+    .line 159
+    .line 160
+    .line 161
+    .line 162
+    .line 163
+    .line 164
+    .line 165
+    .line 166
+    .line 167
+    .line 168
+    .line 169
+    .line 170
+    .line 171
+    .line 172
+    .line 173
+    .line 174
+    .line 175
+    .line 176
+    .line 177
+    .line 178
+    .line 179
+    .line 180
+    .line 181
+    .line 182
+    .line 183
+    .line 184
+    .line 185
+    .line 186
+    .line 187
+    .line 188
+    .line 189
+    .line 190
+    .line 191
+    .line 192
+    .line 193
+    .line 194
+    .line 195
+    .line 196
+    .line 197
+    .line 198
+    .line 199
+    .line 200
+    .line 201
+    .line 202
+    .line 203
+    .line 204
+    .line 205
+    .line 206
+    .line 207
+    .line 208
+    .line 209
+    .line 210
+    .line 211
+    .line 212
+    .line 213
+    .line 214
+    .line 215
+    .line 216
+    .line 217
+    .line 218
+    .line 219
+    .line 220
+    .line 221
+    .line 222
+    .line 223
+    .line 224
+    .line 225
+    .line 226
+    .line 227
+    .line 228
+    .line 229
+    .line 230
+    .line 231
+    .line 232
+    .line 233
+    .line 234
+    .line 235
+    .line 236
+    .line 237
+    .line 238
+    .line 239
+    .line 240
+    .line 241
+    .line 242
+    .line 243
+    .line 244
+    .line 245
+    .line 246
+    .line 247
+    .line 248
+    .line 249
+    .line 250
+    .line 251
+    .line 252
+    .line 253
+    .line 254
+    .line 255
+    .line 256
+    .line 257
+    .line 258
+    .line 259
+    .line 260
+    .line 261
+    .line 262
+    .line 263
+    .line 264
+    .line 265
+    .line 266
+    .line 267
+    .line 268
+    .line 269
+    .line 270
+    .line 271
+    .line 272
+    .line 273
+    .line 274
+    .line 275
+    .line 276
+    .line 277
+    .line 278
+    .line 279
+    .line 280
+    .line 281
+    .line 282
+    .line 283
+    .line 284
+    .line 285
+    .line 286
+    .line 287
+    .line 288
+    .line 289
+    .line 290
+    .line 291
+    .line 292
+    .line 293
+    .line 294
+    .line 295
+    .line 296
+    .line 297
+    .line 298
+    .line 299
+    .line 300
+    .line 301
+    .line 302
+    .line 303
+    .line 304
+    .line 305
+    .line 306
+    .line 307
+    .line 308
+    .line 309
+    .line 310
+    .line 311
+    .line 312
+    .line 313
+    .line 314
+    .line 315
+    .line 316
+    .line 317
+    .line 318
+    .line 319
+    .line 320
+    .line 321
+    .line 322
+    .line 323
+    .line 324
+    .line 325
+    .line 326
+    .line 327
+    .line 328
+    .line 329
+    .line 330
+    .line 331
+    .line 332
+    .line 333
+    .line 334
+    .line 335
+    .line 336
+    .line 337
+    .line 338
+    .line 339
+    .line 340
+    .line 341
+    .line 342
+    .line 343
+    .line 344
+    .line 345
+    .line 346
+    .line 347
+    .line 348
+    .line 349
+    .line 350
+    .line 351
+    .line 352
+    .line 353
+    .line 354
+    .line 355
+    .line 356
+    .line 357
+    .line 358
+    .line 359
+    .line 360
+    .line 361
+    .line 362
+    .line 363
+    .line 364
+    .line 365
+    .line 366
+    .line 367
+    .line 368
+    .line 369
+    .line 370
+    .line 371
+    .line 372
+    .line 373
+    .line 374
+    .line 375
+    .line 376
+    .line 377
+    .line 378
+    .line 379
+    .line 380
+    .line 381
+    .line 382
+    .line 383
+    .line 384
+    .line 385
+    .line 386
+    .line 387
+    .line 388
+    .line 389
+    .line 390
+    .line 391
+    .line 392
+    .line 393
+    .line 394
+    .line 395
+    .line 396
+    .line 397
+    .line 398
+    .line 399
+    .line 400
+    .line 401
+    .line 402
+    .line 403
+    .line 404
+    .line 405
+    .line 406
+    .line 407
+    .line 408
+    .line 409
+    .line 410
+    .line 411
+    .line 412
+    .line 413
+    .line 414
+    .line 415
+    .line 416
+    .line 417
+    .line 418
+    .line 419
+    .line 420
+    .line 421
+    .line 422
+    .line 423
+    .line 424
+    .line 425
+.end method
+
+.method public synthetic constructor <init>([Lcom/kousei/framework/k;[Lcom/kousei/framework/k;)V
+    .registers 4
+
+    .line 25
+    const/4 v0, 0x1
+
+    iput v0, p0, Lcom/kousei/framework/s4;->N:I
+
+    invoke-direct {p0, p1, p2}, Lcom/kousei/framework/e0;-><init>([Lcom/kousei/framework/k;[Lcom/kousei/framework/k;)V
+
+    return-void
 .end method
 
 
 # virtual methods
-.method public final c(Landroid/content/Context;)Z
-    .registers 5
+.method public final i(Lcom/kousei/framework/y;Z)V
+    .registers 11
 
     .line 1
-    iget-boolean p0, p0, Lcom/kousei/framework/s4;->c:Z
+    iget v0, p0, Lcom/kousei/framework/s4;->N:I
 
+    .line 2
     .line 3
-    const/4 v0, 0x0
+    const/16 v1, 0x10
 
     .line 4
-    if-nez p0, :cond_6
+    .line 5
+    iget-object v2, p0, Lcom/kousei/framework/e0;->K:[Lcom/kousei/framework/k;
 
     .line 6
-    goto :goto_1e
-
     .line 7
-    :cond_6
-    invoke-static {p1}, Lcom/kousei/framework/s4;->b(Landroid/content/Context;)Landroid/content/ContentResolver;
+    const/16 v3, 0x31
+
+    .line 8
+    .line 9
+    const/4 v4, 0x1
 
     .line 10
-    move-result-object p0
+    const/4 v5, 0x0
 
     .line 11
-    if-nez p0, :cond_d
+    packed-switch v0, :pswitch_data_ae
 
+    .line 12
     .line 13
-    goto :goto_1e
-
     .line 14
-    :cond_d
-    const-wide v1, -0x731824f5d36712b9L
+    invoke-virtual {p1, p2, v3}, Lcom/kousei/framework/y;->w(ZI)V
 
+    .line 15
+    .line 16
+    .line 17
+    invoke-virtual {p1}, Lcom/kousei/framework/y;->e()Lcom/kousei/framework/i5;
+
+    .line 18
     .line 19
-    invoke-static {v1, v2}, Lcom/kousei/framework/h0;->c0(J)Ljava/lang/String;
+    .line 20
+    move-result-object p2
+
+    .line 21
+    array-length v0, v2
 
     .line 22
-    move-result-object p1
+    iget v3, p0, Lcom/kousei/framework/s4;->O:I
 
     .line 23
-    invoke-static {p0, p1, v0}, Lcom/kousei/framework/KaoriosFramework;->getGlobalInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I
+    .line 24
+    if-gez v3, :cond_45
 
+    .line 25
     .line 26
-    move-result p0
+    if-le v0, v1, :cond_1c
 
     .line 27
-    const/4 p1, 0x1
-
     .line 28
-    if-ne p0, p1, :cond_1e
+    goto :goto_45
+
+    .line 29
+    :cond_1c
+    new-array v1, v0, [Lcom/kousei/framework/a0;
 
     .line 30
-    return p1
+    .line 31
+    move v3, v5
+
+    .line 32
+    move v6, v3
+
+    .line 33
+    :goto_20
+    if-ge v3, v0, :cond_36
+
+    .line 34
+    .line 35
+    aget-object v7, v2, v3
+
+    .line 36
+    .line 37
+    invoke-interface {v7}, Lcom/kousei/framework/k;->b()Lcom/kousei/framework/a0;
+
+    .line 38
+    .line 39
+    .line 40
+    move-result-object v7
+
+    .line 41
+    invoke-virtual {v7}, Lcom/kousei/framework/a0;->p()Lcom/kousei/framework/a0;
+
+    .line 42
+    .line 43
+    .line 44
+    move-result-object v7
+
+    .line 45
+    aput-object v7, v1, v3
+
+    .line 46
+    .line 47
+    invoke-virtual {v7, v4}, Lcom/kousei/framework/a0;->l(Z)I
+
+    .line 48
+    .line 49
+    .line 50
+    move-result v7
+
+    .line 51
+    add-int/2addr v6, v7
+
+    .line 52
+    add-int/lit8 v3, v3, 0x1
+
+    .line 53
+    .line 54
+    goto :goto_20
+
+    .line 55
+    :cond_36
+    iput v6, p0, Lcom/kousei/framework/s4;->O:I
+
+    .line 56
+    .line 57
+    invoke-virtual {p1, v6}, Lcom/kousei/framework/y;->r(I)V
+
+    .line 58
+    .line 59
+    .line 60
+    :goto_3b
+    if-ge v5, v0, :cond_5a
+
+    .line 61
+    .line 62
+    aget-object p0, v1, v5
+
+    .line 63
+    .line 64
+    invoke-virtual {p2, p0}, Lcom/kousei/framework/i5;->x(Lcom/kousei/framework/a0;)V
+
+    .line 65
+    .line 66
+    .line 67
+    add-int/lit8 v5, v5, 0x1
+
+    .line 68
+    .line 69
+    goto :goto_3b
+
+    .line 70
+    :cond_45
+    :goto_45
+    invoke-virtual {p0}, Lcom/kousei/framework/s4;->v()I
+
+    .line 71
+    .line 72
+    .line 73
+    move-result p0
+
+    .line 74
+    invoke-virtual {p1, p0}, Lcom/kousei/framework/y;->r(I)V
+
+    .line 75
+    .line 76
+    .line 77
+    :goto_4c
+    if-ge v5, v0, :cond_5a
+
+    .line 78
+    .line 79
+    aget-object p0, v2, v5
+
+    .line 80
+    .line 81
+    invoke-interface {p0}, Lcom/kousei/framework/k;->b()Lcom/kousei/framework/a0;
+
+    .line 82
+    .line 83
+    .line 84
+    move-result-object p0
+
+    .line 85
+    invoke-virtual {p2, p0}, Lcom/kousei/framework/i5;->x(Lcom/kousei/framework/a0;)V
+
+    .line 86
+    .line 87
+    .line 88
+    add-int/lit8 v5, v5, 0x1
+
+    .line 89
+    .line 90
+    goto :goto_4c
+
+    .line 91
+    :cond_5a
+    return-void
+
+    .line 92
+    :pswitch_5b
+    invoke-virtual {p1, p2, v3}, Lcom/kousei/framework/y;->w(ZI)V
+
+    .line 93
+    .line 94
+    .line 95
+    invoke-virtual {p1}, Lcom/kousei/framework/y;->d()Lcom/kousei/framework/p4;
+
+    .line 96
+    .line 97
+    .line 98
+    move-result-object p2
+
+    .line 99
+    array-length v0, v2
+
+    .line 100
+    iget v3, p0, Lcom/kousei/framework/s4;->O:I
+
+    .line 101
+    .line 102
+    if-gez v3, :cond_93
+
+    .line 103
+    .line 104
+    if-le v0, v1, :cond_6a
+
+    .line 105
+    .line 106
+    goto :goto_93
+
+    .line 107
+    :cond_6a
+    new-array v1, v0, [Lcom/kousei/framework/a0;
+
+    .line 108
+    .line 109
+    move v3, v5
+
+    .line 110
+    move v6, v3
+
+    .line 111
+    :goto_6e
+    if-ge v3, v0, :cond_84
+
+    .line 112
+    .line 113
+    aget-object v7, v2, v3
+
+    .line 114
+    .line 115
+    invoke-interface {v7}, Lcom/kousei/framework/k;->b()Lcom/kousei/framework/a0;
+
+    .line 116
+    .line 117
+    .line 118
+    move-result-object v7
+
+    .line 119
+    invoke-virtual {v7}, Lcom/kousei/framework/a0;->o()Lcom/kousei/framework/a0;
+
+    .line 120
+    .line 121
+    .line 122
+    move-result-object v7
+
+    .line 123
+    aput-object v7, v1, v3
+
+    .line 124
+    .line 125
+    invoke-virtual {v7, v4}, Lcom/kousei/framework/a0;->l(Z)I
+
+    .line 126
+    .line 127
+    .line 128
+    move-result v7
+
+    .line 129
+    add-int/2addr v6, v7
+
+    .line 130
+    add-int/lit8 v3, v3, 0x1
+
+    .line 131
+    .line 132
+    goto :goto_6e
+
+    .line 133
+    :cond_84
+    iput v6, p0, Lcom/kousei/framework/s4;->O:I
+
+    .line 134
+    .line 135
+    invoke-virtual {p1, v6}, Lcom/kousei/framework/y;->r(I)V
+
+    .line 136
+    .line 137
+    .line 138
+    :goto_89
+    if-ge v5, v0, :cond_ac
+
+    .line 139
+    .line 140
+    aget-object p0, v1, v5
+
+    .line 141
+    .line 142
+    invoke-virtual {p0, p2, v4}, Lcom/kousei/framework/a0;->i(Lcom/kousei/framework/y;Z)V
+
+    .line 143
+    .line 144
+    .line 145
+    add-int/lit8 v5, v5, 0x1
+
+    .line 146
+    .line 147
+    goto :goto_89
+
+    .line 148
+    :cond_93
+    :goto_93
+    invoke-virtual {p0}, Lcom/kousei/framework/s4;->u()I
+
+    .line 149
+    .line 150
+    .line 151
+    move-result p0
+
+    .line 152
+    invoke-virtual {p1, p0}, Lcom/kousei/framework/y;->r(I)V
+
+    .line 153
+    .line 154
+    .line 155
+    :goto_9a
+    if-ge v5, v0, :cond_ac
+
+    .line 156
+    .line 157
+    aget-object p0, v2, v5
+
+    .line 158
+    .line 159
+    invoke-interface {p0}, Lcom/kousei/framework/k;->b()Lcom/kousei/framework/a0;
+
+    .line 160
+    .line 161
+    .line 162
+    move-result-object p0
+
+    .line 163
+    invoke-virtual {p0}, Lcom/kousei/framework/a0;->o()Lcom/kousei/framework/a0;
+
+    .line 164
+    .line 165
+    .line 166
+    move-result-object p0
+
+    .line 167
+    invoke-virtual {p0, p2, v4}, Lcom/kousei/framework/a0;->i(Lcom/kousei/framework/y;Z)V
+
+    .line 168
+    .line 169
+    .line 170
+    add-int/lit8 v5, v5, 0x1
+
+    .line 171
+    .line 172
+    goto :goto_9a
+
+    .line 173
+    :cond_ac
+    return-void
+
+    .line 174
+    nop
+
+    .line 175
+    :pswitch_data_ae
+    .packed-switch 0x0
+        :pswitch_5b
+    .end packed-switch
+    .line 176
+    .line 177
+    .line 178
+    .line 179
+    .line 180
+    .line 181
+    .line 182
+    .line 183
+    .line 184
+    .line 185
+    .line 186
+    .line 187
+    .line 188
+    .line 189
+    .line 190
+    .line 191
+    .line 192
+    .line 193
+    .line 194
+    .line 195
+    .line 196
+    .line 197
+    .line 198
+    .line 199
+    .line 200
+    .line 201
+    .line 202
+    .line 203
+    .line 204
+    .line 205
+    .line 206
+    .line 207
+    .line 208
+    .line 209
+    .line 210
+    .line 211
+    .line 212
+    .line 213
+    .line 214
+    .line 215
+    .line 216
+    .line 217
+    .line 218
+    .line 219
+    .line 220
+    .line 221
+    .line 222
+    .line 223
+    .line 224
+    .line 225
+    .line 226
+    .line 227
+    .line 228
+    .line 229
+    .line 230
+    .line 231
+    .line 232
+    .line 233
+    .line 234
+    .line 235
+    .line 236
+    .line 237
+    .line 238
+    .line 239
+    .line 240
+    .line 241
+    .line 242
+    .line 243
+    .line 244
+    .line 245
+    .line 246
+    .line 247
+    .line 248
+    .line 249
+    .line 250
+    .line 251
+    .line 252
+    .line 253
+    .line 254
+    .line 255
+    .line 256
+    .line 257
+    .line 258
+    .line 259
+    .line 260
+    .line 261
+    .line 262
+    .line 263
+    .line 264
+    .line 265
+    .line 266
+    .line 267
+    .line 268
+    .line 269
+    .line 270
+    .line 271
+    .line 272
+    .line 273
+    .line 274
+    .line 275
+    .line 276
+    .line 277
+    .line 278
+    .line 279
+    .line 280
+    .line 281
+    .line 282
+    .line 283
+    .line 284
+    .line 285
+    .line 286
+    .line 287
+    .line 288
+    .line 289
+    .line 290
+    .line 291
+    .line 292
+    .line 293
+    .line 294
+    .line 295
+    .line 296
+    .line 297
+    .line 298
+    .line 299
+    .line 300
+    .line 301
+    .line 302
+    .line 303
+    .line 304
+    .line 305
+    .line 306
+    .line 307
+    .line 308
+    .line 309
+    .line 310
+    .line 311
+    .line 312
+    .line 313
+    .line 314
+    .line 315
+    .line 316
+    .line 317
+    .line 318
+    .line 319
+    .line 320
+    .line 321
+    .line 322
+    .line 323
+    .line 324
+    .line 325
+    .line 326
+    .line 327
+    .line 328
+    .line 329
+    .line 330
+    .line 331
+    .line 332
+    .line 333
+    .line 334
+    .line 335
+    .line 336
+    .line 337
+    .line 338
+    .line 339
+    .line 340
+    .line 341
+    .line 342
+    .line 343
+    .line 344
+    .line 345
+    .line 346
+    .line 347
+    .line 348
+    .line 349
+    .line 350
+    .line 351
+    .line 352
+    .line 353
+    .line 354
+    .line 355
+    .line 356
+    .line 357
+    .line 358
+    .line 359
+    .line 360
+    .line 361
+    .line 362
+    .line 363
+    .line 364
+    .line 365
+    .line 366
+    .line 367
+    .line 368
+    .line 369
+    .line 370
+    .line 371
+    .line 372
+    .line 373
+    .line 374
+    .line 375
+    .line 376
+    .line 377
+    .line 378
+    .line 379
+    .line 380
+    .line 381
+    .line 382
+    .line 383
+    .line 384
+    .line 385
+    .line 386
+    .line 387
+    .line 388
+    .line 389
+    .line 390
+    .line 391
+    .line 392
+    .line 393
+    .line 394
+    .line 395
+    .line 396
+    .line 397
+    .line 398
+    .line 399
+    .line 400
+    .line 401
+    .line 402
+    .line 403
+    .line 404
+    .line 405
+    .line 406
+    .line 407
+    .line 408
+    .line 409
+    .line 410
+    .line 411
+    .line 412
+    .line 413
+    .line 414
+    .line 415
+    .line 416
+    .line 417
+    .line 418
+    .line 419
+    .line 420
+    .line 421
+    .line 422
+    .line 423
+    .line 424
+    .line 425
+.end method
+
+.method public final l(Z)I
+    .registers 3
+
+    .line 1
+    iget v0, p0, Lcom/kousei/framework/s4;->N:I
+
+    .line 2
+    .line 3
+    packed-switch v0, :pswitch_data_18
+
+    .line 4
+    .line 5
+    .line 6
+    invoke-virtual {p0}, Lcom/kousei/framework/s4;->v()I
+
+    .line 7
+    .line 8
+    .line 9
+    move-result p0
+
+    .line 10
+    invoke-static {p1, p0}, Lcom/kousei/framework/y;->g(ZI)I
+
+    .line 11
+    .line 12
+    .line 13
+    move-result p0
+
+    .line 14
+    return p0
+
+    .line 15
+    :pswitch_e
+    invoke-virtual {p0}, Lcom/kousei/framework/s4;->u()I
+
+    .line 16
+    .line 17
+    .line 18
+    move-result p0
+
+    .line 19
+    invoke-static {p1, p0}, Lcom/kousei/framework/y;->g(ZI)I
+
+    .line 20
+    .line 21
+    .line 22
+    move-result p0
+
+    .line 23
+    return p0
+
+    .line 24
+    nop
+
+    .line 25
+    :pswitch_data_18
+    .packed-switch 0x0
+        :pswitch_e
+    .end packed-switch
+    .line 26
+    .line 27
+    .line 28
+    .line 29
+    .line 30
+    .line 31
+    .line 32
+    .line 33
+    .line 34
+    .line 35
+    .line 36
+    .line 37
+    .line 38
+    .line 39
+    .line 40
+    .line 41
+    .line 42
+    .line 43
+    .line 44
+    .line 45
+    .line 46
+    .line 47
+    .line 48
+    .line 49
+    .line 50
+    .line 51
+    .line 52
+    .line 53
+    .line 54
+    .line 55
+    .line 56
+    .line 57
+    .line 58
+    .line 59
+    .line 60
+    .line 61
+    .line 62
+    .line 63
+    .line 64
+    .line 65
+    .line 66
+    .line 67
+    .line 68
+    .line 69
+    .line 70
+    .line 71
+    .line 72
+    .line 73
+    .line 74
+    .line 75
+    .line 76
+    .line 77
+    .line 78
+    .line 79
+    .line 80
+    .line 81
+    .line 82
+    .line 83
+    .line 84
+    .line 85
+    .line 86
+    .line 87
+    .line 88
+    .line 89
+    .line 90
+    .line 91
+    .line 92
+    .line 93
+    .line 94
+    .line 95
+    .line 96
+    .line 97
+    .line 98
+    .line 99
+    .line 100
+    .line 101
+    .line 102
+    .line 103
+    .line 104
+    .line 105
+    .line 106
+    .line 107
+    .line 108
+    .line 109
+    .line 110
+    .line 111
+    .line 112
+    .line 113
+    .line 114
+    .line 115
+    .line 116
+    .line 117
+    .line 118
+    .line 119
+    .line 120
+    .line 121
+    .line 122
+    .line 123
+    .line 124
+    .line 125
+    .line 126
+    .line 127
+    .line 128
+    .line 129
+    .line 130
+    .line 131
+    .line 132
+    .line 133
+    .line 134
+    .line 135
+    .line 136
+    .line 137
+    .line 138
+    .line 139
+    .line 140
+    .line 141
+    .line 142
+    .line 143
+    .line 144
+    .line 145
+    .line 146
+    .line 147
+    .line 148
+    .line 149
+    .line 150
+    .line 151
+    .line 152
+    .line 153
+    .line 154
+    .line 155
+    .line 156
+    .line 157
+    .line 158
+    .line 159
+    .line 160
+    .line 161
+    .line 162
+    .line 163
+    .line 164
+    .line 165
+    .line 166
+    .line 167
+    .line 168
+    .line 169
+    .line 170
+    .line 171
+    .line 172
+    .line 173
+    .line 174
+    .line 175
+    .line 176
+    .line 177
+    .line 178
+    .line 179
+    .line 180
+    .line 181
+    .line 182
+    .line 183
+    .line 184
+    .line 185
+    .line 186
+    .line 187
+    .line 188
+    .line 189
+    .line 190
+    .line 191
+    .line 192
+    .line 193
+    .line 194
+    .line 195
+    .line 196
+    .line 197
+    .line 198
+    .line 199
+    .line 200
+    .line 201
+    .line 202
+    .line 203
+    .line 204
+    .line 205
+    .line 206
+    .line 207
+    .line 208
+    .line 209
+    .line 210
+    .line 211
+    .line 212
+    .line 213
+    .line 214
+    .line 215
+    .line 216
+    .line 217
+    .line 218
+    .line 219
+    .line 220
+    .line 221
+    .line 222
+    .line 223
+    .line 224
+    .line 225
+    .line 226
+    .line 227
+    .line 228
+    .line 229
+    .line 230
+    .line 231
+    .line 232
+    .line 233
+    .line 234
+    .line 235
+    .line 236
+    .line 237
+    .line 238
+    .line 239
+    .line 240
+    .line 241
+    .line 242
+.end method
+
+.method public o()Lcom/kousei/framework/a0;
+    .registers 2
+
+    .line 1
+    iget v0, p0, Lcom/kousei/framework/s4;->N:I
+
+    .line 2
+    .line 3
+    packed-switch v0, :pswitch_data_14
+
+    .line 4
+    .line 5
+    .line 6
+    invoke-super {p0}, Lcom/kousei/framework/e0;->o()Lcom/kousei/framework/a0;
+
+    .line 7
+    .line 8
+    .line 9
+    move-result-object p0
+
+    .line 10
+    return-object p0
+
+    .line 11
+    :pswitch_a
+    iget-object v0, p0, Lcom/kousei/framework/e0;->L:[Lcom/kousei/framework/k;
+
+    .line 12
+    .line 13
+    if-eqz v0, :cond_f
+
+    .line 14
+    .line 15
+    goto :goto_13
+
+    .line 16
+    :cond_f
+    invoke-super {p0}, Lcom/kousei/framework/e0;->o()Lcom/kousei/framework/a0;
+
+    .line 17
+    .line 18
+    .line 19
+    move-result-object p0
+
+    .line 20
+    :goto_13
+    return-object p0
+
+    .line 21
+    :pswitch_data_14
+    .packed-switch 0x0
+        :pswitch_a
+    .end packed-switch
+    .line 22
+    .line 23
+    .line 24
+    .line 25
+    .line 26
+    .line 27
+    .line 28
+    .line 29
+    .line 30
+    .line 31
+    .line 32
+    .line 33
+    .line 34
+    .line 35
+    .line 36
+    .line 37
+    .line 38
+    .line 39
+    .line 40
+    .line 41
+    .line 42
+    .line 43
+    .line 44
+    .line 45
+    .line 46
+    .line 47
+    .line 48
+    .line 49
+    .line 50
+    .line 51
+    .line 52
+    .line 53
+    .line 54
+    .line 55
+    .line 56
+    .line 57
+    .line 58
+    .line 59
+    .line 60
+    .line 61
+    .line 62
+    .line 63
+    .line 64
+    .line 65
+    .line 66
+    .line 67
+    .line 68
+    .line 69
+    .line 70
+    .line 71
+    .line 72
+    .line 73
+    .line 74
+    .line 75
+    .line 76
+    .line 77
+    .line 78
+    .line 79
+    .line 80
+    .line 81
+    .line 82
+    .line 83
+    .line 84
+    .line 85
+    .line 86
+    .line 87
+    .line 88
+    .line 89
+    .line 90
+    .line 91
+    .line 92
+    .line 93
+    .line 94
+    .line 95
+    .line 96
+    .line 97
+    .line 98
+    .line 99
+    .line 100
+    .line 101
+    .line 102
+    .line 103
+    .line 104
+    .line 105
+    .line 106
+    .line 107
+    .line 108
+    .line 109
+    .line 110
+    .line 111
+    .line 112
+    .line 113
+    .line 114
+    .line 115
+    .line 116
+    .line 117
+    .line 118
+    .line 119
+    .line 120
+    .line 121
+    .line 122
+    .line 123
+    .line 124
+    .line 125
+    .line 126
+    .line 127
+    .line 128
+    .line 129
+    .line 130
+    .line 131
+    .line 132
+    .line 133
+    .line 134
+    .line 135
+    .line 136
+    .line 137
+    .line 138
+    .line 139
+    .line 140
+    .line 141
+    .line 142
+    .line 143
+    .line 144
+    .line 145
+    .line 146
+    .line 147
+    .line 148
+    .line 149
+    .line 150
+    .line 151
+    .line 152
+    .line 153
+    .line 154
+    .line 155
+    .line 156
+    .line 157
+    .line 158
+    .line 159
+    .line 160
+    .line 161
+    .line 162
+    .line 163
+    .line 164
+    .line 165
+    .line 166
+    .line 167
+    .line 168
+    .line 169
+    .line 170
+    .line 171
+    .line 172
+.end method
+
+.method public final p()Lcom/kousei/framework/a0;
+    .registers 2
+
+    .line 1
+    iget v0, p0, Lcom/kousei/framework/s4;->N:I
+
+    .line 2
+    .line 3
+    return-object p0
+    .line 4
+    .line 5
+    .line 6
+    .line 7
+    .line 8
+    .line 9
+    .line 10
+    .line 11
+    .line 12
+    .line 13
+    .line 14
+    .line 15
+    .line 16
+    .line 17
+    .line 18
+    .line 19
+    .line 20
+    .line 21
+    .line 22
+    .line 23
+    .line 24
+    .line 25
+    .line 26
+    .line 27
+    .line 28
+    .line 29
+    .line 30
+    .line 31
+    .line 32
+    .line 33
+    .line 34
+    .line 35
+    .line 36
+    .line 37
+    .line 38
+    .line 39
+    .line 40
+    .line 41
+    .line 42
+    .line 43
+    .line 44
+    .line 45
+    .line 46
+    .line 47
+    .line 48
+    .line 49
+    .line 50
+    .line 51
+    .line 52
+    .line 53
+    .line 54
+    .line 55
+    .line 56
+    .line 57
+    .line 58
+    .line 59
+    .line 60
+    .line 61
+    .line 62
+    .line 63
+    .line 64
+    .line 65
+    .line 66
+    .line 67
+    .line 68
+    .line 69
+    .line 70
+    .line 71
+    .line 72
+    .line 73
+    .line 74
+    .line 75
+    .line 76
+    .line 77
+    .line 78
+    .line 79
+    .line 80
+    .line 81
+    .line 82
+    .line 83
+    .line 84
+    .line 85
+    .line 86
+    .line 87
+    .line 88
+    .line 89
+    .line 90
+    .line 91
+    .line 92
+    .line 93
+    .line 94
+    .line 95
+    .line 96
+    .line 97
+    .line 98
+    .line 99
+    .line 100
+    .line 101
+    .line 102
+    .line 103
+    .line 104
+    .line 105
+    .line 106
+    .line 107
+    .line 108
+    .line 109
+    .line 110
+    .line 111
+    .line 112
+    .line 113
+    .line 114
+    .line 115
+    .line 116
+    .line 117
+    .line 118
+    .line 119
+    .line 120
+    .line 121
+    .line 122
+    .line 123
+    .line 124
+    .line 125
+    .line 126
+    .line 127
+    .line 128
+    .line 129
+    .line 130
+    .line 131
+    .line 132
+    .line 133
+    .line 134
+    .line 135
+    .line 136
+    .line 137
+    .line 138
+    .line 139
+    .line 140
+    .line 141
+    .line 142
+    .line 143
+    .line 144
+    .line 145
+    .line 146
+    .line 147
+    .line 148
+    .line 149
+    .line 150
+    .line 151
+    .line 152
+    .line 153
+    .line 154
+    .line 155
+    .line 156
+    .line 157
+    .line 158
+    .line 159
+    .line 160
+    .line 161
+    .line 162
+    .line 163
+    .line 164
+    .line 165
+    .line 166
+    .line 167
+    .line 168
+    .line 169
+    .line 170
+    .line 171
+    .line 172
+.end method
+
+.method public u()I
+    .registers 7
+
+    .line 1
+    iget v0, p0, Lcom/kousei/framework/s4;->O:I
+
+    .line 2
+    .line 3
+    if-gez v0, :cond_20
+
+    .line 4
+    .line 5
+    iget-object v0, p0, Lcom/kousei/framework/e0;->K:[Lcom/kousei/framework/k;
+
+    .line 6
+    .line 7
+    array-length v1, v0
+
+    .line 8
+    const/4 v2, 0x0
+
+    .line 9
+    move v3, v2
+
+    .line 10
+    :goto_9
+    if-ge v2, v1, :cond_1e
+
+    .line 11
+    .line 12
+    aget-object v4, v0, v2
+
+    .line 13
+    .line 14
+    invoke-interface {v4}, Lcom/kousei/framework/k;->b()Lcom/kousei/framework/a0;
+
+    .line 15
+    .line 16
+    .line 17
+    move-result-object v4
+
+    .line 18
+    invoke-virtual {v4}, Lcom/kousei/framework/a0;->o()Lcom/kousei/framework/a0;
+
+    .line 19
+    .line 20
+    .line 21
+    move-result-object v4
+
+    .line 22
+    const/4 v5, 0x1
+
+    .line 23
+    invoke-virtual {v4, v5}, Lcom/kousei/framework/a0;->l(Z)I
+
+    .line 24
+    .line 25
+    .line 26
+    move-result v4
+
+    .line 27
+    add-int/2addr v3, v4
+
+    .line 28
+    add-int/lit8 v2, v2, 0x1
+
+    .line 29
+    .line 30
+    goto :goto_9
 
     .line 31
     :cond_1e
-    :goto_1e
-    return v0
-.end method
-
-.method public final d(Landroid/util/JsonReader;)V
-    .registers 8
-
-    .line 1
-    invoke-virtual {p1}, Landroid/util/JsonReader;->beginObject()V
-
-    .line 4
-    :cond_3
-    :goto_3
-    invoke-virtual {p1}, Landroid/util/JsonReader;->hasNext()Z
-
-    .line 7
-    move-result v0
-
-    .line 8
-    if-eqz v0, :cond_8e
-
-    .line 10
-    invoke-virtual {p1}, Landroid/util/JsonReader;->nextName()Ljava/lang/String;
-
-    .line 13
-    move-result-object v0
-
-    .line 14
-    new-instance v1, Ljava/util/HashMap;
-
-    .line 16
-    invoke-direct {v1}, Ljava/util/HashMap;-><init>()V
-
-    .line 19
-    invoke-virtual {p1}, Landroid/util/JsonReader;->beginObject()V
-
-    .line 22
-    :goto_15
-    invoke-virtual {p1}, Landroid/util/JsonReader;->hasNext()Z
-
-    .line 25
-    move-result v2
-
-    .line 26
-    if-eqz v2, :cond_27
-
-    .line 28
-    invoke-virtual {p1}, Landroid/util/JsonReader;->nextName()Ljava/lang/String;
-
-    .line 31
-    move-result-object v2
+    iput v3, p0, Lcom/kousei/framework/s4;->O:I
 
     .line 32
-    invoke-virtual {p1}, Landroid/util/JsonReader;->nextString()Ljava/lang/String;
-
-    .line 35
-    move-result-object v3
-
-    .line 36
-    invoke-virtual {v1, v2, v3}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 39
-    goto :goto_15
-
-    .line 40
-    :cond_27
-    invoke-virtual {p1}, Landroid/util/JsonReader;->endObject()V
-
-    .line 43
-    invoke-virtual {v1}, Ljava/util/HashMap;->isEmpty()Z
-
-    .line 46
-    move-result v2
-
-    .line 47
-    if-nez v2, :cond_3
-
-    .line 49
-    iget-object v2, p0, Lcom/kousei/framework/s4;->a:Ljava/util/concurrent/ConcurrentHashMap;
-
-    .line 51
-    invoke-virtual {v2, v0, v1}, Ljava/util/concurrent/ConcurrentHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 54
-    const-wide v2, -0x73182458d36712b9L
-
-    .line 59
-    invoke-static {v2, v3}, Lcom/kousei/framework/h0;->c0(J)Ljava/lang/String;
-
-    .line 62
-    move-result-object v2
-
-    .line 63
-    invoke-virtual {v1, v2}, Ljava/util/HashMap;->get(Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 66
-    move-result-object v1
-
-    .line 67
-    check-cast v1, Ljava/lang/String;
-
-    .line 69
-    iget-object v2, p0, Lcom/kousei/framework/s4;->b:Ljava/util/concurrent/ConcurrentHashMap;
-
-    .line 71
-    if-eqz v1, :cond_89
-
-    .line 73
-    invoke-virtual {v1}, Ljava/lang/String;->isEmpty()Z
-
-    .line 76
-    move-result v3
-
-    .line 77
-    if-eqz v3, :cond_4f
-
-    .line 79
-    goto :goto_89
-
-    .line 80
-    :cond_4f
-    new-instance v3, Ljava/util/HashMap;
-
-    .line 82
-    invoke-direct {v3}, Ljava/util/HashMap;-><init>()V
-
-    .line 85
-    const-wide v4, -0x73182467d36712b9L
-
-    .line 90
-    invoke-static {v4, v5}, Lcom/kousei/framework/h0;->c0(J)Ljava/lang/String;
-
-    .line 93
-    move-result-object v4
-
-    .line 94
-    invoke-virtual {v3, v4, v1}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 97
-    const-wide v4, -0x73182487d36712b9L
-
-    .line 102
-    invoke-static {v4, v5}, Lcom/kousei/framework/h0;->c0(J)Ljava/lang/String;
-
-    .line 105
-    move-result-object v4
-
-    .line 106
-    invoke-virtual {v3, v4, v1}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 109
-    const-wide v4, -0x731824a6d36712b9L
-
-    .line 114
-    invoke-static {v4, v5}, Lcom/kousei/framework/h0;->c0(J)Ljava/lang/String;
-
-    .line 117
-    move-result-object v4
-
-    .line 118
-    invoke-virtual {v3, v4, v1}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 121
-    const-wide v4, -0x731824cdd36712b9L
-
-    .line 126
-    invoke-static {v4, v5}, Lcom/kousei/framework/h0;->c0(J)Ljava/lang/String;
-
-    .line 129
-    move-result-object v4
-
-    .line 130
-    invoke-virtual {v3, v4, v1}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 133
-    invoke-virtual {v2, v0, v3}, Ljava/util/concurrent/ConcurrentHashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 136
-    goto/16 :goto_3
-
-    .line 138
-    :cond_89
-    :goto_89
-    invoke-virtual {v2, v0}, Ljava/util/concurrent/ConcurrentHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;
-
-    .line 141
-    goto/16 :goto_3
-
-    .line 143
-    :cond_8e
-    invoke-virtual {p1}, Landroid/util/JsonReader;->endObject()V
-
-    .line 146
-    return-void
-.end method
-
-.method public final e(Ljava/lang/String;)V
-    .registers 5
-
-    .line 1
-    :try_start_0
-    new-instance v0, Landroid/util/JsonReader;
-
-    .line 3
-    new-instance v1, Ljava/io/StringReader;
-
-    .line 5
-    invoke-direct {v1, p1}, Ljava/io/StringReader;-><init>(Ljava/lang/String;)V
-
-    .line 8
-    invoke-direct {v0, v1}, Landroid/util/JsonReader;-><init>(Ljava/io/Reader;)V
-    :try_end_a
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_a} :catch_40
-
-    .line 11
-    :try_start_a
-    invoke-virtual {v0}, Landroid/util/JsonReader;->beginObject()V
-
-    .line 14
-    :goto_d
-    invoke-virtual {v0}, Landroid/util/JsonReader;->hasNext()Z
-
-    .line 17
-    move-result p1
-
-    .line 18
-    if-eqz p1, :cond_30
-
-    .line 20
-    invoke-virtual {v0}, Landroid/util/JsonReader;->nextName()Ljava/lang/String;
-
-    .line 23
-    move-result-object p1
-
-    .line 24
-    const-wide v1, -0x73182452d36712b9L
-
-    .line 29
-    invoke-static {v1, v2}, Lcom/kousei/framework/h0;->c0(J)Ljava/lang/String;
-
-    .line 32
-    move-result-object v1
-
     .line 33
-    invoke-virtual {v1, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    :cond_20
+    iget p0, p0, Lcom/kousei/framework/s4;->O:I
 
+    .line 34
+    .line 35
+    return p0
     .line 36
-    move-result p1
-
     .line 37
-    if-eqz p1, :cond_2c
-
+    .line 38
     .line 39
-    invoke-virtual {p0, v0}, Lcom/kousei/framework/s4;->d(Landroid/util/JsonReader;)V
-
+    .line 40
+    .line 41
     .line 42
-    goto :goto_d
-
     .line 43
-    :catchall_2a
-    move-exception p0
-
     .line 44
-    goto :goto_37
-
     .line 45
-    :cond_2c
-    invoke-virtual {v0}, Landroid/util/JsonReader;->skipValue()V
-
+    .line 46
+    .line 47
     .line 48
-    goto :goto_d
-
     .line 49
-    :cond_30
-    invoke-virtual {v0}, Landroid/util/JsonReader;->endObject()V
-    :try_end_33
-    .catchall {:try_start_a .. :try_end_33} :catchall_2a
-
+    .line 50
+    .line 51
     .line 52
-    :try_start_33
-    invoke-virtual {v0}, Landroid/util/JsonReader;->close()V
-    :try_end_36
-    .catch Ljava/lang/Exception; {:try_start_33 .. :try_end_36} :catch_40
-
+    .line 53
+    .line 54
     .line 55
-    return-void
-
     .line 56
-    :goto_37
-    :try_start_37
-    invoke-virtual {v0}, Landroid/util/JsonReader;->close()V
-    :try_end_3a
-    .catchall {:try_start_37 .. :try_end_3a} :catchall_3b
-
+    .line 57
+    .line 58
     .line 59
-    goto :goto_3f
-
     .line 60
-    :catchall_3b
-    move-exception p1
-
     .line 61
-    :try_start_3c
-    invoke-virtual {p0, p1}, Ljava/lang/Throwable;->addSuppressed(Ljava/lang/Throwable;)V
-
+    .line 62
+    .line 63
     .line 64
-    :goto_3f
-    throw p0
-    :try_end_40
-    .catch Ljava/lang/Exception; {:try_start_3c .. :try_end_40} :catch_40
-
     .line 65
-    :catch_40
-    return-void
+    .line 66
+    .line 67
+    .line 68
+    .line 69
+    .line 70
+    .line 71
+    .line 72
+    .line 73
+    .line 74
+    .line 75
+    .line 76
+    .line 77
+    .line 78
+    .line 79
+    .line 80
+    .line 81
+    .line 82
+    .line 83
+    .line 84
+    .line 85
+    .line 86
+    .line 87
+    .line 88
+    .line 89
+    .line 90
+    .line 91
+    .line 92
+    .line 93
+    .line 94
+    .line 95
+    .line 96
+    .line 97
+    .line 98
+    .line 99
+    .line 100
+    .line 101
+    .line 102
+    .line 103
+    .line 104
+    .line 105
+    .line 106
+    .line 107
+    .line 108
+    .line 109
+    .line 110
+    .line 111
+    .line 112
+    .line 113
+    .line 114
+    .line 115
+    .line 116
+    .line 117
+    .line 118
+    .line 119
+    .line 120
+    .line 121
+    .line 122
+    .line 123
+    .line 124
+    .line 125
+    .line 126
+    .line 127
+    .line 128
+    .line 129
+    .line 130
+    .line 131
+    .line 132
+    .line 133
+    .line 134
+    .line 135
+    .line 136
+    .line 137
+    .line 138
+    .line 139
+    .line 140
+    .line 141
+    .line 142
+    .line 143
+    .line 144
+    .line 145
+    .line 146
+    .line 147
+    .line 148
+    .line 149
+    .line 150
+    .line 151
+    .line 152
+    .line 153
+    .line 154
+    .line 155
+    .line 156
+    .line 157
+    .line 158
+    .line 159
+    .line 160
+    .line 161
+    .line 162
+    .line 163
+    .line 164
+    .line 165
+    .line 166
+    .line 167
+    .line 168
+    .line 169
+    .line 170
+    .line 171
+    .line 172
 .end method
 
-.method public final f(Landroid/content/Context;Ljava/lang/String;)V
-    .registers 6
+.method public v()I
+    .registers 7
 
     .line 1
-    invoke-virtual {p0, p1}, Lcom/kousei/framework/s4;->c(Landroid/content/Context;)Z
+    iget v0, p0, Lcom/kousei/framework/s4;->O:I
+
+    .line 2
+    .line 3
+    if-gez v0, :cond_20
 
     .line 4
-    move-result p1
-
     .line 5
-    if-nez p1, :cond_8
+    iget-object v0, p0, Lcom/kousei/framework/e0;->K:[Lcom/kousei/framework/k;
 
+    .line 6
     .line 7
-    goto/16 :goto_aa
+    array-length v1, v0
+
+    .line 8
+    const/4 v2, 0x0
 
     .line 9
-    :cond_8
-    iget-boolean p1, p0, Lcom/kousei/framework/s4;->c:Z
+    move v3, v2
+
+    .line 10
+    :goto_9
+    if-ge v2, v1, :cond_1e
 
     .line 11
-    if-nez p1, :cond_e
+    .line 12
+    aget-object v4, v0, v2
 
     .line 13
-    goto/16 :goto_aa
+    .line 14
+    invoke-interface {v4}, Lcom/kousei/framework/k;->b()Lcom/kousei/framework/a0;
 
     .line 15
-    :cond_e
-    if-nez p2, :cond_12
-
+    .line 16
     .line 17
-    goto/16 :goto_aa
+    move-result-object v4
+
+    .line 18
+    invoke-virtual {v4}, Lcom/kousei/framework/a0;->p()Lcom/kousei/framework/a0;
 
     .line 19
-    :cond_12
-    iget-object p0, p0, Lcom/kousei/framework/s4;->a:Ljava/util/concurrent/ConcurrentHashMap;
-
+    .line 20
     .line 21
-    invoke-virtual {p0, p2}, Ljava/util/concurrent/ConcurrentHashMap;->get(Ljava/lang/Object;)Ljava/lang/Object;
+    move-result-object v4
+
+    .line 22
+    const/4 v5, 0x1
+
+    .line 23
+    invoke-virtual {v4, v5}, Lcom/kousei/framework/a0;->l(Z)I
 
     .line 24
-    move-result-object p0
-
     .line 25
-    check-cast p0, Ljava/util/Map;
+    .line 26
+    move-result v4
 
     .line 27
-    if-eqz p0, :cond_aa
+    add-int/2addr v3, v4
+
+    .line 28
+    add-int/lit8 v2, v2, 0x1
 
     .line 29
-    invoke-interface {p0}, Ljava/util/Map;->isEmpty()Z
+    .line 30
+    goto :goto_9
+
+    .line 31
+    :cond_1e
+    iput v3, p0, Lcom/kousei/framework/s4;->O:I
 
     .line 32
-    move-result p1
-
     .line 33
-    if-eqz p1, :cond_24
+    :cond_20
+    iget p0, p0, Lcom/kousei/framework/s4;->O:I
 
+    .line 34
     .line 35
-    goto/16 :goto_aa
-
+    return p0
+    .line 36
     .line 37
-    :cond_24
-    invoke-interface {p0}, Ljava/util/Map;->entrySet()Ljava/util/Set;
-
+    .line 38
+    .line 39
     .line 40
-    move-result-object p0
-
     .line 41
-    invoke-interface {p0}, Ljava/util/Set;->iterator()Ljava/util/Iterator;
-
+    .line 42
+    .line 43
     .line 44
-    move-result-object p0
-
     .line 45
-    :catch_2c
-    :cond_2c
-    :goto_2c
-    invoke-interface {p0}, Ljava/util/Iterator;->hasNext()Z
-
+    .line 46
+    .line 47
     .line 48
-    move-result p1
-
     .line 49
-    if-eqz p1, :cond_aa
-
+    .line 50
     .line 51
-    invoke-interface {p0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
-
+    .line 52
+    .line 53
     .line 54
-    move-result-object p1
-
     .line 55
-    check-cast p1, Ljava/util/Map$Entry;
-
+    .line 56
     .line 57
-    invoke-interface {p1}, Ljava/util/Map$Entry;->getKey()Ljava/lang/Object;
-
+    .line 58
+    .line 59
     .line 60
-    move-result-object p2
-
     .line 61
-    check-cast p2, Ljava/lang/String;
-
+    .line 62
     .line 63
-    invoke-interface {p1}, Ljava/util/Map$Entry;->getValue()Ljava/lang/Object;
-
+    .line 64
+    .line 65
     .line 66
-    move-result-object p1
-
     .line 67
-    check-cast p1, Ljava/lang/String;
-
+    .line 68
     .line 69
-    if-eqz p1, :cond_2c
-
+    .line 70
     .line 71
-    invoke-virtual {p1}, Ljava/lang/String;->isEmpty()Z
-
+    .line 72
+    .line 73
     .line 74
-    move-result v0
-
     .line 75
-    if-eqz v0, :cond_4d
-
+    .line 76
     .line 77
-    goto :goto_2c
-
     .line 78
-    :cond_4d
-    :try_start_4d
-    const-class v0, Landroid/os/Build;
-    :try_end_4f
-    .catch Ljava/lang/Exception; {:try_start_4d .. :try_end_4f} :catch_2c
-
+    .line 79
     .line 80
-    const/4 v1, 0x0
-
     .line 81
-    :try_start_50
-    invoke-virtual {v0, p2}, Ljava/lang/Class;->getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field;
-
+    .line 82
+    .line 83
     .line 84
-    move-result-object v0
-    :try_end_54
-    .catch Ljava/lang/NoSuchFieldException; {:try_start_50 .. :try_end_54} :catch_55
-    .catch Ljava/lang/Exception; {:try_start_50 .. :try_end_54} :catch_2c
-
     .line 85
-    goto :goto_56
-
     .line 86
-    :catch_55
-    move-object v0, v1
-
     .line 87
-    :goto_56
-    if-nez v0, :cond_61
-
+    .line 88
     .line 89
-    :try_start_58
-    const-class v0, Landroid/os/Build$VERSION;
-    :try_end_5a
-    .catch Ljava/lang/Exception; {:try_start_58 .. :try_end_5a} :catch_2c
-
+    .line 90
     .line 91
-    :try_start_5a
-    invoke-virtual {v0, p2}, Ljava/lang/Class;->getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field;
-
+    .line 92
+    .line 93
     .line 94
-    move-result-object p2
-    :try_end_5e
-    .catch Ljava/lang/NoSuchFieldException; {:try_start_5a .. :try_end_5e} :catch_60
-    .catch Ljava/lang/Exception; {:try_start_5a .. :try_end_5e} :catch_2c
-
     .line 95
-    move-object v0, p2
-
     .line 96
-    goto :goto_61
-
     .line 97
-    :catch_60
-    move-object v0, v1
-
     .line 98
-    :cond_61
-    :goto_61
-    if-nez v0, :cond_64
-
+    .line 99
     .line 100
-    goto :goto_2c
-
     .line 101
-    :cond_64
-    const/4 p2, 0x1
-
     .line 102
-    :try_start_65
-    invoke-virtual {v0, p2}, Ljava/lang/reflect/AccessibleObject;->setAccessible(Z)V
-
+    .line 103
+    .line 104
     .line 105
-    invoke-virtual {v0, v1}, Ljava/lang/reflect/Field;->get(Ljava/lang/Object;)Ljava/lang/Object;
-
+    .line 106
+    .line 107
     .line 108
-    move-result-object p2
-
     .line 109
-    invoke-static {p2}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
-
+    .line 110
+    .line 111
     .line 112
-    move-result-object p2
-
     .line 113
-    invoke-virtual {p1, p2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
-
+    .line 114
+    .line 115
     .line 116
-    move-result p2
-
     .line 117
-    if-eqz p2, :cond_77
-
+    .line 118
     .line 119
-    goto :goto_2c
-
     .line 120
-    :cond_77
-    invoke-virtual {v0}, Ljava/lang/reflect/Field;->getType()Ljava/lang/Class;
-
+    .line 121
+    .line 122
     .line 123
-    move-result-object p2
-
     .line 124
-    const-class v2, Ljava/lang/String;
-
+    .line 125
     .line 126
-    if-ne p2, v2, :cond_80
-
+    .line 127
     .line 128
-    goto :goto_a6
-
     .line 129
-    :cond_80
-    sget-object v2, Ljava/lang/Integer;->TYPE:Ljava/lang/Class;
-
+    .line 130
     .line 131
-    if-ne p2, v2, :cond_8d
-
+    .line 132
     .line 133
-    invoke-static {p1}, Ljava/lang/Integer;->parseInt(Ljava/lang/String;)I
-
+    .line 134
+    .line 135
     .line 136
-    move-result p1
-
     .line 137
-    invoke-static {p1}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
-
+    .line 138
+    .line 139
     .line 140
-    move-result-object p1
-
     .line 141
-    goto :goto_a6
-
     .line 142
-    :cond_8d
-    sget-object v2, Ljava/lang/Long;->TYPE:Ljava/lang/Class;
-
+    .line 143
     .line 144
-    if-ne p2, v2, :cond_9a
-
+    .line 145
     .line 146
-    invoke-static {p1}, Ljava/lang/Long;->parseLong(Ljava/lang/String;)J
-
+    .line 147
+    .line 148
     .line 149
-    move-result-wide p1
-
     .line 150
-    invoke-static {p1, p2}, Ljava/lang/Long;->valueOf(J)Ljava/lang/Long;
-
+    .line 151
+    .line 152
     .line 153
-    move-result-object p1
-
     .line 154
-    goto :goto_a6
-
     .line 155
-    :cond_9a
-    sget-object v2, Ljava/lang/Boolean;->TYPE:Ljava/lang/Class;
-
+    .line 156
     .line 157
-    if-ne p2, v2, :cond_2c
-
+    .line 158
     .line 159
-    invoke-static {p1}, Ljava/lang/Boolean;->parseBoolean(Ljava/lang/String;)Z
-
+    .line 160
+    .line 161
     .line 162
-    move-result p1
-
     .line 163
-    invoke-static {p1}, Ljava/lang/Boolean;->valueOf(Z)Ljava/lang/Boolean;
-
+    .line 164
+    .line 165
     .line 166
-    move-result-object p1
-
     .line 167
-    :goto_a6
-    invoke-virtual {v0, v1, p1}, Ljava/lang/reflect/Field;->set(Ljava/lang/Object;Ljava/lang/Object;)V
-    :try_end_a9
-    .catch Ljava/lang/Exception; {:try_start_65 .. :try_end_a9} :catch_2c
-
+    .line 168
+    .line 169
     .line 170
-    goto :goto_2c
-
     .line 171
-    :cond_aa
-    :goto_aa
-    return-void
+    .line 172
 .end method

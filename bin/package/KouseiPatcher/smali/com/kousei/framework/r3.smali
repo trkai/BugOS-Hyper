@@ -1,211 +1,210 @@
-.class public final Lcom/kousei/framework/r3;
-.super Lcom/kousei/framework/h0;
+.class public abstract Lcom/kousei/framework/r3;
+.super Ljava/lang/Object;
 
 
-# instance fields
-.field public final synthetic S:I
-
-.field public final synthetic T:I
-
-.field public final synthetic U:[J
-
-.field public final synthetic V:[I
-
-.field public final synthetic W:Lcom/kousei/framework/s3;
+# static fields
+.field public static final a:Lcom/kousei/framework/v;
 
 
 # direct methods
-.method public constructor <init>(Lcom/kousei/framework/s3;II[J[I)V
-    .registers 7
+.method static constructor <clinit>()V
+    .registers 3
 
     .line 1
-    const/16 v0, 0x14
+    new-instance v0, Lcom/kousei/framework/v;
 
+    .line 2
     .line 3
-    invoke-direct {p0, v0}, Lcom/kousei/framework/h0;-><init>(I)V
+    const-string v1, "1.3.6.1.4.1.3029"
+
+    .line 4
+    .line 5
+    invoke-direct {v0, v1}, Lcom/kousei/framework/v;-><init>(Ljava/lang/String;)V
 
     .line 6
-    iput p2, p0, Lcom/kousei/framework/r3;->S:I
-
-    .line 8
-    iput p3, p0, Lcom/kousei/framework/r3;->T:I
-
-    .line 10
-    iput-object p4, p0, Lcom/kousei/framework/r3;->U:[J
-
-    .line 12
-    iput-object p5, p0, Lcom/kousei/framework/r3;->V:[I
-
-    .line 14
-    iput-object p1, p0, Lcom/kousei/framework/r3;->W:Lcom/kousei/framework/s3;
-
-    .line 16
-    return-void
-.end method
-
-
-# virtual methods
-.method public final J0(I)Lcom/kousei/framework/c4;
-    .registers 18
-
-    .line 1
-    move-object/from16 v0, p0
-
-    .line 3
-    iget v1, v0, Lcom/kousei/framework/r3;->T:I
-
-    .line 5
-    new-array v2, v1, [J
-
     .line 7
-    new-array v3, v1, [J
+    .line 8
+    const-string v1, "1"
 
     .line 9
-    const/4 v4, 0x0
-
     .line 10
-    move v5, v4
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/v;->q(Ljava/lang/String;)Lcom/kousei/framework/v;
 
     .line 11
-    move v6, v5
-
     .line 12
-    :goto_b
-    iget v7, v0, Lcom/kousei/framework/r3;->S:I
+    .line 13
+    move-result-object v0
 
     .line 14
-    if-ge v5, v7, :cond_39
+    const-string v2, "5"
 
+    .line 15
     .line 16
-    xor-int v7, v5, p1
+    invoke-virtual {v0, v2}, Lcom/kousei/framework/v;->q(Ljava/lang/String;)Lcom/kousei/framework/v;
 
+    .line 17
     .line 18
-    add-int/lit8 v7, v7, -0x1
+    .line 19
+    move-result-object v0
 
     .line 20
-    shr-int/lit8 v7, v7, 0x1f
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/v;->q(Ljava/lang/String;)Lcom/kousei/framework/v;
 
+    .line 21
     .line 22
-    int-to-long v7, v7
-
     .line 23
-    move v9, v4
+    move-result-object v0
 
     .line 24
-    :goto_17
-    if-ge v9, v1, :cond_33
+    sput-object v0, Lcom/kousei/framework/r3;->a:Lcom/kousei/framework/v;
 
+    .line 25
     .line 26
-    aget-wide v10, v2, v9
-
+    return-void
+    .line 27
     .line 28
-    add-int v12, v6, v9
-
+    .line 29
     .line 30
-    iget-object v13, v0, Lcom/kousei/framework/r3;->U:[J
-
+    .line 31
     .line 32
-    aget-wide v14, v13, v12
-
+    .line 33
     .line 34
-    and-long/2addr v14, v7
-
     .line 35
-    xor-long/2addr v10, v14
-
     .line 36
-    aput-wide v10, v2, v9
-
+    .line 37
     .line 38
-    aget-wide v10, v3, v9
-
+    .line 39
     .line 40
-    add-int v12, v6, v1
-
+    .line 41
     .line 42
-    add-int/2addr v12, v9
-
     .line 43
-    aget-wide v12, v13, v12
-
+    .line 44
     .line 45
-    and-long/2addr v12, v7
-
     .line 46
-    xor-long/2addr v10, v12
-
     .line 47
-    aput-wide v10, v3, v9
-
+    .line 48
     .line 49
-    add-int/lit8 v9, v9, 0x1
-
+    .line 50
     .line 51
-    goto :goto_17
-
     .line 52
-    :cond_33
-    mul-int/lit8 v7, v1, 0x2
-
+    .line 53
     .line 54
-    add-int/2addr v6, v7
-
     .line 55
-    add-int/lit8 v5, v5, 0x1
-
+    .line 56
     .line 57
-    goto :goto_b
-
     .line 58
-    :cond_39
-    new-instance v1, Lcom/kousei/framework/y3;
-
+    .line 59
     .line 60
-    iget-object v5, v0, Lcom/kousei/framework/r3;->W:Lcom/kousei/framework/s3;
-
+    .line 61
     .line 62
-    iget v6, v5, Lcom/kousei/framework/s3;->g:I
-
+    .line 63
     .line 64
-    new-instance v7, Lcom/kousei/framework/f6;
-
+    .line 65
     .line 66
-    invoke-direct {v7, v2}, Lcom/kousei/framework/f6;-><init>([J)V
-
+    .line 67
+    .line 68
     .line 69
-    iget-object v0, v0, Lcom/kousei/framework/r3;->V:[I
-
+    .line 70
     .line 71
-    invoke-direct {v1, v6, v0, v7}, Lcom/kousei/framework/y3;-><init>(I[ILcom/kousei/framework/f6;)V
-
+    .line 72
+    .line 73
     .line 74
-    new-instance v2, Lcom/kousei/framework/y3;
-
+    .line 75
     .line 76
-    new-instance v7, Lcom/kousei/framework/f6;
-
+    .line 77
     .line 78
-    invoke-direct {v7, v3}, Lcom/kousei/framework/f6;-><init>([J)V
-
+    .line 79
+    .line 80
     .line 81
-    invoke-direct {v2, v6, v0, v7}, Lcom/kousei/framework/y3;-><init>(I[ILcom/kousei/framework/f6;)V
-
+    .line 82
+    .line 83
     .line 84
-    new-instance v0, Lcom/kousei/framework/d4;
-
+    .line 85
     .line 86
-    invoke-direct {v0, v5, v1, v2, v4}, Lcom/kousei/framework/d4;-><init>(Lcom/kousei/framework/u3;Lcom/kousei/framework/h0;Lcom/kousei/framework/h0;I)V
-
+    .line 87
+    .line 88
     .line 89
-    return-object v0
-.end method
-
-.method public final b0()I
-    .registers 1
-
-    .line 1
-    iget p0, p0, Lcom/kousei/framework/r3;->S:I
-
-    .line 3
-    return p0
+    .line 90
+    .line 91
+    .line 92
+    .line 93
+    .line 94
+    .line 95
+    .line 96
+    .line 97
+    .line 98
+    .line 99
+    .line 100
+    .line 101
+    .line 102
+    .line 103
+    .line 104
+    .line 105
+    .line 106
+    .line 107
+    .line 108
+    .line 109
+    .line 110
+    .line 111
+    .line 112
+    .line 113
+    .line 114
+    .line 115
+    .line 116
+    .line 117
+    .line 118
+    .line 119
+    .line 120
+    .line 121
+    .line 122
+    .line 123
+    .line 124
+    .line 125
+    .line 126
+    .line 127
+    .line 128
+    .line 129
+    .line 130
+    .line 131
+    .line 132
+    .line 133
+    .line 134
+    .line 135
+    .line 136
+    .line 137
+    .line 138
+    .line 139
+    .line 140
+    .line 141
+    .line 142
+    .line 143
+    .line 144
+    .line 145
+    .line 146
+    .line 147
+    .line 148
+    .line 149
+    .line 150
+    .line 151
+    .line 152
+    .line 153
+    .line 154
+    .line 155
+    .line 156
+    .line 157
+    .line 158
+    .line 159
+    .line 160
+    .line 161
+    .line 162
+    .line 163
+    .line 164
+    .line 165
+    .line 166
+    .line 167
+    .line 168
+    .line 169
+    .line 170
+    .line 171
+    .line 172
 .end method

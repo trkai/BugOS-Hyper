@@ -1,157 +1,277 @@
 .class public final Lcom/kousei/framework/c3;
-.super Ljava/lang/Object;
-
-# interfaces
-.implements Lcom/kousei/framework/m1;
+.super Lcom/kousei/framework/s;
 
 
 # instance fields
-.field public final a:Ljava/math/BigInteger;
+.field public K:I
 
-.field public final b:Ljava/math/BigInteger;
+.field public L:[B
 
-.field public final c:Ljava/math/BigInteger;
+.field public M:[B
 
-.field public final d:Lcom/kousei/framework/d3;
+.field public N:[B
 
+.field public O:[B
 
-# direct methods
-.method public constructor <init>(Ljava/math/BigInteger;Ljava/math/BigInteger;Ljava/math/BigInteger;Lcom/kousei/framework/d3;)V
-    .registers 5
+.field public P:[B
 
-    .line 1
-    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
-
-    .line 4
-    iput-object p3, p0, Lcom/kousei/framework/c3;->a:Ljava/math/BigInteger;
-
-    .line 6
-    iput-object p1, p0, Lcom/kousei/framework/c3;->c:Ljava/math/BigInteger;
-
-    .line 8
-    iput-object p2, p0, Lcom/kousei/framework/c3;->b:Ljava/math/BigInteger;
-
-    .line 10
-    iput-object p4, p0, Lcom/kousei/framework/c3;->d:Lcom/kousei/framework/d3;
-
-    .line 12
-    return-void
-.end method
+.field public Q:Lcom/kousei/framework/e3;
 
 
 # virtual methods
-.method public final equals(Ljava/lang/Object;)Z
+.method public final b()Lcom/kousei/framework/a0;
     .registers 4
 
     .line 1
-    instance-of v0, p1, Lcom/kousei/framework/c3;
+    new-instance v0, Lcom/kousei/framework/l;
 
+    .line 2
     .line 3
-    if-nez v0, :cond_5
+    invoke-direct {v0}, Lcom/kousei/framework/l;-><init>()V
 
+    .line 4
     .line 5
-    goto :goto_27
-
     .line 6
-    :cond_5
-    check-cast p1, Lcom/kousei/framework/c3;
-
-    .line 8
-    iget-object v0, p1, Lcom/kousei/framework/c3;->c:Ljava/math/BigInteger;
-
-    .line 10
-    iget-object v1, p0, Lcom/kousei/framework/c3;->c:Ljava/math/BigInteger;
-
-    .line 12
-    invoke-virtual {v0, v1}, Ljava/math/BigInteger;->equals(Ljava/lang/Object;)Z
-
-    .line 15
-    move-result v0
-
-    .line 16
-    if-eqz v0, :cond_27
-
-    .line 18
-    iget-object v0, p1, Lcom/kousei/framework/c3;->b:Ljava/math/BigInteger;
-
-    .line 20
-    iget-object v1, p0, Lcom/kousei/framework/c3;->b:Ljava/math/BigInteger;
-
-    .line 22
-    invoke-virtual {v0, v1}, Ljava/math/BigInteger;->equals(Ljava/lang/Object;)Z
-
-    .line 25
-    move-result v0
-
-    .line 26
-    if-eqz v0, :cond_27
-
-    .line 28
-    iget-object p1, p1, Lcom/kousei/framework/c3;->a:Ljava/math/BigInteger;
-
-    .line 30
-    iget-object p0, p0, Lcom/kousei/framework/c3;->a:Ljava/math/BigInteger;
-
-    .line 32
-    invoke-virtual {p1, p0}, Ljava/math/BigInteger;->equals(Ljava/lang/Object;)Z
-
-    .line 35
-    move-result p0
-
-    .line 36
-    if-eqz p0, :cond_27
-
-    .line 38
-    const/4 p0, 0x1
-
-    .line 39
-    return p0
-
-    .line 40
-    :cond_27
-    :goto_27
-    const/4 p0, 0x0
-
-    .line 41
-    return p0
-.end method
-
-.method public final hashCode()I
-    .registers 3
-
-    .line 1
-    iget-object v0, p0, Lcom/kousei/framework/c3;->c:Ljava/math/BigInteger;
-
-    .line 3
-    invoke-virtual {v0}, Ljava/math/BigInteger;->hashCode()I
-
-    .line 6
-    move-result v0
+    iget v1, p0, Lcom/kousei/framework/c3;->K:I
 
     .line 7
-    iget-object v1, p0, Lcom/kousei/framework/c3;->b:Ljava/math/BigInteger;
+    .line 8
+    invoke-static {v1}, Lcom/kousei/framework/q;->z(I)Lcom/kousei/framework/q;
 
     .line 9
-    invoke-virtual {v1}, Ljava/math/BigInteger;->hashCode()I
+    .line 10
+    .line 11
+    move-result-object v1
 
     .line 12
-    move-result v1
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/l;->a(Lcom/kousei/framework/k;)V
 
     .line 13
-    xor-int/2addr v0, v1
-
     .line 14
-    iget-object p0, p0, Lcom/kousei/framework/c3;->a:Ljava/math/BigInteger;
+    .line 15
+    new-instance v1, Lcom/kousei/framework/o4;
 
     .line 16
-    invoke-virtual {p0}, Ljava/math/BigInteger;->hashCode()I
+    .line 17
+    iget-object v2, p0, Lcom/kousei/framework/c3;->L:[B
 
+    .line 18
     .line 19
-    move-result p0
+    invoke-direct {v1, v2}, Lcom/kousei/framework/w;-><init>([B)V
 
     .line 20
-    xor-int/2addr p0, v0
-
     .line 21
-    return p0
+    .line 22
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/l;->a(Lcom/kousei/framework/k;)V
+
+    .line 23
+    .line 24
+    .line 25
+    new-instance v1, Lcom/kousei/framework/o4;
+
+    .line 26
+    .line 27
+    iget-object v2, p0, Lcom/kousei/framework/c3;->M:[B
+
+    .line 28
+    .line 29
+    invoke-direct {v1, v2}, Lcom/kousei/framework/w;-><init>([B)V
+
+    .line 30
+    .line 31
+    .line 32
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/l;->a(Lcom/kousei/framework/k;)V
+
+    .line 33
+    .line 34
+    .line 35
+    new-instance v1, Lcom/kousei/framework/o4;
+
+    .line 36
+    .line 37
+    iget-object v2, p0, Lcom/kousei/framework/c3;->N:[B
+
+    .line 38
+    .line 39
+    invoke-direct {v1, v2}, Lcom/kousei/framework/w;-><init>([B)V
+
+    .line 40
+    .line 41
+    .line 42
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/l;->a(Lcom/kousei/framework/k;)V
+
+    .line 43
+    .line 44
+    .line 45
+    new-instance v1, Lcom/kousei/framework/o4;
+
+    .line 46
+    .line 47
+    iget-object v2, p0, Lcom/kousei/framework/c3;->O:[B
+
+    .line 48
+    .line 49
+    invoke-direct {v1, v2}, Lcom/kousei/framework/w;-><init>([B)V
+
+    .line 50
+    .line 51
+    .line 52
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/l;->a(Lcom/kousei/framework/k;)V
+
+    .line 53
+    .line 54
+    .line 55
+    new-instance v1, Lcom/kousei/framework/o4;
+
+    .line 56
+    .line 57
+    iget-object v2, p0, Lcom/kousei/framework/c3;->P:[B
+
+    .line 58
+    .line 59
+    invoke-direct {v1, v2}, Lcom/kousei/framework/w;-><init>([B)V
+
+    .line 60
+    .line 61
+    .line 62
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/l;->a(Lcom/kousei/framework/k;)V
+
+    .line 63
+    .line 64
+    .line 65
+    iget-object p0, p0, Lcom/kousei/framework/c3;->Q:Lcom/kousei/framework/e3;
+
+    .line 66
+    .line 67
+    if-eqz p0, :cond_52
+
+    .line 68
+    .line 69
+    new-instance v1, Lcom/kousei/framework/e3;
+
+    .line 70
+    .line 71
+    iget-object p0, p0, Lcom/kousei/framework/e3;->K:[B
+
+    .line 72
+    .line 73
+    invoke-static {p0}, Lcom/kousei/framework/i0;->J([B)[B
+
+    .line 74
+    .line 75
+    .line 76
+    move-result-object p0
+
+    .line 77
+    invoke-direct {v1, p0}, Lcom/kousei/framework/e3;-><init>([B)V
+
+    .line 78
+    .line 79
+    .line 80
+    invoke-virtual {v0, v1}, Lcom/kousei/framework/l;->a(Lcom/kousei/framework/k;)V
+
+    .line 81
+    .line 82
+    .line 83
+    :cond_52
+    new-instance p0, Lcom/kousei/framework/r4;
+
+    .line 84
+    .line 85
+    const/4 v1, 0x0
+
+    .line 86
+    invoke-direct {p0, v0, v1}, Lcom/kousei/framework/r4;-><init>(Lcom/kousei/framework/l;Z)V
+
+    .line 87
+    .line 88
+    .line 89
+    const/4 v0, -0x1
+
+    .line 90
+    iput v0, p0, Lcom/kousei/framework/r4;->N:I
+
+    .line 91
+    .line 92
+    return-object p0
+    .line 93
+    .line 94
+    .line 95
+    .line 96
+    .line 97
+    .line 98
+    .line 99
+    .line 100
+    .line 101
+    .line 102
+    .line 103
+    .line 104
+    .line 105
+    .line 106
+    .line 107
+    .line 108
+    .line 109
+    .line 110
+    .line 111
+    .line 112
+    .line 113
+    .line 114
+    .line 115
+    .line 116
+    .line 117
+    .line 118
+    .line 119
+    .line 120
+    .line 121
+    .line 122
+    .line 123
+    .line 124
+    .line 125
+    .line 126
+    .line 127
+    .line 128
+    .line 129
+    .line 130
+    .line 131
+    .line 132
+    .line 133
+    .line 134
+    .line 135
+    .line 136
+    .line 137
+    .line 138
+    .line 139
+    .line 140
+    .line 141
+    .line 142
+    .line 143
+    .line 144
+    .line 145
+    .line 146
+    .line 147
+    .line 148
+    .line 149
+    .line 150
+    .line 151
+    .line 152
+    .line 153
+    .line 154
+    .line 155
+    .line 156
+    .line 157
+    .line 158
+    .line 159
+    .line 160
+    .line 161
+    .line 162
+    .line 163
+    .line 164
+    .line 165
+    .line 166
+    .line 167
+    .line 168
+    .line 169
+    .line 170
+    .line 171
+    .line 172
 .end method
