@@ -74,21 +74,34 @@ if [ "${#debloat_pkgs[@]}" -gt 0 ]; then
 fi
 
 # --- 2. Debloat theo tên thư mục (cách cũ, giữ để tương thích) -------------
+#
+# CHỈ xoá thư mục nằm ngay trong app/ priv-app/ data-app/ overlay/. Khớp glob
+# trần "*$tên*" trên toàn bộ images thì tên ngắn ăn cả thư mục hệ thống: bản
+# OS4.0.5.0 có entry "mab" và nó khớp "*mab*" -> d/bpf/d**mab**uf, build xoá
+# luôn /system/system/etc/bpf/dmabuf. Cùng lý do, entry "Mi" sẽ khớp MiuiHome.
+# pkg: vẫn là cách đúng; nhánh này chỉ còn để tương thích APPLIST cũ.
 for debloat_app in "${debloat_apps[@]}"; do
     [ -z "$debloat_app" ] && continue
     all_app_dirs=$(
-        find "$MAIN_FOLDER/system" -type d -name "*$debloat_app*" 2>/dev/null
-        find "$MAIN_FOLDER/product" -type d -name "*$debloat_app*" 2>/dev/null
-        find "$MAIN_FOLDER/mi_ext" -type d -name "*$debloat_app*" 2>/dev/null
-        find "$MAIN_FOLDER/system_ext" -type d -name "*$debloat_app*" 2>/dev/null
+        find "$MAIN_FOLDER/system" "$MAIN_FOLDER/product" "$MAIN_FOLDER/mi_ext" \
+             "$MAIN_FOLDER/system_ext" \
+             -type d -name "*$debloat_app*" \
+             \( -path '*/app/*' -o -path '*/priv-app/*' -o -path '*/data-app/*' -o -path '*/overlay/*' \) \
+             2>/dev/null
     )
 
     while IFS= read -r app_dir; do
         [ -n "$app_dir" ] || continue
-        if [[ -d "$app_dir" ]]; then
-            info "Removing directory: $app_dir"
-            rm -rf "$app_dir"
-        fi
+        [[ -d $app_dir ]] || continue
+        case "$(basename "$(dirname "$app_dir")")" in
+            app|priv-app|data-app|overlay)
+                info "Removing directory: $app_dir"
+                rm -rf "$app_dir"
+                ;;
+            *)
+                warn "Debloat: bỏ qua '$app_dir' - thư mục mẹ không phải app/priv-app/data-app/overlay"
+                ;;
+        esac
     done <<< "$all_app_dirs"
 done
 
