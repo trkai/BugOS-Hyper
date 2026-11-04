@@ -19,6 +19,79 @@
 work_dir=$(pwd)
 source $work_dir/functions.sh
 appdir="$work_dir/bin/package/KouseiPatcher/app"
+IMG="$work_dir/build/baserom/images"
+
+# ---------------------------------------------------------------------------
+# SELinux cho AdvancedPolicyService.
+#
+# Payload đăng ký một service Binder tên "kaorios_advanced_policy" từ
+# KaoriosHook.initSystemServer() (chạy trong SystemServer.run). App
+# com.kousei.kaorios gọi ServiceManager.getService(tên đó) để điều khiển.
+#
+# Thiếu policy thì ServiceManager.addService() trong system_server bị từ chối
+# (không có allow nào cho system_server add vào default_android_service - tên
+# chưa khai báo trong service_contexts sẽ rơi vào label đó), service không được
+# đăng ký, app không tìm thấy -> mục "Sửa lỗi Integrity" không mở được.
+#
+# Tên service lấy từ chính payload: giải mã hằng số trong
+# ServiceManagerBridge.<clinit> (p.a(J)) -> "kaorios_advanced_policy". Không
+# đoán từ tài liệu upstream.
+#
+# Bốn thứ phải khớp nhau, thiếu một là hỏng:
+#   1. type + roletype
+#   2. gán type vào attribute service_manager_type
+#   3. allow system_server add/find, allow priv_app find
+#   4. plat_service_contexts: map TÊN -> type (nếu không, tên vẫn là
+#      default_android_service và các allow ở (3) không bao giờ khớp)
+# ---------------------------------------------------------------------------
+KAORIOS_SVC="kaorios_advanced_policy"
+KAORIOS_TYPE="${KAORIOS_SVC}_service"
+
+install_kaorios_policy() {
+    local cil="$IMG/system/system/etc/selinux/plat_sepolicy.cil"
+    local ctx="$IMG/system/system/etc/selinux/plat_service_contexts"
+
+    if [ ! -f "$cil" ]; then
+        warn "Kousei: không thấy plat_sepolicy.cil - bỏ qua policy cho $KAORIOS_SVC"
+        return 0
+    fi
+
+    if grep -Fq "(type $KAORIOS_TYPE)" "$cil"; then
+        mods "Kousei: policy $KAORIOS_TYPE đã có - bỏ qua"
+    else
+        {
+            echo ""
+            echo "# BugOS: service Binder riêng của Kaorios Toolbox"
+            echo "(type $KAORIOS_TYPE)"
+            echo "(roletype object_r $KAORIOS_TYPE)"
+            echo "(typeattributeset service_manager_type ($KAORIOS_TYPE))"
+            echo "(allow system_server $KAORIOS_TYPE (service_manager (add find)))"
+            echo "(allow priv_app $KAORIOS_TYPE (service_manager (find)))"
+            echo "(allow priv_app system_server (binder (call)))"
+        } >> "$cil"
+        if grep -Fq "(type $KAORIOS_TYPE)" "$cil"; then
+            mods "Kousei: đã thêm policy $KAORIOS_TYPE vào plat_sepolicy.cil"
+        else
+            warn "Kousei: ghi plat_sepolicy.cil thất bại - $KAORIOS_SVC sẽ không đăng ký được"
+        fi
+    fi
+
+    if [ ! -f "$ctx" ]; then
+        warn "Kousei: không thấy plat_service_contexts - service sẽ mang label default_android_service"
+        return 0
+    fi
+
+    if grep -qE "^${KAORIOS_SVC}[[:space:]]" "$ctx"; then
+        mods "Kousei: $KAORIOS_SVC đã có trong plat_service_contexts - bỏ qua"
+    else
+        echo "${KAORIOS_SVC} u:object_r:${KAORIOS_TYPE}:s0" >> "$ctx"
+        if grep -qE "^${KAORIOS_SVC}[[:space:]]" "$ctx"; then
+            mods "Kousei: đã map $KAORIOS_SVC -> ${KAORIOS_TYPE} trong plat_service_contexts"
+        else
+            warn "Kousei: ghi plat_service_contexts thất bại"
+        fi
+    fi
+}
 
 # Chỉ khớp dòng khai báo thật, không khớp dòng comment. Bản cũ dùng
 # grep "install_toolbox" nên nếu config.env có comment nhắc tới tên này thì nó
@@ -36,13 +109,14 @@ if [[ $kaoriospatch == "true" ]]; then
 
     if [[ $fakelock == "true" ]]; then
         bash $work_dir/bin/package/KouseiPatcher/patcher.sh
+        install_kaorios_policy
     else
         mods "Kousei: fake_lock=false - không vá framework/services"
         mods "Kousei: vẫn cài KaoriosToolbox, app sẽ hiện trạng thái THẬT"
     fi
 
-    cp -rf $appdir/KaoriosToolbox $work_dir/build/baserom/images/system/system/priv-app
-    cp -rf $appdir/com.kousei.kaorios.xml $work_dir/build/baserom/images/system/system/etc/permissions
+    cp -rf $appdir/KaoriosToolbox "$IMG/system/system/priv-app"
+    cp -rf $appdir/com.kousei.kaorios.xml "$IMG/system/system/etc/permissions"
     mods "Kousei: KaoriosToolbox 2.0.6.1 đã vào priv-app"
 else
     mods "Kousei: install_toolbox=false - không cài KaoriosToolbox"
