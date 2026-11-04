@@ -110,7 +110,7 @@ jobs:
         run: |
           sudo -E bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
-      - name: Validate SELinux policy
+      - name: Check Kaorios SELinux block
         run: |
           set -e
           CIL="build/baserom/images/system/system/etc/selinux/plat_sepolicy.cil"
@@ -118,28 +118,15 @@ jobs:
             echo "Không thấy $CIL - bỏ qua"
             exit 0
           fi
-          if ! grep -q 'kaorios_advanced_policy_service' "$CIL"; then
-            echo "CIL không chứa policy Kaorios - không có gì để kiểm"
-            exit 0
-          fi
 
-          # Policy hỏng cú pháp thì init không dựng được policy lúc boot: panic
-          # rồi rơi ra fastboot. Đã xảy ra một lần ở commit f871109, và lúc đó
-          # không có cách nào biết trước vì secilc chỉ chạy trên máy.
-          # Bước này biến lỗi đó thành lỗi build - build đỏ thì không có ROM để
-          # flash, thay vì có ROM rồi brick máy.
-          sudo apt-get update -qq
-          if ! sudo apt-get install -y -qq secilc; then
-            echo "::error::Không cài được secilc nên không kiểm được policy. Cài lại hoặc đặt kaorios_service_policy=false."
-            exit 1
-          fi
-          secilc --help >/dev/null 2>&1 || true
-          echo "secilc: $(command -v secilc)"
-
-          # -N: bỏ qua neverallow, giống cách Android build policy của ROM.
-          # -c 33: policy version đang dùng trên ROM này.
-          secilc -m -M true -G -N -c 33 -o /tmp/policy_check.cil "$CIL"
-          echo "SELinux policy OK: $(stat -c%s /tmp/policy_check.cil) bytes"
+          # Không biên dịch được cả file: policy của ROM dùng permissionx kind
+          # "nlmsg" (app_neverallows.te:151) mà secilc 3.5 của Ubuntu không
+          # biết, nên nó chết ở dòng 16237 - trước cả khối của mình. Repo
+          # Ubuntu này không có secilc mới hơn.
+          #
+          # Nên kiểm bằng script: đúng những lỗi đã làm brick máy (05/11) -
+          # '#' thay vì ';', ngoặc lệch, type/attribute/role/class không tồn tại.
+          python3 bin/tools/check_cil_block.py "$CIL"
 
       - name: Pack ROM...
         timeout-minutes: 40

@@ -64,6 +64,7 @@ install_kaorios_policy() {
             # CIL dung ';' cho comment, KHONG dung '#'. Ghi '#' thi secilc bao
             # "Symbol not inside parenthesis" va ca policy khong bien dich duoc
             # -> init panic -> fastboot. Da dinh dung loi nay o f871109.
+            echo "; BUGOS-KAORIOS-BEGIN"
             echo "; BugOS: service Binder riêng của Kaorios Toolbox"
             echo "(type $KAORIOS_TYPE)"
             echo "(roletype object_r $KAORIOS_TYPE)"
@@ -71,6 +72,7 @@ install_kaorios_policy() {
             echo "(allow system_server $KAORIOS_TYPE (service_manager (add find)))"
             echo "(allow priv_app $KAORIOS_TYPE (service_manager (find)))"
             echo "(allow priv_app system_server (binder (call)))"
+            echo "; BUGOS-KAORIOS-END"
         } >> "$cil"
         if grep -Fq "(type $KAORIOS_TYPE)" "$cil"; then
             mods "Kousei: đã thêm policy $KAORIOS_TYPE vào plat_sepolicy.cil"
