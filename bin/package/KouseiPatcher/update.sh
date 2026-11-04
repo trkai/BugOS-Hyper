@@ -109,7 +109,13 @@ if [[ $kaoriospatch == "true" ]]; then
 
     if [[ $fakelock == "true" ]]; then
         bash $work_dir/bin/package/KouseiPatcher/patcher.sh
-        install_kaorios_policy
+
+        kaoriospolicy=$(grep -m1 '^kaorios_service_policy=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+        if [ "$kaoriospolicy" = "false" ]; then
+            mods "Kousei: kaorios_service_policy=false - không thêm policy cho $KAORIOS_SVC"
+        else
+            install_kaorios_policy
+        fi
     else
         mods "Kousei: fake_lock=false - không vá framework/services"
         mods "Kousei: vẫn cài KaoriosToolbox, app sẽ hiện trạng thái THẬT"
