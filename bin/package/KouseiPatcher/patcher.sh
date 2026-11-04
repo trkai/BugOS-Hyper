@@ -189,6 +189,9 @@ jar_util()
         fi
 
         cd "$dir" || return 1
+        # 7za a mà còn archive cũ thì nó GHI THÊM chứ không dựng lại -> giữ entry
+        # mồ côi của lần chạy trước.
+        rm -f "$JARDIR/$2_notal"
         7za a -tzip -mx=0 "$JARDIR/$2_notal" "$JARDIR/$2.out/." >/dev/null 2>&1
         zipalign 4 "$JARDIR/$2_notal" "$JARDIR/$2"
         if [[ -f "$JARDIR/$2" ]] && unzip -t "$JARDIR/$2" >/dev/null 2>&1; then
