@@ -84,6 +84,8 @@
 #define PROP_DIR "/dev/__properties__"
 #define KMSG "/dev/kmsg"
 #define TAG "BUGOS_PROP: "
+/* Ban sao log doc duoc khong can root - /dev/kmsg chi root doc duoc. */
+#define LOGFILE "/data/local/tmp/bugos_propfix.log"
 
 /* serial: bit0 = dirty, bit16 = kLongFlag, byte cao = do dai value. */
 #define SERIAL_DIRTY(s)       ((s) & 1u)
@@ -145,6 +147,7 @@ static int g_n;
 static void klog(const char *fmt, ...)
 {
     static int fd = -2;
+    static int lfd = -2;
     char buf[256];
     va_list ap;
     size_t used;
@@ -154,7 +157,11 @@ static void klog(const char *fmt, ...)
     if (fd == -2) {
         fd = open(KMSG, O_WRONLY | O_CLOEXEC);
     }
-    if (fd < 0) {
+    if (lfd == -2) {
+        lfd = open(LOGFILE, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+    }
+
+    if (fd < 0 && lfd < 0) {
         return;
     }
 
@@ -177,7 +184,15 @@ static void klog(const char *fmt, ...)
         used = sizeof(buf) - 1;
     }
 
-    if (write(fd, buf, used) < 0) {
+    if (fd >= 0 && write(fd, buf, used) < 0) {
+        /* bo qua */
+    }
+    /*
+     * Ban sao ra file de doc duoc bang adb shell khi khong co root: /dev/kmsg
+     * chi root doc duoc, nen truoc day khong co cach nao biet binary co chay
+     * hay khong. Dong nay la thu duy nhat tra loi duoc cau hoi do.
+     */
+    if (lfd >= 0 && write(lfd, buf + 3, used - 3) < 0) {
         /* bo qua */
     }
 }

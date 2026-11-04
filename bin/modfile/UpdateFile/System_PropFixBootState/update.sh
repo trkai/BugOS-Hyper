@@ -140,17 +140,34 @@ cat > "$DEST_RC" << 'RCEOF'
 #
 # Chay 2 lan (post-fs-data + boot_completed) vi binary idempotent; lan sau chi
 # ghi lai neu co gi do ghi de.
+#
+# HAI dang exec, co y:
+#
+#   exec -- /system/bin/bugos_propfix
+#       Dang tran: khong seclabel, khong user. Neu init mac dinh chay bang root
+#       thi day la du nhat.
+#
+#   exec u:r:init:s0 root root -- /system/bin/bugos_propfix
+#       Dang day du, giong init.kaorios.rc cua upstream. Can thiet vi cac file
+#       trong /dev/__properties__ deu la 0444 (do that tren may): chi root co
+#       CAP_DAC_OVERRIDE moi open(O_RDWR) duoc. Neu dang tran chay bang user
+#       khac root thi no im lang that bai - dung trieu chung "prop van orange".
+#
+# Ca hai deu idempotent nen chay ca hai khong hai gi: cai nao ghi duoc thi ghi,
+# cai con lai chi doc lai roi thoat.
 
 on post-fs-data
     exec -- /system/bin/bugos_propfix
+    exec u:r:init:s0 root root -- /system/bin/bugos_propfix
 
 on property:sys.boot_completed=1
     exec -- /system/bin/bugos_propfix
+    exec u:r:init:s0 root root -- /system/bin/bugos_propfix
 RCEOF
 
 chmod 0644 "$DEST_RC"
 
-if grep -q "exec -- /system/bin/bugos_propfix" "$DEST_RC" && [ -x "$DEST_BIN" ]; then
+if grep -q "exec u:r:init:s0 root root -- /system/bin/bugos_propfix" "$DEST_RC" && [ -x "$DEST_BIN" ]; then
     mods "PropFix: /system/bin/bugos_propfix + exec từ init (ghi thẳng kho prop)"
 else
     warn "PropFix: cài đặt không như mong đợi - kiểm tra $DEST_RC"
