@@ -61,7 +61,10 @@ install_kaorios_policy() {
     else
         {
             echo ""
-            echo "# BugOS: service Binder riêng của Kaorios Toolbox"
+            # CIL dung ';' cho comment, KHONG dung '#'. Ghi '#' thi secilc bao
+            # "Symbol not inside parenthesis" va ca policy khong bien dich duoc
+            # -> init panic -> fastboot. Da dinh dung loi nay o f871109.
+            echo "; BugOS: service Binder riêng của Kaorios Toolbox"
             echo "(type $KAORIOS_TYPE)"
             echo "(roletype object_r $KAORIOS_TYPE)"
             echo "(typeattributeset service_manager_type ($KAORIOS_TYPE))"
