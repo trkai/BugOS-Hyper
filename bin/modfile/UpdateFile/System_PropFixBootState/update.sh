@@ -148,7 +148,8 @@ cat > "$DEST_RC" << 'RCEOF'
 #       thi day la du nhat.
 #
 #   exec u:r:init:s0 root root -- /system/bin/bugos_propfix
-#       Dang day du, giong init.kaorios.rc cua upstream. Can thiet vi cac file
+#       Dang day du: neu chi ghi 'exec -- cmd' thi init chay bang user mac dinh,
+#       khong phai root. Can thiet vi cac file
 #       trong /dev/__properties__ deu la 0444 (do that tren may): chi root co
 #       CAP_DAC_OVERRIDE moi open(O_RDWR) duoc. Neu dang tran chay bang user
 #       khac root thi no im lang that bai - dung trieu chung "prop van orange".

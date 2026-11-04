@@ -5,7 +5,7 @@
 #
 # VÌ SAO CẦN, KHI ĐÃ CÓ PATCH SystemProperties:
 #   Đã kiểm chứng trên máy (annibale, bản build có boot_state_spoof):
-#     - KaoriosToolbox (Java) đọc được green / locked
+#     - app Java đọc được green / locked
 #     - Settings > Trạng thái Mở khóa Mi hiện "Thiết bị này đã khóa"
 #     - getprop (native) vẫn orange
 #     - VNeID VẪN báo CA-E006

@@ -47,7 +47,7 @@ Không cần sửa `build.sh`, `patchpackage.sh`, `insupdate.sh`, `insfile.sh`.
 | `Fonts` (regex `^OS[3-9]`) | `COREPATCH/jar_patcher_a*.sh` |
 | `MultiLang` (regex `^OS[4-9]`) | `NOTIFICATION_FIX/A*/` |
 | `Settings_AdvancedTexture` (prop) | `FCM_NotificationFix` (engine chỉ có strategy A16) |
-| `Xiaomi_NoLowEnd` (prop) | `KouseiPatcher/toolbox.py` (anchor smali) |
+| `Xiaomi_NoLowEnd` (prop) | `KernelSU/patch.sh` (KMI theo kernel) |
 | `Google_DefaultOn` (prop + APKEditor) | `thememanager` OS3/OS4 (APK ThemeManager) |
 | `DISABLE_AVB` (vbmeta) | `gmsservices/maps/A*` |
 | `Settings_ROMInformation` (APKEditor) | |
@@ -70,21 +70,30 @@ nó im lặng bỏ qua — đó là lỗi nguy hiểm nhất đã sửa).
 
 ---
 
-## 5. Fake Lock
+## 5. Root và trạng thái bootloader
 
-Ba tầng, bật/tắt bằng `config.env: install_toolbox=true`.
+ROM **không còn tự giả** trạng thái bootloader. Bộ hook Kaorios (KouseiPatcher) đã bị
+gỡ khỏi cây: `KaoriosHook.getSpoofedProperty` không có caller nào trong payload, nên
+tầng đó chưa bao giờ đổi được `ro.boot.*`, còn khối SELinux cho `AdvancedPolicyService`
+của nó đã hai lần làm máy rơi vào fastboot.
 
-| Tầng | File | Ghi chú |
+Thay vào đó ROM **có root sẵn** — KernelSU Next 3.4.2, chế độ LKM:
+
+| Việc | File | Ghi chú |
 |---|---|---|
-| cmdline `vendor_boot.img` | `KouseiPatcher/fakelock_patch.sh` | có backup + rollback trong script |
-| prop | `KouseiPatcher/prop/build.prop` + `cust.prop` | đã dedupe |
-| hook framework | `KouseiPatcher/patcher.sh` + `toolbox.py` | fail-fast, có backup/restore |
+| vá kernel | `KernelSU/patch.sh` | `ksud boot-patch-v2` nhúng `kernelsu.ko` vào `boot.img` |
+| KMI | tự dò từ chuỗi version kernel | override bằng `config.env: kernelsu_kmi` |
+| manager | `product/app/KernelSUNext` | APK 3.4.2, cùng tag với ksud và .ko |
 
-**Không khoá bootloader thật.** Nó spoof attestation + prop báo cáo. AVB vẫn đang tắt
-(`DISABLE_AVB`) — đó là điều kiện để chạy ROM mod nội dung `/system`.
+Việc giả trạng thái/attestation chuyển sang module KSU (PIF, keybox, SUSFS) — cài sau
+khi flash, không nhúng vào ROM.
 
-Nếu patch trượt, `patcher.sh` **giữ nguyên jar gốc** và in cảnh báo rõ; ROM vẫn boot,
-chỉ là trạng thái lock/integrity là thật.
+Ba tầng prop của BugOS vẫn giữ nguyên và độc lập với root:
+`prop_fix_boot_state` (ghi thẳng vùng property từ init), `boot_state_spoof` (vá
+`SystemProperties` trong `framework.jar`), `getprop_spoof` (wrapper `getprop`).
+
+**Không khoá bootloader thật.** AVB vẫn tắt (`DISABLE_AVB`) — điều kiện để chạy ROM
+mod nội dung `/system`.
 
 ---
 

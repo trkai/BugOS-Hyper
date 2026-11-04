@@ -110,24 +110,6 @@ jobs:
         run: |
           sudo -E bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
-      - name: Check Kaorios SELinux block
-        run: |
-          set -e
-          CIL="build/baserom/images/system/system/etc/selinux/plat_sepolicy.cil"
-          if [ ! -f "$CIL" ]; then
-            echo "Không thấy $CIL - bỏ qua"
-            exit 0
-          fi
-
-          # Không biên dịch được cả file: policy của ROM dùng permissionx kind
-          # "nlmsg" (app_neverallows.te:151) mà secilc 3.5 của Ubuntu không
-          # biết, nên nó chết ở dòng 16237 - trước cả khối của mình. Repo
-          # Ubuntu này không có secilc mới hơn.
-          #
-          # Nên kiểm bằng script: đúng những lỗi đã làm brick máy (05/11) -
-          # '#' thay vì ';', ngoặc lệch, type/attribute/role/class không tồn tại.
-          python3 bin/tools/check_cil_block.py "$CIL"
-
       - name: Pack ROM...
         timeout-minutes: 40
         run: |
