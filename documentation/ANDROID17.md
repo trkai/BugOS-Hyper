@@ -1,8 +1,11 @@
 # Android target separation (A16 / A17)
 
 Tài liệu này mô tả cách BugOS tách nhánh theo phiên bản Android **mà không di chuyển
-file nào**. Cấu trúc cũ (`bin/modfile/OS1..OS4`, `bin/package/...`) được giữ nguyên;
-việc tách thực hiện bằng **quy ước đặt tên + cổng chặn build**.
+file nào**. Cấu trúc `bin/modfile/OS<n>` + `bin/package/...` được giữ nguyên; việc tách
+thực hiện bằng **quy ước đặt tên + cổng chặn build**.
+
+`bin/modfile/OS1` và `OS2` đã bị xoá — chúng chỉ còn dispatcher, không có mod nào bên
+trong. Còn lại `OS3` và `OS4`, mỗi cái tự thoát nếu `rom_os` không khớp.
 
 ---
 

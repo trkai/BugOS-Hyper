@@ -270,8 +270,7 @@ bash $work_dir/bin/ddevice/target_check.sh || { error "Dừng: Android target ch
 bash $work_dir/bin/ddevice/DEBLOAT/debloat.sh
 info "Done"
 
-bash $work_dir/bin/modfile/OS1/insmod.sh
-bash $work_dir/bin/modfile/OS2/insmod.sh
+# OS1/OS2 da bi xoa: chung chi co dispatcher, khong co mod nao ben trong.
 bash $work_dir/bin/modfile/OS3/insmod.sh
 bash $work_dir/bin/modfile/OS4/insmod.sh
 bash $work_dir/bin/modfile/Universal/insfile.sh
