@@ -25,7 +25,7 @@ API_LEVEL=37
 #
 # Bằng chứng từ log build OS4: trên CÙNG framework.jar của Android 17,
 #   - smali 3.0.5  -> IndexOutOfBoundsException trong DebugInfoCache.hashCode
-#   - smali 2.5.2  -> "Success" (KouseiPatcher dùng baksmaliv2/smaliv2 và vá được)
+#   - smali 2.5.2  -> "Success" (baksmaliv2/smaliv2 trong bin/apktool vá được)
 # Nên 3.0.5 không "hiện đại hơn" mà là bản hỏng với dex này. Giữ 2.5.2.
 # (run_patch bên dưới vẫn có lần thử 2 với --debug-info false nếu cần.)
 
