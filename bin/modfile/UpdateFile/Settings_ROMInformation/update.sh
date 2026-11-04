@@ -81,6 +81,32 @@ rom_version_short=${rom_version_short% }
 rom_version_display="${rom_version_short} | BugOS"
 mods "OS version hiển thị: ${rom_version_display}  <- ${rom_version_src}"
 
+# ---------------------------------------------------------------------------
+# Chuỗi cho dòng "Phiên bản OS" (mục Giới thiệu điện thoại).
+#
+# Dòng đó do MiuiAboutPhoneUtils.getOsVersionCode() dựng: đọc
+# ro.mi.os.version.incremental rồi cắt "OS" ở đầu -> "4.0.5.0.XPKCNXM".
+# Đuôi XPKCNXM chỉ là mã vùng+model của Xiaomi, không mang thêm thông tin gì
+# cho người dùng, nên thay bằng <region><ddmmyy>:
+#
+#     OS4.0.5.0.XPKCNXM  ->  OS4.0.5.0.CN041126
+#
+# Phần đầu (4.0.5.0) lấy từ chính tên ROM, nên bản sau tự đổi theo.
+# KHÔNG đụng ro.mi.os.version.incremental / ro.build.version.incremental:
+# ro.build.fingerprint được init ghép từ prop sau, sửa vào là hỏng định dạng.
+# Giá trị chỉ đi qua prop riêng ro.bugos.osversioncode + patch smali.
+# ---------------------------------------------------------------------------
+rom_version_core=$(printf '%s\n' "$rom_version_short" | awk -F. -v OFS=. '{ if (NF > 4) NF = 4; print }')
+case "$regionTYPE" in
+    China)  osver_region=CN ;;
+    Global) osver_region=GL ;;
+    *)      osver_region=CN ;;
+esac
+# dd/mm/yy - cùng nguồn ngày với build_date bên dưới, chỉ khác thứ tự
+build_ddmmyy=$(TZ=Asia/Ho_Chi_Minh date +"%d%m%y")
+rom_version_code="OS${rom_version_core}.${osver_region}${build_ddmmyy}"
+mods "OS version (dòng Phiên bản OS): ${rom_version_code}"
+
 # brand_incremental=false (mặc định): KHÔNG gắn " | BugOS" vào
 #   ro.build.version.incremental.
 #
@@ -105,6 +131,7 @@ for p in "${my_props[@]}"; do
         -e '/^ro\.bugos\.incremental=/d'
         -e '/^ro\.bugos\.simposcode=/d'
         -e '/^ro\.bugos\.osversion=/d'
+        -e '/^ro\.bugos\.osversioncode=/d'
         -e '/^ro\.mi\.os\.version\.incremental=/d'
     )
     if [ "$BRAND_INC" = "true" ]; then
@@ -136,6 +163,7 @@ for p in "${my_props[@]}"; do
         echo "ro.bugos.incremental=${rom_version_display}"
         echo "ro.bugos.simposcode=${rom_version_display}"
         echo "ro.bugos.osversion=${build_date}"
+        echo "ro.bugos.osversioncode=${rom_version_code}"
         # Các prop gốc mà Settings đọc cho dòng "OS version"
         echo "ro.mi.os.version.incremental=${rom_version_display}"
         if [ "$BRAND_INC" = "true" ]; then
@@ -484,7 +512,7 @@ patch_settings_apk() {
     p1=$(find "$out" -type f -name "MiuiAboutPhoneUtils.smali" 2>/dev/null | head -n 1)
     if [ -n "$p1" ] && [ -f "$p1" ]; then
         local ini before after
-        for ini in getMiuiVersionInCard getRoXmsVersion getXmsVersion getSimpleOSVersion; do
+        for ini in getMiuiVersionInCard getRoXmsVersion getXmsVersion getSimpleOSVersion getOsVersionCode; do
             [ -f "$SRC_DIR/$ini.ini" ] || continue
             before=$(md5sum "$p1" | cut -d' ' -f1)
             $repS "$SRC_DIR/$ini.ini" "$p1" >/dev/null 2>&1
