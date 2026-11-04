@@ -1,27 +1,31 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0
 # ---------------------------------------------------------------------------
-# KernelSU Next 3.4.2 - root sẵn trong ROM (chế độ LKM)
+# KernelSU Next 3.4.2 - root sẵn trong ROM, dùng được cho nhiều máy.
 #
-# Vá INIT_BOOT, không phải boot.img.
+# Đường đang dùng: ksud boot-patch-v2, nhúng kernelsu.ko vào CHÍNH kernel
+# trong boot.img dưới dạng capsule (tự phục hồi kallsyms/BTF rồi giải
+# relocation). Không thay kernel GKI, không đụng ramdisk.
 #
-#   boot.img  : chứa kernel 6.6.118-android15-8 do Xiaomi vá + vendor_dlkm phải
-#               khớp vermagic -> thay kernel GKI là mất boot.
-#   init_boot : chứa ramdisk generic, tức cái `init` đầu tiên của userspace.
+# VÌ SAO KHÔNG dùng init_boot (boot-patch v1):
+#   Trên MÁY, ksud chọn init_boot cho LKM và chèn init wrapper vào ramdisk.
+#   Nhưng trên HOST, boot-patch v1 cần thêm `ksuinit`
+#   (boot_patch.rs: assets::get_asset("{arch}/ksuinit")), và upstream KHÔNG
+#   phát hành ksuinit: 33 asset của v3.4.2 chỉ có *.ko, ksud, 2 APK; trong
+#   ksud-x86_64-unknown-linux-musl cũng không có chuỗi "ksuinit" nào.
+#   ksuinit là project Rust (userspace/ksuinit), muốn có phải build
+#   aarch64-musl trong CI.
+#   boot-patch-v2 thì KHÔNG cần ksuinit -> đây là đường chạy được từ host.
 #
-#   LKM hoạt động bằng cách chèn một init wrapper vào ramdisk để nó `insmod`
-#   kernelsu.ko trước khi mount /data. Đó là init_boot. Đây cũng đúng là lựa
-#   chọn của chính ksud: boot_patch.rs::choose_boot_partition() trả "init_boot"
-#   khi KHÔNG thay kernel và máy có phân vùng init_boot (chỉ bỏ qua với
-#   android12-*). Máy này android15 -> init_boot.
-#
-#   (ksud boot-patch-v2 thì khác: nó nhúng .ko vào chính KERNEL dạng capsule và
-#   luôn nhận boot.img. Đường đó đọc kallsyms của kernel Xiaomi nên dễ vỡ hơn,
-#   và không phải đường upstream chọn cho máy có init_boot.)
+# Tính tổng quát:
+#   - KMI tự dò từ chuỗi version của kernel trong boot.img, không hardcode.
+#   - KMI dò ra được thì tải đúng aarch64_<kmi>_kernelsu.ko của v3.4.2.
+#   - Dò không được thì đặt kernelsu_kmi=<kmi> trong config.env.
+#   - KMI không có trong release v3.4.2 thì dừng, in danh sách có sẵn.
 #
 # Vì sao phải chạy TRƯỚC patchpackage.sh:
 #   patchpackage.sh -> DISABLE_AVB tính lại vbmeta trên các image hiện có.
-#   Vá init_boot sau bước đó là vbmeta lệch với init_boot.
+#   Vá boot.img sau bước đó là vbmeta lệch với boot.img.
 #
 # Bật/tắt bằng cờ kernelsu trong config.env.
 # ---------------------------------------------------------------------------
@@ -31,8 +35,11 @@ source "$work_dir/functions.sh"
 
 KSU_VER=3.4.2
 KSU_BUILD=33355
-KSU_KMI=android15-6.6
 BASE="https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v${KSU_VER}"
+
+# Kiến trúc module. Mọi máy Xiaomi HyperOS hiện hành đều arm64; máy arm32 sẽ
+# không có module trong release nên bước dò KMI bên dưới báo lỗi rõ ràng.
+KSU_ARCH=aarch64
 
 IMG="$work_dir/build/baserom/images"
 CACHE="$work_dir/.ksu_cache"
@@ -43,10 +50,9 @@ if [ "$ENABLE" = "false" ]; then
     exit 0
 fi
 
-BOOT="$IMG/boot.img"          # chi de doc version kernel
-TARGET="$IMG/init_boot.img"   # doi tuong bi va
-if [ ! -f "$TARGET" ]; then
-    error "KernelSU: không thấy $TARGET - không có chỗ chèn module"
+BOOT="$IMG/boot.img"
+if [ ! -f "$BOOT" ]; then
+    error "KernelSU: không thấy $BOOT - không có kernel để vá"
     error "KernelSU: đặt kernelsu=false trong config.env để bỏ qua bước này."
     exit 1
 fi
@@ -74,46 +80,52 @@ fetch() {
 }
 
 KSUSD="$CACHE/ksud"
-KO="$CACHE/kernelsu.ko"
 APK="$CACHE/KernelSUNext.apk"
 
-fetch "$BASE/ksud-x86_64-unknown-linux-musl"                "$KSUSD" 5000000  || { error "KernelSU: không tải được ksud"; exit 1; }
-fetch "$BASE/aarch64_${KSU_KMI}_kernelsu.ko"                "$KO"    300000   || { error "KernelSU: không tải được kernelsu.ko cho $KSU_KMI"; exit 1; }
+fetch "$BASE/ksud-x86_64-unknown-linux-musl" "$KSUSD" 5000000 || { error "KernelSU: không tải được ksud"; exit 1; }
 fetch "$BASE/KernelSU_Next_v${KSU_VER}_${KSU_BUILD}-release.apk" "$APK" 10000000 || { error "KernelSU: không tải được manager APK"; exit 1; }
-
 chmod 0755 "$KSUSD"
 
-# Kiểm KMI của module có khớp kernel không, trước khi vá. Kernel nằm trong
-# boot.img (không phải init_boot), nên đọc version từ đó.
-# Lệch KMI thì ksud vẫn vá được nhưng kernel sẽ không nạp được module - hỏng
-# lúc boot chứ không hỏng lúc build, nên cảnh báo sớm ở đây.
-# Kernel báo "6.6.118-android15-8-g...", KMI của KSU là "android15-6.6":
-# hai chuỗi khác định dạng nên phải tách ra rồi so từng phần.
-BOOT_VER=$(strings "$BOOT" 2>/dev/null | grep -m1 -oE "[0-9]+\.[0-9]+\.[0-9]+-android[0-9]+-[0-9]+" || true)
-if [ -n "$BOOT_VER" ]; then
+# ---------------------------------------------------------------------------
+# Dò KMI: kernel báo "6.6.118-android15-8-g0908354dac1b-ab...-4k", KMI của
+# KernelSU là "android15-6.6" -> lấy androidNN và major.minor rồi ghép lại.
+# ---------------------------------------------------------------------------
+KMI_CFG=$(grep -m1 '^kernelsu_kmi=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+
+if [ -n "$KMI_CFG" ]; then
+    KMI="$KMI_CFG"
+    mods "KernelSU: KMI lấy từ config.env = $KMI"
+else
+    BOOT_VER=$(strings "$BOOT" 2>/dev/null | grep -m1 -oE "[0-9]+\.[0-9]+\.[0-9]+-android[0-9]+-[0-9]+" || true)
+    if [ -z "$BOOT_VER" ]; then
+        error "KernelSU: không đọc được version kernel trong boot.img"
+        error "KernelSU: đặt kernelsu_kmi=androidNN-X.Y trong config.env rồi chạy lại."
+        exit 1
+    fi
     boot_android=$(printf '%s' "$BOOT_VER" | grep -oE "android[0-9]+" | head -1)
     boot_kver=$(printf '%s' "$BOOT_VER" | grep -oE "^[0-9]+\.[0-9]+" | head -1)
-    ksu_android=${KSU_KMI%%-*}
-    ksu_kver=${KSU_KMI##*-}
-    mods "KernelSU: kernel '$BOOT_VER' -> ${boot_android}-${boot_kver}; module '${ksu_android}-${ksu_kver}'"
-    if [ "$boot_android" != "$ksu_android" ] || [ "$boot_kver" != "$ksu_kver" ]; then
-        warn "KernelSU: KMI lệch - module có thể không nạp được. Sửa KSU_KMI trong bin/package/KernelSU/patch.sh"
-    fi
+    KMI="${boot_android}-${boot_kver}"
+    mods "KernelSU: kernel '$BOOT_VER' -> KMI $KMI"
 fi
 
-OUT="$CACHE/init_boot_ksu.img"
+KO="$CACHE/${KSU_ARCH}_${KMI}_kernelsu.ko"
+if ! fetch "$BASE/${KSU_ARCH}_${KMI}_kernelsu.ko" "$KO" 200000; then
+    error "KernelSU: v$KSU_VER không có module cho KMI '$KMI' (${KSU_ARCH})"
+    error "KernelSU: các KMI mà v$KSU_VER phát hành:"
+    for k in android12-5.10 android13-5.10 android13-5.15 android14-5.15 android14-6.1 android15-6.6 android16-6.12 android17-6.18; do
+        error "             ${k}"
+    done
+    error "KernelSU: đặt kernelsu=false nếu máy này không nằm trong danh sách."
+    exit 1
+fi
+mods "KernelSU: module ${KSU_ARCH}/${KMI}_kernelsu.ko ($(stat -c%s "$KO") byte)"
+
+OUT="$CACHE/boot_ksu.img"
 rm -f "$OUT"
 
-# boot-patch (KHONG phai boot-patch-v2): che do LKM, chen init wrapper + module
-# vao ramdisk cua image duoc dua vao. Tren host khong co /dev/block/by-name nen
-# phai truyen --boot tuong minh, neu khong no se tu do phan vung va that bai.
-mods "KernelSU: vá init_boot.img bằng ksud boot-patch (LKM, $KSU_KMI) ..."
-if ! "$KSUSD" boot-patch \
-        --boot "$TARGET" \
-        --module "$KO" \
-        --kmi "$KSU_KMI" \
-        --out "$OUT"; then
-    error "KernelSU: ksud boot-patch THẤT BẠI - không vá được init_boot.img"
+mods "KernelSU: vá boot.img bằng ksud boot-patch-v2 (capsule trong kernel) ..."
+if ! "$KSUSD" boot-patch-v2 --boot "$BOOT" --module "$KO" --output "$OUT" --force; then
+    error "KernelSU: boot-patch-v2 THẤT BẠI - không vá được kernel trong boot.img"
     error "KernelSU: ROM sẽ không có root. Đặt kernelsu=false trong config.env để bỏ qua bước này."
     exit 1
 fi
@@ -123,12 +135,12 @@ if [ ! -s "$OUT" ]; then
     exit 1
 fi
 
-cp -f "$TARGET" "$CACHE/init_boot.img.stock"
-cp -f "$OUT" "$TARGET"
-mods "KernelSU: init_boot.img đã vá - $(stat -c%s "$TARGET") byte (gốc $(stat -c%s "$CACHE/init_boot.img.stock"))"
+cp -f "$BOOT" "$CACHE/boot.img.stock"
+cp -f "$OUT" "$BOOT"
+mods "KernelSU: boot.img đã vá - $(stat -c%s "$BOOT") byte (gốc $(stat -c%s "$CACHE/boot.img.stock"))"
 
-# Manager: đặt ở product/app để chắc chắn được cài. product/data-app cần
-# PreinstallApp của MIUI chạy đúng, còn product/app thì PackageManager luôn thấy.
+# Manager: product/app để PackageManager luôn thấy. product/data-app phụ thuộc
+# PreinstallApp của MIUI chạy đúng.
 APP_DIR="$IMG/product/app/KernelSUNext"
 if [ -d "$IMG/product" ]; then
     mkdir -p "$APP_DIR"
