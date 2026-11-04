@@ -6,24 +6,59 @@ source $work_dir/functions.sh
 # Check whether it is a local package or a link
 if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     info "Download link detected, starting a download..."
-    # -c: resume. Thieu no thi moi lan retry (va moi lan re-run job) tai lai
-    #     tu byte 0, mat ca chuc phut da tai.
-    # --timeout/--connect-timeout/--max-tries: mac dinh aria2 khong co gioi han
-    #     tong, gap CDN tra cham la treo im lang khong bao gio ket thuc.
-    # --summary-interval=10: in tien do moi 10s, de log CI thay no con chay.
-    aria2c -c --max-tries=20 --retry-wait=5 \
-        --timeout=60 --connect-timeout=30 --lowest-speed-limit=100K \
-        --summary-interval=10 --console-log-level=warn \
-        --max-download-limit=1024M --file-allocation=none -s10 -x10 -j10 --content-disposition -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${baserom}"
-    baserom=$(basename ${baserom} | sed 's/\?t.*//')
+
+    # Kiem tra file tai ve co dung la mot zip hoan chinh khong.
+    # -f chi noi "co file", khong noi file do dung duoc: mot file bi cat ngang
+    # van qua duoc -f, va do chinh la cach build 05/11 di tiep voi mot zip
+    # 4.2/8.7 GiB roi chet o buoc unzip voi thong bao kho hieu
+    # "End-of-central-directory signature not found".
+    rom_zip_ok() {
+        [ -f "$1" ] || return 1
+        unzip -t "$1" >/dev/null 2>&1
+    }
+
+    # Ten file tren dia khac URL: --content-disposition lay ten tu header.
+    # Phai tinh TRUOC vong lap, vi vong lap can biet dang kiem file nao.
+    rom_file=$(basename "${baserom%%\?*}")
+    info "ROM: file đích ${rom_file}"
+
+    for attempt in 1 2 3; do
+        # Lan 1: -c de resume neu con file do dang. Cac lan sau: file da bi
+        # nghiem la hong (khong chi thieu byte) nen phai xoa va tai lai tu dau,
+        # vi resume tu mot central directory hong se ket thuc ngay lap tuc.
+        if [ "$attempt" -gt 1 ]; then
+            rm -f "$rom_file"
+        fi
+
+        # -c: resume.
+        # --timeout/--connect-timeout/--max-tries: mac dinh aria2 khong co gioi
+        #     han tong, gap CDN tra cham la treo im lang khong bao gio ket thuc.
+        # --lowest-speed-limit: TRUOC DAY LA 100K va no tu giet download. CDN
+        #     Xiaomi co luc tut ve ~55KB/s (log 05/11 01:51:46: "Too slow
+        #     Downloading speed: 55650 <= 102400"), aria2 huy CA 10 ket noi va
+        #     tra ERR du toc do trung binh van 91MiB/s. 10K chi bat dung truong
+        #     hop chet han, con --timeout=60 moi la thu bat stall that su.
+        # --summary-interval=10: in tien do moi 10s, de log CI thay no con chay.
+        aria2c -c --max-tries=20 --retry-wait=5 \
+            --timeout=60 --connect-timeout=30 --lowest-speed-limit=10K \
+            --summary-interval=10 --console-log-level=warn \
+            --max-download-limit=1024M --file-allocation=none -s10 -x10 -j10 --content-disposition -U "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "${baserom}" || true
+
+        if rom_zip_ok "$rom_file"; then
+            break
+        fi
+        warn "ROM: lần tải $attempt chưa xong hoặc file hỏng - thử lại"
+    done
+
+    baserom="$rom_file"
     if [ -f $work_dir/topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip ]; then
         baserom="topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip"
         info "BASEROM: ${baserom}"
     elif [ -f $work_dir/munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip ]; then
         baserom="munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip"
         info "BASEROM: ${baserom}"
-    elif [ ! -f "${baserom}" ]; then
-        error "Download error!"
+    elif ! rom_zip_ok "${baserom}"; then
+        error "Download error! (thiếu hoặc hỏng: ${baserom})"
         exit 1
     fi
 elif [ -f "${baserom}" ]; then
