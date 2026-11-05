@@ -1197,7 +1197,7 @@ apply_services_disable_secure_flag() {
 }
 
 # ---------------------------------------------------------------------------
-# Chèn bù method mà miui-services.jar gọi nhưng services.jar THIẾU.
+# Lưới an toàn: chèn WindowState.isBypassSecureFlag() nếu services.jar thiếu.
 #
 # Triệu chứng trên máy (05/11): bấm chụp màn hình -> đơ một nhịp -> soft reboot.
 #   FATAL EXCEPTION IN SYSTEM PROCESS: binder:...
@@ -1206,18 +1206,16 @@ apply_services_disable_secure_flag() {
 #     at WindowManagerServiceImpl.notAllowCaptureDisplay(...)
 #     at WindowManagerService.captureDisplay(...)
 #
-# Nguyên nhân: WindowManagerServiceImpl (miui-services.jar) gọi
-# WindowState.isBypassSecureFlag() - method static do MIUI thêm - nhưng
-# services.jar của bản ROM này không có nó. Đã quét cả 4 dex của services.jar:
-# không có chuỗi "isBypassSecureFlag" ở đâu cả. Các method khác mà
-# miui-services gọi tưởng thiếu (getWindowingMode, inMultiWindowMode,
-# setBounds, getActivityType...) đều nằm ở lớp cha ConfigurationContainer nên
-# vẫn resolve được; riêng method static này không thừa kế được -> nổ.
+# NGUỒN GỐC THẬT (đính chính so với kết luận đầu tiên): lời gọi đó do CHÍNH
+# patch của mình chèn vào - NOTIFICATION_FIX/A17/patch_miui_services_a17.py,
+# hàm patch_window_manager_secure_flag. Method này KHÔNG hề tồn tại trong
+# services.jar (đã quét cả 4 dex), nên patch đó tạo ra một lời gọi chết.
+# Patch ấy đã bị bỏ hẳn; xem commit ngay sau aab1ed2.
 #
-# Vì sao chèn stub thay vì bỏ lời gọi: stub giữ nguyên logic của Xiaomi, chỉ
-# trả false = "không bỏ qua cờ secure", tức cửa sổ bảo mật vẫn không cho chụp -
-# đúng hành vi mặc định. Thay cả thân notAllowCaptureDisplay bằng return false
-# sẽ đổi hành vi (cho chụp cả màn hình secure) nên không dùng.
+# Vì sao vẫn giữ stub: nó chỉ được chèn khi method chưa có, trả false =
+# "không bỏ qua cờ secure" (đúng hành vi mặc định). Nếu sau này ai bật lại
+# patch kia, hoặc ROM nền khác có jar gọi method này, system_server không chết
+# vì một dòng lệnh thiếu. Không có caller thì nó là một method thừa vô hại.
 inject_windowstate_bypass_stub() {
   local decompile_dir="$1"
   local f
@@ -1232,7 +1230,7 @@ inject_windowstate_bypass_stub() {
   fi
   cat >> "$f" << 'SMALI'
 
-# BugOS: stub cho method miui-services.jar gọi nhưng services.jar thiếu.
+# BugOS: stub phòng hờ cho WindowState.isBypassSecureFlag().
 # Xem bin/package/COREPATCH/jar_patcher_a17.sh
 .method public static isBypassSecureFlag()Z
     .registers 1
@@ -1242,7 +1240,7 @@ inject_windowstate_bypass_stub() {
     return v0
 .end method
 SMALI
-  log "Đã chèn WindowState.isBypassSecureFlag() -> false (chống crash khi chụp màn hình)"
+  log "Đã chèn WindowState.isBypassSecureFlag() -> false (phòng hờ, không còn caller)"
 }
 
 # Main services patching function (Android 16)

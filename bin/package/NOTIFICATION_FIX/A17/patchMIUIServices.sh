@@ -15,8 +15,11 @@
 #    - killAppForHasOtherTask: IS_INTERNATIONAL_BUILD -> IS_MIUI (bảo vệ foreground services)
 # 4. PackageManagerServiceImpl.smali:
 #    - verifyIsolationViolation & canBeUpdate -> return-void (bỏ qua giới hạn cài đặt/cập nhật)
-# 5. WindowManagerServiceImpl.smali:
-#    - notAllowCaptureDisplay -> chèn WindowState.isBypassSecureFlag() (cho phép chụp màn hình app bảo mật)
+#
+# KHÔNG vá WindowManagerServiceImpl.notAllowCaptureDisplay nữa.
+# Bản trước chèn lời gọi WindowState.isBypassSecureFlag() - method không tồn tại
+# trong services.jar của ROM này -> chụp màn hình là system_server chết
+# (NoSuchMethodError) -> đơ rồi soft reboot. Đã bỏ hẳn.
 
 work_dir=$(pwd)
 source $work_dir/functions.sh
@@ -66,7 +69,7 @@ decompile_jar() {
     local dex decompiled_any=0
     for dex in "$JAR_OUT"/*.dex; do
         [[ -f $dex ]] || continue
-        if grep -aqm1 -E 'BroadcastQueueModernStubImpl|ProcessManagerService|ProcessSceneCleaner|PackageManagerServiceImpl|WindowManagerServiceImpl' "$dex" 2>/dev/null; then
+        if grep -aqm1 -E 'BroadcastQueueModernStubImpl|ProcessManagerService|ProcessSceneCleaner|PackageManagerServiceImpl' "$dex" 2>/dev/null; then
             patch "Decompiling $(basename "$dex") (có chứa class mục tiêu)..."
             $bak "$dex" -o "$dex.out"
             if [[ -d "$dex.out" ]]; then
