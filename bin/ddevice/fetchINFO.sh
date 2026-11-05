@@ -23,11 +23,32 @@ else
 echo "Non-VAB" > $work_dir/bin/script2flash/META-INF/Data/Structure
 fi
 
-if [ -f $work_dir/build/baserom/images/vendor/etc/init/hw/init.qcom.rc ]; then
-   echo "Snapdragon" > $work_dir/bin/script2flash/META-INF/Data/Chip
-else
-   echo "Mediatek" > $work_dir/bin/script2flash/META-INF/Data/Chip
-fi 
+# Chip: quyết định zip có flash được bằng recovery hay không (update-binary chặn
+# MediaTek). Bản cũ chỉ dò init.qcom.rc - thiếu file đó là ghi "Mediatek" và
+# update-binary từ chối cài trên máy Snapdragon.
+#
+# Giờ ưu tiên build.prop, vì ro.board.platform / ro.hardware là thứ ROM luôn có.
+# Xiaomi chỉ dùng 2 nền: qcom (Snapdragon) và mtk (MediaTek), nên chỉ cần tìm
+# dấu hiệu mtk; không thấy thì là Snapdragon. Kernel MTK luôn để lại "mtk" trong
+# ro.board.platform / ro.hardware.
+vendor_prop="$work_dir/build/baserom/images/vendor/build.prop"
+board=$(grep -m1 -E '^(ro\.board\.platform|ro\.hardware)=' "$vendor_prop" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+board_lc=$(printf '%s' "$board" | tr 'A-Z' 'a-z')
+
+if [ -z "$board_lc" ]; then
+    # build.prop không đọc được: quay lại cách cũ
+    if [ -f $work_dir/build/baserom/images/vendor/etc/init/hw/init.qcom.rc ]; then
+        board_lc="qcom"
+    else
+        board_lc="mtk"
+    fi
+fi
+
+case "$board_lc" in
+    *mtk*|*mediatek*) echo "Mediatek"   > $work_dir/bin/script2flash/META-INF/Data/Chip ;;
+    *)                echo "Snapdragon" > $work_dir/bin/script2flash/META-INF/Data/Chip ;;
+esac
+echo "Chip platform: ${board:-$board_lc} -> $(cat $work_dir/bin/script2flash/META-INF/Data/Chip)"
 
 echo "$os_type" > $work_dir/bin/ddevice/os_type.txt
 echo "$AndroidVer" > $work_dir/bin/ddevice/androidver.txt
