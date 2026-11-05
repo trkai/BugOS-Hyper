@@ -50,6 +50,14 @@ if [ "$ENABLE" = "false" ]; then
     exit 0
 fi
 
+# Bản manager: "spoofed" (mặc định) hay "normal".
+#   spoofed: package ngẫu nhiên - ở v3.4.2 là kqvdie.zeykvw.hpbcyd - nên không
+#            có chữ "kernelsu" nào trong tên package hay tên app. Cùng một app,
+#            cùng kernel, cùng quyền; chỉ khác định danh.
+#   normal : com.rifsxd.ksunext, tên thật. Dễ nhận ra khi cần debug.
+MANAGER=$(grep -m1 '^kernelsu_manager=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+[ -z "$MANAGER" ] && MANAGER=spoofed
+
 BOOT="$IMG/boot.img"
 if [ ! -f "$BOOT" ]; then
     error "KernelSU: không thấy $BOOT - không có kernel để vá"
@@ -80,11 +88,19 @@ fetch() {
 }
 
 KSUSD="$CACHE/ksud"
-APK="$CACHE/KernelSUNext.apk"
+
+# Tên asset trên release đổi theo bản manager. Cache đặt theo đúng tên file nên
+# đổi cờ là tải lại, không dùng nhầm bản cũ.
+case "$MANAGER" in
+    normal) APK_NAME="KernelSU_Next_v${KSU_VER}_${KSU_BUILD}-release.apk" ;;
+    *)      APK_NAME="KernelSU_Next_v${KSU_VER}-spoofed_${KSU_BUILD}-release.apk" ;;
+esac
+APK="$CACHE/$APK_NAME"
 
 fetch "$BASE/ksud-x86_64-unknown-linux-musl" "$KSUSD" 5000000 || { error "KernelSU: không tải được ksud"; exit 1; }
-fetch "$BASE/KernelSU_Next_v${KSU_VER}_${KSU_BUILD}-release.apk" "$APK" 10000000 || { error "KernelSU: không tải được manager APK"; exit 1; }
+fetch "$BASE/$APK_NAME" "$APK" 10000000 || { error "KernelSU: không tải được manager APK ($APK_NAME)"; exit 1; }
 chmod 0755 "$KSUSD"
+mods "KernelSU: manager bản $MANAGER ($APK_NAME)"
 
 # ---------------------------------------------------------------------------
 # Dò KMI: kernel báo "6.6.118-android15-8-g0908354dac1b-ab...-4k", KMI của
@@ -141,11 +157,31 @@ mods "KernelSU: boot.img đã vá - $(stat -c%s "$BOOT") byte (gốc $(stat -c%s
 
 # Manager: product/app để PackageManager luôn thấy. product/data-app phụ thuộc
 # PreinstallApp của MIUI chạy đúng.
+#
+# Native lib PHẢI nằm NGOÀI apk, trong <appdir>/lib/arm64/. App hệ thống nằm
+# trên phân vùng chỉ đọc nên PackageManager không giải nén lib vào /data được,
+# mà APK này khai extractNativeLibs=false -> System.loadLibrary("kernelsu")
+# không thấy gì và manager chết ngay khi mở:
+#   UnsatisfiedLinkError: dlopen failed: library "libkernelsu.so" not found
+# Đã gặp thật trên máy 05/11 với bản chỉ copy mỗi APK.
+#
+# Tên thư mục là "arm64", KHÔNG phải "arm64-v8a" - đó là quy ước
+# nativeLibraryDir của app hệ thống (/product/app/X/lib/arm64).
 APP_DIR="$IMG/product/app/KernelSUNext"
 if [ -d "$IMG/product" ]; then
     mkdir -p "$APP_DIR"
     cp -f "$APK" "$APP_DIR/KernelSUNext.apk"
     chmod 0644 "$APP_DIR/KernelSUNext.apk"
+
+    mkdir -p "$APP_DIR/lib/arm64"
+    unzip -o -j -q "$APK" 'lib/arm64-v8a/*.so' -d "$APP_DIR/lib/arm64" >/dev/null 2>&1 || true
+    if [ -f "$APP_DIR/lib/arm64/libkernelsu.so" ]; then
+        chmod 0644 "$APP_DIR/lib/arm64/"*.so
+        mods "KernelSU: lib arm64 -> product/app/KernelSUNext/lib/arm64 ($(ls "$APP_DIR/lib/arm64" | wc -l) file)"
+    else
+        error "KernelSU: APK không có lib/arm64-v8a/libkernelsu.so - manager sẽ crash khi mở"
+        exit 1
+    fi
     mods "KernelSU: manager v$KSU_VER -> product/app/KernelSUNext"
 else
     warn "KernelSU: không thấy product/ - manager không được cài sẵn"
