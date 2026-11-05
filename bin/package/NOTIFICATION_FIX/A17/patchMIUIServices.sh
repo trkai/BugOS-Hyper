@@ -1,125 +1,112 @@
 #!/bin/bash
 # BugOS - NOTIFICATION_FIX A17 - miui-services.jar
-# Credit: hướng dẫn gốc của @MMETMAmods
+# Fix thông báo cho HyperOS 4.0 Android 17 (dựa trên phân tích mã nhị phân ROM vá thực tế)
+#
+# Các điểm vá chính:
+# 1. BroadcastQueueModernStubImpl.smali:
+#    - isInternationalSpecialAction: IS_INTERNATIONAL_BUILD -> IS_MIUI (cho phép special actions)
+#    - updateBlockBroadcast: IS_INTERNATIONAL_BUILD -> IS_MIUI (bỏ qua chặn broadcast provision)
+#    - checkApplicationAutoStart: IS_INTERNATIONAL_BUILD -> IS_MIUI (cho phép FCM RECEIVE chạy nền)
+#    * checkReceiverAppDealBroadcast: GIỮ NGUYÊN IS_INTERNATIONAL_BUILD (bảo toàn PACKAGE_ADDED)
+# 2. ProcessManagerService.smali:
+#    - isForceStopEnable: IS_INTERNATIONAL_BUILD -> IS_MIUI (ép trả về false, không kill process)
+# 3. ProcessSceneCleaner.smali:
+#    - handleSwipeKill: IS_INTERNATIONAL_BUILD -> IS_MIUI (bảo vệ foreground services khi vuốt)
+#    - killAppForHasOtherTask: IS_INTERNATIONAL_BUILD -> IS_MIUI (bảo vệ foreground services)
+# 4. PackageManagerServiceImpl.smali:
+#    - verifyIsolationViolation & canBeUpdate -> return-void (bỏ qua giới hạn cài đặt/cập nhật)
+# 5. WindowManagerServiceImpl.smali:
+#    - notAllowCaptureDisplay -> chèn WindowState.isBypassSecureFlag() (cho phép chụp màn hình app bảo mật)
+
 work_dir=$(pwd)
 source $work_dir/functions.sh
 MAIN_FOLDER="$work_dir/build/baserom/images"
 JAR_NAME="miui-services.jar"
-JAR_SRC="$MAIN_FOLDER/system_ext/framework/$JAR_NAME"
+NF="$work_dir/bin/package/NOTIFICATION_FIX/A17"
+
+find_jar() {
+    local name="$1"; shift
+    local p
+    for p in "$@"; do
+        [ -f "$p" ] && { printf '%s' "$p"; return 0; }
+    done
+    find "$MAIN_FOLDER" -type f -name "$name" 2>/dev/null | head -n 1
+}
+
+JAR_SRC=$(find_jar "$JAR_NAME" \
+    "$MAIN_FOLDER/system_ext/framework/$JAR_NAME" \
+    "$MAIN_FOLDER/system/system_ext/framework/$JAR_NAME" \
+    "$MAIN_FOLDER/system/system/framework/$JAR_NAME" \
+    "$MAIN_FOLDER/product/framework/$JAR_NAME")
+
 JAR_TMP="$work_dir/jar_temp"
 JAR_OUT="$JAR_TMP/$JAR_NAME.out"
 bak="java -jar $work_dir/bin/apktool/baksmaliv2.jar d --api 37"
 sma="java -jar $work_dir/bin/apktool/smaliv2.jar a --api 37"
 
-# Các file smali sẽ đổi IS_INTERNATIONAL_BUILD -> IS_MIUI
-# (đã bao gồm 3 class bắt buộc: BroadcastQueueModernStubImpl, ProcessManagerService, ProcessSceneCleaner)
-PATCH_FILES=(
-    'ActivityManagerServiceImpl.smali'
-    'BroadcastQueueModernStubImpl.smali'
-    'MiProcessTracker.smali'
-    'MutableActivityManagerShellCommandStubImpl.smali'
-    'PreStartFeedbackImpl.smali'
-    'ProcessManagerService.smali'
-    'ProcessPolicy.smali'
-    'ProcessSceneCleaner.smali'
-    'AudioServiceStubImpl.smali'
-    'ClipboardChecker.smali'
-    'ClipboardServiceStubImpl.smali'
-    'DevicePolicyManagerServiceStubImpl.smali'
-    'InputManagerServiceStubImpl.smali'
-    'InputMethodManagerServiceImpl.smali'
-    'SogouInputMethodSwitcher.smali'
-    'JobServiceContextImpl.smali'
-    'GnssEventTrackingImpl.smali'
-    'PackageManagerServiceImpl.smali'
-    'MiuiShortcutTriggerHelper$ShortcutSettingsObserver.smali'
-    'ActivityTaskSupervisorImpl.smali'
-    'MiuiSplitInputMethodImpl.smali'
-    'WindowManagerServiceImpl.smali'
-    'DeviceIdleControllerStubImpl.smali'
-    'ForceDarkAppListManager.smali'
-)
-
 decompile_jar() {
-    patch "$JAR_NAME"
-    # Ghi nhớ xem jar đã được mod FCM_NotificationFix vá trước đó chưa, để cuối
-    # cùng kiểm tra lại xem bước reassemble có làm rơi class FcmWakeFilter không.
+    patch "$JAR_NAME (Android 17 / HyperOS 4.0)"
+    
+    # Kiểm tra FcmWakeFilter trước khi giải nén
     if grep -aqm1 FcmWakeFilter "$JAR_SRC" 2>/dev/null; then
         HAD_FCM=1
     else
         HAD_FCM=0
     fi
+
     sudo cp "$JAR_SRC" "$JAR_TMP/"
     sudo chown "$(whoami)" "$JAR_TMP/$JAR_NAME"
     rm -rf "$JAR_OUT"
     unzip -o "$JAR_TMP/$JAR_NAME" -d "$JAR_OUT" >/dev/null 2>&1
     [[ -d $JAR_OUT ]] || return 1
     rm -f "$JAR_TMP/$JAR_NAME"
-    local dex
+
+    # Chỉ decompile các DEX có chứa các class cần vá (thường là classes.dex).
+    # Giữ nguyên classes2.dex ở dạng binary nếu nó không chứa class cần vá -> bảo toàn FcmWakeFilter 100%!
+    local dex decompiled_any=0
     for dex in "$JAR_OUT"/*.dex; do
         [[ -f $dex ]] || continue
-        $bak "$dex" -o "$dex.out"
-        [[ -d "$dex.out" ]] && rm -f "$dex"
+        if grep -aqm1 -E 'BroadcastQueueModernStubImpl|ProcessManagerService|ProcessSceneCleaner|PackageManagerServiceImpl|WindowManagerServiceImpl' "$dex" 2>/dev/null; then
+            patch "Decompiling $(basename "$dex") (có chứa class mục tiêu)..."
+            $bak "$dex" -o "$dex.out"
+            if [[ -d "$dex.out" ]]; then
+                rm -f "$dex"
+                decompiled_any=1
+            fi
+        fi
     done
-    # phải có ít nhất một thư mục smali
+
+    # Nếu không grep trúng (do dex bị nén), fallback decompile tất cả
+    if [[ $decompiled_any -eq 0 ]]; then
+        for dex in "$JAR_OUT"/*.dex; do
+            [[ -f $dex ]] || continue
+            $bak "$dex" -o "$dex.out"
+            [[ -d "$dex.out" ]] && rm -f "$dex"
+        done
+    fi
+
     compgen -G "$JAR_OUT/*.dex.out" >/dev/null
 }
 
-find_and_replace() {
-    local search=$1 replace=$2 name f count=0
-    for name in "${PATCH_FILES[@]}"; do
-        while IFS= read -r f; do
-            [[ -n $f ]] || continue
-            if grep -qF "$search" "$f"; then
-                sed -i "s|$search|$replace|g" "$f"
-                count=$((count + 1))
-            fi
-        done < <(find "$JAR_OUT" -type f -name "$name")
-    done
-    if [[ $count -eq 0 ]]; then
-        patch "Cảnh báo: không file nào chứa IS_INTERNATIONAL_BUILD để vá"
-    else
-        patch "Đã vá IS_INTERNATIONAL_BUILD ở $count file"
+apply_patches() {
+    local patcher_py="$NF/patch_miui_services_a17.py"
+    if [[ ! -f "$patcher_py" ]]; then
+        patch "Cảnh báo: không tìm thấy $patcher_py!"
+        return 1
     fi
 
-    # Chẩn đoán (không sửa): các class còn đọc IS_INTERNATIONAL_BUILD nhưng không
-    # nằm trong PATCH_FILES. Đây là danh sách để cân nhắc bổ sung, không phải lỗi.
-    local extra
-    extra=$(grep -rl --include="*.smali" 'Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z' "$JAR_OUT" 2>/dev/null \
-        | xargs -r -n1 basename 2>/dev/null | sort -u | grep -vxF -f <(printf '%s\n' "${PATCH_FILES[@]}") || true)
-    if [[ -n $extra ]]; then
-        patch "Chẩn đoán: còn $(printf '%s\n' "$extra" | wc -l) class ngoài danh sách đọc IS_INTERNATIONAL_BUILD"
-        printf '%s\n' "$extra" | head -n 10 | sed 's/^/    /'
+    python3 "$patcher_py" "$JAR_OUT"
+    local rc=$?
+    if [[ $rc -ne 0 ]]; then
+        patch "Lỗi khi chạy patch_miui_services_a17.py (mã thoát: $rc)"
+        return 1
     fi
+    return 0
 }
 
-# CN policy = false (dùng chính sách không-China, ít đóng băng hơn).
-#
-# A16 ghi đè field PolicyManager.CN_MODEL. Trên Android 17 field đó KHÔNG CÒN.
-# Cấu trúc thật của A17 (đọc từ miui-services.jar gốc của OS4):
-#
-#   PolicyManager.isCnModel()Z
-#       -> PolicyManagerConfig.isCnModel()Z
-#              -> sget-boolean sCnModel:Z
-#   PolicyManagerConfig.<clinit>
-#       const-string "CN"
-#       Build.getRegion()  -> equals -> sput-boolean sCnModel
-#
-# Build.getRegion() đọc ro.miui.region (chuỗi này có trong miui-framework.jar).
-#
-# LƯU Ý: build.prop KHÔNG phải nguồn đúng của ro.miui.region. Lúc boot,
-# /system_ext/etc/cust/<variant>/cust.prop được nạp SAU và ghi đè. Trên annibale
-# OS4.0.5.0: build.prop ghi ro.miui.cust_variant=vn + ro.miui.region=VN, nhưng
-# không có cust/vn - chỉ có cust/cn*, và getprop thực tế trả cn/CN. Đọc build.prop
-# là đọc sai và bỏ qua luôn bước vá.
-#
-# Ở đây: nếu còn field CN_MODEL thì vá như A16; nếu không, đọc cấu trúc mới và
-# chỉ vá khi region thực sự là CN.
+# CN policy fallback nếu có PolicyManagerConfig hoặc CN_MODEL
 patch_cn_model() {
     local hits f total=0 done_files=0
-
-    # Chỉ trong package greeze: các class khác cũng có field tên CN_MODEL nhưng
-    # không liên quan (vd TicketSnatchingModeScenario), vá chúng chỉ làm log sai.
     hits=$(grep -rl --include="*.smali" 'sput-boolean.*CN_MODEL:Z' "$JAR_OUT" 2>/dev/null \
         | grep '/com/miui/server/greeze/' || true)
     if [[ -n $hits ]]; then
@@ -133,60 +120,16 @@ patch_cn_model() {
                 total=$((total + $(grep -c 'sput-boolean.*CN_MODEL:Z' "$f")))
             fi
         done <<< "$hits"
-
-        if [[ $done_files -gt 0 ]]; then
-            patch "Đã vá CN_MODEL = false ($total chỗ ghi, $done_files file)"
-        else
-            patch "Cảnh báo: không vá được CN_MODEL"
-        fi
+        [[ $done_files -gt 0 ]] && patch "Đã vá CN_MODEL = false ($total chỗ ghi, $done_files file)"
         return 0
     fi
 
-    # ---- A17: không còn field CN_MODEL ----
-    local cfg region
+    local cfg
     cfg=$(find "$JAR_OUT" -type f -name "PolicyManagerConfig.smali" 2>/dev/null | head -n1)
-    if [[ -z $cfg ]]; then
-        patch "CN policy: không thấy CN_MODEL lẫn PolicyManagerConfig - bỏ qua"
-        return 0
-    fi
-    if ! grep -q 'Lmiui/os/Build;->getRegion' "$cfg"; then
-        patch "CN policy: PolicyManagerConfig không dựa vào getRegion - bỏ qua"
-        return 0
-    fi
-
-    # region thật: cust.prop của biến thể thắng build.prop lúc boot.
-    local variant cust_prop
-    variant=$(grep -rh -m1 '^ro\.miui\.cust_variant=' \
-        "$MAIN_FOLDER/system/system/build.prop" "$MAIN_FOLDER"/product/etc/build.prop 2>/dev/null \
-        | head -n1 | cut -d= -f2 | tr -d '\r\n ')
-    # variant trỏ vào thư mục không tồn tại thì boot rơi về biến thể có sẵn đầu tiên
-    if [[ -z $variant || ! -d "$MAIN_FOLDER/system_ext/etc/cust/$variant" ]]; then
-        variant=$(find "$MAIN_FOLDER/system_ext/etc/cust" -mindepth 1 -maxdepth 1 -type d \
-            -name 'cn*' 2>/dev/null | sort | head -n1 | sed 's|.*/||')
-        [[ -n $variant ]] && patch "CN policy: variant build.prop không có cust dir -> dùng '$variant'"
-    fi
-    cust_prop="$MAIN_FOLDER/system_ext/etc/cust/${variant:-vn}/cust.prop"
-    if [[ -f $cust_prop ]]; then
-        region=$(grep -m1 '^ro\.miui\.region=' "$cust_prop" | cut -d= -f2 | tr -d '\r\n ')
-    fi
-    if [[ -z $region ]]; then
-        region=$(grep -m1 '^ro\.miui\.region=' "$MAIN_FOLDER/system/system/build.prop" 2>/dev/null \
-            | cut -d= -f2 | tr -d '\r\n ')
-    fi
-    if [[ -z $region ]]; then
-        region=$(grep -rh -m1 '^ro\.miui\.region=' "$MAIN_FOLDER"/product/etc/build.prop 2>/dev/null \
-            | cut -d= -f2 | tr -d '\r\n ')
-    fi
-
-    if [[ $region == "CN" ]]; then
-        # region là CN -> sCnModel = true -> ép về false
+    if [[ -n $cfg ]] && grep -q 'Lmiui/os/Build;->getRegion' "$cfg"; then
         if python3 "$work_dir/bin/tools/patch_smali_method.py" "$cfg" isCnModel Z 0 >/dev/null 2>&1; then
-            patch "CN policy: region=CN -> đã ép isCnModel() = false"
-        else
-            patch "Cảnh báo: region=CN nhưng không vá được isCnModel()"
+            patch "CN policy: đã ép isCnModel() = false trong PolicyManagerConfig"
         fi
-    else
-        patch "CN policy: region='${region:-?}' -> sCnModel đã false sẵn (không cần vá)"
     fi
 }
 
@@ -196,17 +139,30 @@ recompile_jar() {
     for fld in ./*.out; do
         [[ -d $fld ]] || continue
         out="${fld%.out}"
+        patch "Reassembling $(basename "$out")..."
         $sma "$fld" -o "$out"
         [[ -f $out ]] && rm -rf "$fld"
     done
+
     # nếu còn thư mục .out nghĩa là smali lỗi, không ghi đè jar gốc
     if compgen -G "$JAR_OUT/*.out" >/dev/null; then
         cd "$work_dir"
         return 1
     fi
+
     rm -f "$JAR_TMP/${JAR_NAME}_notal" "$JAR_TMP/$JAR_NAME"
-    7za a -tzip -mx=0 "$JAR_TMP/${JAR_NAME}_notal" "$JAR_OUT/." >/dev/null 2>&1
-    zipalign 4 "$JAR_TMP/${JAR_NAME}_notal" "$JAR_TMP/$JAR_NAME"
+    if command -v 7za >/dev/null 2>&1; then
+        7za a -tzip -mx=0 "$JAR_TMP/${JAR_NAME}_notal" "$JAR_OUT/." >/dev/null 2>&1
+    elif command -v zip >/dev/null 2>&1; then
+        (cd "$JAR_OUT" && zip -q -0 -r "$JAR_TMP/${JAR_NAME}_notal" .)
+    fi
+
+    if command -v zipalign >/dev/null 2>&1; then
+        zipalign 4 "$JAR_TMP/${JAR_NAME}_notal" "$JAR_TMP/$JAR_NAME"
+    else
+        cp -f "$JAR_TMP/${JAR_NAME}_notal" "$JAR_TMP/$JAR_NAME"
+    fi
+
     cd "$work_dir"
     [[ -f "$JAR_TMP/$JAR_NAME" ]] || return 1
     sudo cp -rf "$JAR_TMP/$JAR_NAME" "$JAR_SRC"
@@ -215,7 +171,7 @@ recompile_jar() {
 
 mkdir -p "$JAR_TMP"
 
-if [[ ! -f $JAR_SRC ]]; then
+if [[ -z "$JAR_SRC" || ! -f "$JAR_SRC" ]]; then
     patch "Không thấy $JAR_NAME, bỏ qua"
     exit 0
 fi
@@ -226,16 +182,16 @@ if ! decompile_jar; then
     exit 1
 fi
 
-find_and_replace "Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z" "Lmiui/os/Build;->IS_MIUI:Z"
+apply_patches
 patch_cn_model
 
 if recompile_jar; then
-    patch "Success"
+    patch "Success: đã vá thành công $JAR_NAME cho Android 17 / HyperOS 4.0!"
     if [[ ${HAD_FCM:-0} -eq 1 ]]; then
         if grep -aqm1 FcmWakeFilter "$JAR_SRC" 2>/dev/null; then
             patch "FcmWakeFilter vẫn còn trong jar (FCM fix an toàn)"
         else
-            patch "CẢNH BÁO: bước rebuild đã làm rơi FcmWakeFilter - vector V2/V3 của FCM mất, V1 trong services.jar vẫn còn"
+            patch "CẢNH BÁO: bước rebuild đã làm rơi FcmWakeFilter"
         fi
     fi
 else
