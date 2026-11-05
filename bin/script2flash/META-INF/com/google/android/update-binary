@@ -1,94 +1,247 @@
 #!/sbin/sh
-set -e
+# ---------------------------------------------------------------------------
+# BugOS Recovery Installer - chạy trong TWRP / OrangeFox / các recovery TWRP-based.
+#
+# Giao thức: recovery gọi  update-binary <api> <outfd> <zipfile>.
+#   $1 = API version (bỏ qua)
+#   $2 = fd để ghi ui_print (recovery đọc log từ đó)
+#   $3 = đường dẫn zip
+#
+# KHÔNG dùng `set -e`: script chạy bằng mksh trong TWRP, chết giữa đường mà
+# không in gì thì người dùng chỉ thấy "Updater process ended with ERROR: 1"
+# và không biết hỏng ở đâu. Mọi bước ghi đều tự kiểm tra rồi báo bằng ui_print.
+# ---------------------------------------------------------------------------
+
 ZIP=$3
-OUTFD=/proc/self/fd/$2;
-ui_print() { echo -e "ui_print $1\nui_print" > $OUTFD; }
+OUTFD=/proc/self/fd/$2
 
-if [ -d /tmp/maianh ];then rm -r /tmp/maianh ; fi
-mkdir -p /tmp/maianh/bin
-unzip "$ZIP" META-INF/bin/* -d /tmp/maianh
-mv /tmp/maianh/META-INF/bin/* /tmp/maianh/bin
-unzip "$ZIP" META-INF/Data/Structure -d /tmp/maianh
-unzip "$ZIP" META-INF/Data/DeviceCode -d /tmp/maianh
-unzip "$ZIP" META-INF/Data/DeviceName -d /tmp/maianh
-unzip "$ZIP" META-INF/Data/AndroidVer -d /tmp/maianh
-unzip "$ZIP" META-INF/Data/Region -d /tmp/maianh
-unzip "$ZIP" META-INF/Data/RomBased -d /tmp/maianh
-unzip "$ZIP" META-INF/Data/Version -d /tmp/maianh
-unzip "$ZIP" META-INF/Data/Types -d /tmp/maianh
-unzip "$ZIP" META-INF/Data/Chip -d /tmp/maianh
-chmod -R 0777 /tmp/maianh
-structure=$(cat '/tmp/maianh/META-INF/Data/Structure')
-codename=$(cat '/tmp/maianh/META-INF/Data/DeviceCode')
-name=$(cat '/tmp/maianh/META-INF/Data/DeviceName')
-android=$(cat '/tmp/maianh/META-INF/Data/AndroidVer')
-region=$(cat '/tmp/maianh/META-INF/Data/Region')
-based=$(cat '/tmp/maianh/META-INF/Data/RomBased')
-version=$(cat '/tmp/maianh/META-INF/Data/Version')
-Types=$(cat '/tmp/maianh/META-INF/Data/Types')
-Chip=$(cat '/tmp/maianh/META-INF/Data/Chip')
-partitionPath="/dev/block/bootdevice/by-name"
+# Dùng `echo` thường, KHÔNG `echo -e`: /sbin/sh của TWRP là mksh, nó in ra
+# nguyên chuỗi "-e ui_print ..." và recovery hiện rác.
+ui_print() { echo "ui_print $1" >> "$OUTFD"; echo "ui_print" >> "$OUTFD"; }
+abort_install() { ui_print " "; ui_print "!! $1"; ui_print " "; exit 1; }
 
-export PATH=/tmp/maianh/bin:$PATH
-
-ui_print "> Check infomation... "
-
-if [ "$Chip" != "Snapdragon" ]; then
-  echo "Device is mediatek chip and is not supported to be install from recovery!"
-  exit 1
+if [ -z "$ZIP" ] || [ ! -f "$ZIP" ]; then
+    ui_print "!! Không thấy file zip - recovery gọi sai tham số"
+    exit 1
 fi
 
-device=$(getprop ro.product.device)
-if [ "$device" != "$codename" ]; then
-   echo "Device is not $codename! Device is: $device"
-   exit 1
+TMP=/tmp/bugos_install
+rm -rf "$TMP"
+mkdir -p "$TMP/bin" || abort_install "Không tạo được $TMP"
+
+ui_print "> Đang đọc thông tin gói..."
+
+# Trích META-INF ra /tmp để đọc Data + lấy 7zz/zstd.
+#
+# KHÔNG dùng pattern kiểu 'META-INF/*': Info-ZIP unzip trả mã 11 ("filename not
+# matched") khi pattern không khớp - và một số bản không cho `*` đi qua dấu `/`.
+# Cũng không giải nén cả zip: super.img.zst nặng hàng GB, /tmp của recovery
+# không đủ chỗ.
+#
+# Cách chắc ăn: liệt kê tên chính xác rồi giải nén đúng những tên đó. Tên tuyệt
+# đối thì luôn khớp, không phụ thuộc cú pháp wildcard của từng bản unzip.
+meta_names=$(unzip -l "$ZIP" 2>/dev/null | grep -o 'META-INF/[A-Za-z0-9_./-]*' | sort -u)
+if [ -z "$meta_names" ]; then
+    abort_install "Không đọc được danh sách META-INF trong zip"
+fi
+unzip -o -q "$ZIP" -d "$TMP" $meta_names 2>/dev/null
+if [ ! -d "$TMP/META-INF/Data" ]; then
+    abort_install "Không đọc được META-INF/Data từ zip - file hỏng?"
+fi
+mv -f "$TMP"/META-INF/bin/* "$TMP/bin" 2>/dev/null
+chmod -R 0777 "$TMP" 2>/dev/null
+
+DATA="$TMP/META-INF/Data"
+structure=$(cat "$DATA/Structure" 2>/dev/null | tr -d '\r\n')
+codename=$(cat "$DATA/DeviceCode" 2>/dev/null | tr -d '\r\n')
+name=$(cat "$DATA/DeviceName" 2>/dev/null | tr -d '\r\n')
+android=$(cat "$DATA/AndroidVer" 2>/dev/null | tr -d '\r\n')
+region=$(cat "$DATA/Region" 2>/dev/null | tr -d '\r\n')
+based=$(cat "$DATA/RomBased" 2>/dev/null | tr -d '\r\n')
+version=$(cat "$DATA/Version" 2>/dev/null | tr -d '\r\n')
+chip=$(cat "$DATA/Chip" 2>/dev/null | tr -d '\r\n')
+types=$(cat "$DATA/Types" 2>/dev/null | tr -d '\r\n')
+
+export PATH="$TMP/bin:$PATH"
+
+# ---------------------------------------------------------------------------
+# Kiểm tra thiết bị
+#
+# Bản cũ: `if [ "$Chip" != "Snapdragon" ]` -> file Data/Chip rỗng (hoặc ghi
+# "Mediatek" chỉ vì thiếu init.qcom.rc) là thoát ngay, người dùng thấy
+# "Device is mediatek chip and is not supported" trên máy Snapdragon.
+# Giờ chỉ chặn khi CHẮC CHẮN là MediaTek.
+# ---------------------------------------------------------------------------
+case "$(printf '%s' "$chip" | tr 'A-Z' 'a-z')" in
+    *mediatek*|*mtk*)
+        abort_install "Máy MediaTek - chỉ hỗ trợ flash qua fastboot, không qua recovery" ;;
+esac
+
+device=$(getprop ro.product.device 2>/dev/null)
+if [ -z "$device" ]; then
+    device=$(getprop ro.product.vendor.device 2>/dev/null)
+fi
+# TWRP đôi khi chưa set prop -> đọc thẳng từ build.prop đã mount.
+if [ -z "$device" ] && [ -f /system/build.prop ]; then
+    device=$(grep -m1 '^ro.product.device=' /system/build.prop 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+fi
+
+if [ -n "$codename" ] && [ -n "$device" ] && [ "$device" != "$codename" ]; then
+    abort_install "ROM dành cho '$codename' nhưng máy là '$device' - dừng"
 fi
 
 ui_print "------------------------------------------------"
-ui_print "Device Name: $name"
-ui_print "Codename: $codename"
-ui_print "Android: $android"
-ui_print "Based: $based"
-ui_print "Region: $region"
-ui_print "Version: $version"
+ui_print "Thiết bị : ${name:-?} (${codename:-?})"
+ui_print "Android  : ${android:-?}"
+ui_print "Nền ROM  : ${based:-?}"
+ui_print "Khu vực  : ${region:-?}"
+ui_print "Phiên bản: ${version:-?}"
+[ -n "$types" ] && ui_print "Filesystem: $types"
+ui_print "Cấu trúc : ${structure:-Non-VAB}"
 ui_print "------------------------------------------------"
 ui_print " "
 
-ui_print "> Starting Installing... "
-ui_print " "
-ui_print "----- Flashing firmware -----"
-ui_print " "
+# ---------------------------------------------------------------------------
+# Đường dẫn block device. TWRP có /dev/block/bootdevice/by-name; OrangeFox và
+# một số bản TWRP chỉ có /dev/block/by-name.
+# ---------------------------------------------------------------------------
+BLK=""
+for p in /dev/block/bootdevice/by-name /dev/block/by-name /dev/block/mapper; do
+    [ -d "$p" ] && { BLK="$p"; break; }
+done
+[ -z "$BLK" ] && abort_install "Không tìm thấy thư mục by-name của block device"
 
-for imageFile in $(7zz l "$ZIP" | grep images | grep -o "/.*" ); do
-	partition=${imageFile##*/}
-	partition=${partition%%.*}
-	if [ "$partition" == "cust" ]; then
-	    ui_print "> Flashing ${partition}"
-	    unzip -p "$ZIP" "images/cust.img" > "${partitionPath}/cust"
-	elif [ "$structure" == "VAB" ] ;then
-	    ui_print "> Flashing ${partition}_a"
-		unzip -p "$ZIP" "images${imageFile}" > "${partitionPath}/${partition}_a" 
-		ui_print "> Flashing ${partition}_b"
-		unzip -p "$ZIP" "images${imageFile}" > "${partitionPath}/${partition}_b" 
-	else
-	    ui_print "> Flashing ${partition}"
-		unzip -p "$ZIP" "images${imageFile}" > "${partitionPath}/${partition}"
-	fi
+ui_print "> Block device: $BLK"
+
+# Liệt kê nội dung zip: 7zz trước (bản static aarch64 đóng sẵn trong META-INF),
+# không có thì rơi về unzip của recovery. Cả hai in mỗi entry một dòng kèm
+# đường dẫn, nên các regex bên dưới dùng chung được.
+list_zip() {
+    if [ -x "$TMP/bin/7zz" ]; then
+        "$TMP/bin/7zz" l "$ZIP" 2>/dev/null && return 0
+    fi
+    unzip -l "$ZIP" 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Gỡ các phân vùng nằm trên super TRƯỚC khi ghi đè super.
+#
+# TWRP tự mount /system, /vendor, /product từ super qua device-mapper. Ghi raw
+# lên super trong khi các dm đó còn mở là cách nhanh nhất để ra một super hỏng
+# (kernel còn page cache của dm cũ, ghi đè lên metadata mới). Recovery không có
+# lệnh umount "sạch" cho mọi bản, nên thử cả 3 kiểu rồi kiểm tra lại.
+# ---------------------------------------------------------------------------
+ui_print "> Gỡ /system /vendor /product /system_ext khỏi super..."
+for mnt in /system /system_root /vendor /product /system_ext /mi_ext /odm; do
+    umount -l "$mnt" 2>/dev/null
+    umount "$mnt" 2>/dev/null
+done
+# Một số bản TWRP có sẵn helper riêng.
+for helper in /sbin/unmountsystem /sbin/twrp unmount; do
+    [ -x "$helper" ] && "$helper" 2>/dev/null
 done
 
-ui_print "----- Flashing super -----"
+# ---------------------------------------------------------------------------
+# Ghi image thường (boot, dtbo, vendor_boot, vbmeta, cust...)
+# ---------------------------------------------------------------------------
+ui_print " "
+ui_print "----- Ghi các phân vùng firmware -----"
 
-for zstFile in $(7zz l "$ZIP" | grep -o "[a-z]*.img.zst"); do
-	partition=${zstFile%%.*}
-	ui_print "> Flashing ${partition} "
-	7zz x -so "$ZIP" "${zstFile}" | zstd -c -d > "${partitionPath}/${partition}" 
+is_vab=0
+[ "$structure" = "VAB" ] && is_vab=1
+
+flash_one() {
+    # $1 = tên file trong images/, $2 = tên phân vùng trên thiết bị
+    local src="$1" part="$2" target ok=0
+    if [ "$is_vab" -eq 1 ]; then
+        for slot in _a _b; do
+            target="$BLK/$part$slot"
+            [ -e "$target" ] || continue
+            ui_print "> $part$slot"
+            unzip -p "$ZIP" "images/$src" > "$target" 2>/dev/null || abort_install "Ghi $part$slot thất bại"
+            ok=1
+        done
+    fi
+    if [ "$ok" -eq 0 ]; then
+        target="$BLK/$part"
+        [ -e "$target" ] || return 1
+        ui_print "> $part"
+        unzip -p "$ZIP" "images/$src" > "$target" 2>/dev/null || abort_install "Ghi $part thất bại"
+    fi
+    return 0
+}
+
+# Danh sách lấy từ chính nội dung zip, không hardcode: ROM nào có gì thì ghi nấy.
+for entry in $(list_zip | grep -o 'images/[A-Za-z0-9_.-]*\.img' | sort -u); do
+    fname=${entry#images/}
+    [ "$fname" = "super.img" ] && continue
+    # cust nằm ở phân vùng tên "cust" trên cả máy A/B, không có hậu tố slot.
+    case "$fname" in
+        cust.img)
+            if [ -e "$BLK/cust" ]; then
+                ui_print "> cust"
+                unzip -p "$ZIP" "images/$fname" > "$BLK/cust" 2>/dev/null || abort_install "Ghi cust thất bại"
+            fi
+            ;;
+        *)
+            part=${fname%.img}
+            flash_one "$fname" "$part" || ui_print "! bỏ qua $part (máy không có phân vùng này)"
+            ;;
+    esac
 done
 
-rm -rf /data/dalvik-cache/arm/*
-rm -rf /data/dalvik-cache/arm64/*
-
-ui_print "----- Install Success -----"
+# ---------------------------------------------------------------------------
+# Ghi super
+# ---------------------------------------------------------------------------
 ui_print " "
-ui_print "Try format data if not boot"
+ui_print "----- Ghi super -----"
+
+super_entries=$(list_zip | grep -o '[A-Za-z0-9_.-]*super\.img\.zst' | sort -u)
+if [ -z "$super_entries" ]; then
+    super_entries=$(list_zip | grep -o '[A-Za-z0-9_.-]*super\.img$' | sort -u)
+fi
+
+if [ -z "$super_entries" ]; then
+    ui_print "!! Không thấy super.img trong zip - ROM này thiếu phần hệ thống"
+    abort_install "Zip không có super.img"
+fi
+
+if [ ! -e "$BLK/super" ]; then
+    abort_install "Máy không có phân vùng super - không phải thiết bị dynamic partition"
+fi
+
+for s in $super_entries; do
+    case "$s" in
+        *super.img.zst)
+            ui_print "> Giải nén và ghi super (zstd)"
+            # -f để zstd ghi đè được device node; --no-progress cho log gọn.
+            #
+            # Kiểm tra bằng $? của CẢ pipeline: mksh không có pipefail, nên phải
+            # bắt lỗi qua biến trung gian thay vì tin vào exit code của zstd.
+            "$TMP/bin/7zz" x -so "$ZIP" "$s" 2>/dev/null | zstd -d -c -q > "$BLK/super" 2>/dev/null
+            if [ $? -ne 0 ]; then
+                abort_install "Ghi super thất bại (giải nén zstd lỗi)"
+            fi
+            ;;
+        *)
+            ui_print "> Ghi super (raw)"
+            unzip -p "$ZIP" "$s" > "$BLK/super" 2>/dev/null || abort_install "Ghi super thất bại"
+            ;;
+    esac
+done
+
+# ---------------------------------------------------------------------------
+# Xoá dalvik cache để lần boot đầu không dùng dex cũ của ROM trước.
+# ---------------------------------------------------------------------------
+rm -rf /data/dalvik-cache/arm/* /data/dalvik-cache/arm64/* 2>/dev/null
+rm -rf /data/dalvik-cache/*.oat /data/dalvik-cache/*.art 2>/dev/null
+
+rm -rf "$TMP"
+
+ui_print " "
+ui_print "----- Cài đặt thành công -----"
+ui_print " "
+ui_print "Nếu máy không boot: format Data (KHÔNG chỉ wipe) rồi flash lại."
+ui_print " "
 
 exit 0

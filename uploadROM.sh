@@ -64,7 +64,15 @@ fi
 cp -rf $work_dir/bin/script2flash/META-INF "$target_out_dir/"
 cp -rf $work_dir/bin/script2flash/*.bat "$target_out_dir/" 2>/dev/null || true
 cp -rf $work_dir/bin/script2flash/*.sh "$target_out_dir/" 2>/dev/null || true
-cp -rf $work_dir/bin/script2flash/cust.img "$target_out_dir/images/" 2>/dev/null || true
+
+# cust.img: chỉ dùng bản mẫu trong repo khi ROM không có cust thật.
+#
+# Bản mẫu chỉ 2 MB. Trước đây `cp -rf` chạy SAU bước mv nên nó đè lên cust.img
+# thật vừa giải nén từ base ROM (build.sh: simg2img cust.img.* -> images/cust.img),
+# tức là máy nhận một cust rỗng thay vì cust của ROM gốc.
+if [ ! -f "$target_out_dir/images/cust.img" ]; then
+    cp -rf $work_dir/bin/script2flash/cust.img "$target_out_dir/images/" 2>/dev/null || true
+fi
 
 mkdir -p "$target_out_dir/META-INF/Data"
 echo "$device_f" > "$target_out_dir/META-INF/Data/DeviceCode"
