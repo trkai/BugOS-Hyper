@@ -210,17 +210,47 @@ if [ ! -e "$BLK/super" ]; then
     abort_install "Máy không có phân vùng super - không phải thiết bị dynamic partition"
 fi
 
+# ---------------------------------------------------------------------------
+# Kiểm tra toàn vẹn super TRƯỚC khi ghi.
+#
+# Đã gặp thật (06/11): zip tải từ Drive bị hỏng đúng entry super.img.zst
+# ("Data Error", zstd "premature end"). Script cũ ghi được 3.4 GB rồi mới chết
+# -> super bị ghi dở, máy không boot được, mà lỗi chỉ hiện SAU khi đã phá.
+#
+# `7zz t` đọc hết entry và kiểm CRC. Tốn ~1 phút cho 7.6 GB, đổi lấy việc
+# không bao giờ để lại một super nửa vời. Hỏng thì dừng trước khi chạm vào máy.
+# ---------------------------------------------------------------------------
+for s in $super_entries; do
+    case "$s" in
+        *super.img.zst)
+            ui_print "> Kiểm tra toàn vẹn $s (đọc hết entry, có thể mất 1-2 phút)..."
+            if ! "$TMP/bin/7zz" t "$ZIP" "$s" > /tmp/bugos_verify.log 2>&1; then
+                tail -n 3 /tmp/bugos_verify.log 2>/dev/null | while read -r line; do
+                    ui_print "   $line"
+                done
+                abort_install "Zip hỏng ở '$s' - KHÔNG ghi gì cả. Tải lại file ROM rồi thử lại."
+            fi
+            ui_print "  toàn vẹn OK"
+            ;;
+    esac
+done
+
 for s in $super_entries; do
     case "$s" in
         *super.img.zst)
             ui_print "> Giải nén và ghi super (zstd)"
-            # -f để zstd ghi đè được device node; --no-progress cho log gọn.
-            #
-            # Kiểm tra bằng $? của CẢ pipeline: mksh không có pipefail, nên phải
-            # bắt lỗi qua biến trung gian thay vì tin vào exit code của zstd.
-            "$TMP/bin/7zz" x -so "$ZIP" "$s" 2>/dev/null | zstd -d -c -q > "$BLK/super" 2>/dev/null
-            if [ $? -ne 0 ]; then
-                abort_install "Ghi super thất bại (giải nén zstd lỗi)"
+            # Giữ stderr lại thay vì nuốt vào /dev/null: lần trước lỗi chỉ hiện
+            # "giải nén zstd lỗi" mà không biết vì sao (thực ra là zip hỏng).
+            "$TMP/bin/7zz" x -so "$ZIP" "$s" 2>/tmp/bugos_7zz.err \
+                | zstd -d -c -q > "$BLK/super" 2>/tmp/bugos_zstd.err
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+                for f in /tmp/bugos_7zz.err /tmp/bugos_zstd.err; do
+                    [ -s "$f" ] && tail -n 2 "$f" | while read -r line; do
+                        ui_print "   $(basename "$f"): $line"
+                    done
+                done
+                abort_install "Ghi super thất bại (mã $rc)"
             fi
             ;;
         *)
