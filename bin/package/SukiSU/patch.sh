@@ -245,16 +245,35 @@ if [ -d "$IMG/system_ext" ]; then
 APK=/product/app/SukiSUUltra/SukiSUUltra.apk
 LOG=/data/local/tmp/bugos_sukisu_install.log
 
-[ -f "$APK" ] || exit 0
+# Ghi dòng đầu TIÊN, trước mọi thứ khác: uid ở đây là thứ duy nhất cho biết
+# service chạy bằng user nào. Không có dòng này thì khi hỏng chỉ thấy im lặng.
+echo "=== $(date) start uid=$(id -u) gid=$(id -g)" >> "$LOG" 2>&1
+
+# Chờ framework lên. Service chạy ở class late_start (init tự khởi động, không
+# phụ thuộc trigger sys.boot_completed) nên phải tự đợi, tối đa 240s.
+i=0
+while [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ] && [ "$i" -lt 120 ]; do
+    sleep 2
+    i=$((i + 1))
+done
+echo "--- boot_completed=$(getprop sys.boot_completed 2>/dev/null) sau ${i} lần chờ" >> "$LOG" 2>&1
+
+if [ ! -f "$APK" ]; then
+    echo "--- không thấy $APK - bỏ qua" >> "$LOG" 2>&1
+    exit 0
+fi
 
 # Đã là app dữ liệu rồi thì thôi (cài rồi, hoặc người dùng đã tự cài).
-case "$(pm path com.sukisu.ultra 2>/dev/null)" in
-    *"/data/app/"*) exit 0 ;;
+pm_path=$(pm path com.sukisu.ultra 2>&1)
+echo "--- pm path: $pm_path" >> "$LOG" 2>&1
+case "$pm_path" in
+    *"/data/app/"*) echo "--- đã ở /data/app, không làm gì" >> "$LOG" 2>&1; exit 0 ;;
 esac
 
-echo "--- $(date) pm install -r $APK" >> "$LOG"
+echo "--- pm install -r $APK" >> "$LOG" 2>&1
 pm install -r "$APK" >> "$LOG" 2>&1
-echo "--- exit=$?" >> "$LOG"
+echo "--- pm exit=$?" >> "$LOG" 2>&1
+echo "--- sau cài: $(pm path com.sukisu.ultra 2>&1)" >> "$LOG" 2>&1
 SHEOF
     chmod 0755 "$INSTALL_SH"
 
@@ -262,20 +281,44 @@ SHEOF
 # BugOS - cài SukiSU Ultra vào /data/app ở lần boot đầu.
 # Xem bin/package/SukiSU/patch.sh.
 #
-# Dùng đúng khuôn của pubcert_download trong init.miui.ext.rc: init exec
-# /system/bin/sh với seclabel u:r:shell:s0. Domain shell có binder nên gọi
-# được `pm`; domain init thì không.
+# seclabel u:r:shell:s0: chỉ domain shell mới có binder gọi được `pm`; domain
+# init thì không. Đây là khuôn có sẵn trong init.rc (service console).
+#
+# KHÔNG dùng `on property:sys.boot_completed=1` nữa: lần trước service có được
+# start (ro.boottime có ghi) nhưng script không chạy được dòng nào. Nguyên nhân
+# đo được trên máy: file script bị fspatch đóng 0750 root:root nên nếu tiến
+# trình không phải uid 0 thì `sh` không đọc nổi file -> thoát ngay, không log.
+# Giờ: file 0755 (ép trong fs_config), service nằm ở class main (init chắc chắn
+# start mỗi lần boot) và tự chờ sys.boot_completed - bỏ hẳn phụ thuộc trigger.
 service bugos_sukisu_manager /system/bin/sh /system_ext/bin/bugos_sukisu_manager.sh
+    class main
     user root
     group root system
     oneshot
-    disabled
     seclabel u:r:shell:s0
 
+# Lưới an toàn: nếu vì lý do nào đó class main không start được service này,
+# trigger boot_completed vẫn kích hoạt nó. Script idempotent (thấy /data/app là
+# thoát), nên chạy hai đường không sao.
 on property:sys.boot_completed=1
     start bugos_sukisu_manager
 RCEOF
     chmod 0644 "$INSTALL_RC"
+
+    # fspatch.py tự đóng 0750 cho mọi file .sh nằm dưới /bin (quy ước của ROM
+    # gốc). Với file của mình thì phải là 0755, nếu không `sh` không đọc được
+    # khi service không chạy bằng uid 0 - đúng lỗi đã gặp. Ghi thẳng vào
+    # fs_config: fspatch giữ nguyên entry đã có, nên entry này thắng.
+    FS_CFG="$IMG/config/system_ext_fs_config"
+    if [ -f "$FS_CFG" ]; then
+        {
+            echo "system_ext/bin/bugos_sukisu_manager.sh 0 0 0755"
+            echo "system_ext/etc/init/init.bugos.sukisu.rc 0 0 0644"
+        } >> "$FS_CFG"
+        mods "SukiSU: fs_config -> script 0755, rc 0644"
+    else
+        warn "SukiSU: không thấy $FS_CFG - script có thể bị đóng 0750 và không chạy được"
+    fi
 
     mods "SukiSU: script cài manager vào /data/app ở boot đầu -> system_ext/bin"
 else
