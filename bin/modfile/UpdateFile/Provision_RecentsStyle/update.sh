@@ -42,9 +42,9 @@ DEXTOOL="$work_dir/bin/tools/apk_dex_patch.py"
 DUMPDIR="$work_dir/documentation/provision_src"
 PKG="com.android.provision"
 
-# Mặc định TẮT: launcher đã là bản mod Kashi nên 3 kiểu Gần đây vẫn có trong
-# Cài đặt launcher, còn bước setup chỉ là hiển thị. Provision là app sống-còn
-# của lần boot đầu nên không đụng vào trừ khi bật rõ ràng trong config.env.
+# Mặc định TẮT. Launcher giờ là bản gốc của ROM (đã bỏ launcher mod Kashi), nên
+# bước setup hiện đúng những gì bản gốc hỗ trợ. Provision là app sống-còn của
+# lần boot đầu nên không đụng vào trừ khi bật rõ ràng trong config.env.
 ENABLE=$(grep -m1 '^patch_provision_recents=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
 if [ "$ENABLE" != "true" ]; then
     mods "Provision: bỏ qua bộ chọn kiểu Gần đây (patch_provision_recents != true)"
