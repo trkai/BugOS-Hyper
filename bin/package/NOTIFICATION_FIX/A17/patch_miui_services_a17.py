@@ -22,8 +22,13 @@ Targets:
    - verifyIsolationViolation(...)V     -> return-void (bypass package isolation restrictions)
    - canBeUpdate(...)V                  -> return-void (bypass package update restrictions)
 
-5. WindowManagerServiceImpl.smali:
-   - notAllowCaptureDisplay(...)Z       -> inject isBypassSecureFlag() check if missing
+KHÔNG đụng WindowManagerServiceImpl.notAllowCaptureDisplay nữa.
+
+Bản trước chèn vào đó một lời gọi
+`invoke-static {}, Lcom/android/server/wm/WindowState;->isBypassSecureFlag()Z`
+- một method KHÔNG tồn tại trong services.jar của ROM này (đã quét cả 4 dex).
+Kết quả trên máy: chụp màn hình -> system_server chết vì NoSuchMethodError ->
+đơ một nhịp rồi soft reboot. Đã bỏ hẳn phần chèn; xem commit đi kèm.
 """
 
 import os
@@ -97,41 +102,6 @@ def stub_method_return_void(file_path, method_name, registers=2):
         return False
 
 
-def patch_window_manager_secure_flag(file_path):
-    if not os.path.isfile(file_path):
-        return False
-
-    with open(file_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-
-    if "isBypassSecureFlag" in content:
-        print(f"[i] {os.path.basename(file_path)}: Đã có sẵn isBypassSecureFlag (không cần vá lại)")
-        return True
-
-    pattern = re.compile(
-        r'(?ms)(^[ \t]*\.method public notAllowCaptureDisplay\(Lcom/android/server/wm/RootWindowContainer;I\)Z\n.*?' +
-        r'^[ \t]*\.param p2, "displayId"    # I\n)'
-    )
-
-    injection = (
-        "\n    invoke-static {}, Lcom/android/server/wm/WindowState;->isBypassSecureFlag()Z\n\n"
-        "    move-result v0\n\n"
-        "    if-eqz v0, :cond_bypass_flag\n\n"
-        "    const/4 v0, 0x0\n\n"
-        "    return v0\n\n"
-        "    :cond_bypass_flag\n"
-    )
-
-    new_content, count = pattern.subn(r'\g<1>' + injection, content)
-    if count > 0:
-        with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
-            f.write(new_content)
-        print(f"[+] {os.path.basename(file_path)}: Đã chèn isBypassSecureFlag vào notAllowCaptureDisplay")
-        return True
-    else:
-        print(f"[!] {os.path.basename(file_path)}: Không tìm thấy method notAllowCaptureDisplay")
-        return False
-
 
 def main():
     if len(sys.argv) < 2:
@@ -185,12 +155,6 @@ def main():
         if stub_method_return_void(pms_path, "verifyIsolationViolation", registers=3):
             total_actions += 1
         if stub_method_return_void(pms_path, "canBeUpdate", registers=2):
-            total_actions += 1
-
-    # 5. WindowManagerServiceImpl.smali
-    wm_files = find_files_by_name(root_dir, "WindowManagerServiceImpl.smali")
-    for wm_path in wm_files:
-        if patch_window_manager_secure_flag(wm_path):
             total_actions += 1
 
     print(f"=== Hoàn thành: {total_actions} hành động vá đã thực hiện ===")
