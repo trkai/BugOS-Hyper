@@ -70,9 +70,28 @@ mkdir -p "$target_out_dir/META-INF/Data"
 echo "$device_f" > "$target_out_dir/META-INF/Data/DeviceCode"
 repack "Done"
 
-# Định dạng tên file: BugOS_<codename>_<phiên bản os>_<ngày tháng năm>.zip
+# Định dạng tên file: BugOS_<codename>_<phiên bản os>_<ngày tháng năm>[_<nhánh>].zip
+#
+# Hậu tố nhánh: tên file không chứa tên nhánh, mà workflow lại đẩy lên cùng một
+# thư mục Drive. Build từ nhánh thử nghiệm cùng ngày cùng base ROM sẽ ghi đè file
+# ROM của main. Nên các nhánh trong danh sách dưới đây được gắn thêm "_<nhánh>".
+# Thêm nhánh mới vào chuỗi này nếu muốn nó cũng tách file riêng.
+experimental_branches="dev"
+
+# GITHUB_REF_NAME trước: trong Actions, checkout có thể ở detached HEAD nên
+# `git branch --show-current` trả rỗng. Chạy tay trên máy thì dùng git.
+build_branch="${GITHUB_REF_NAME:-$(git branch --show-current 2>/dev/null || true)}"
+branch_suffix=""
+for _b in $experimental_branches; do
+    if [ "$build_branch" = "$_b" ]; then
+        # '/' trong tên nhánh (feature/foo) không được lọt vào tên file
+        branch_suffix="_$(printf '%s' "$build_branch" | sed 's|[^A-Za-z0-9._-]|-|g')"
+        break
+    fi
+done
+
 build_date=$(TZ=Asia/Ho_Chi_Minh date +%d%m%Y)
-final_zip_name="BugOS_${device_code}_${base_rom_code}_${build_date}.zip"
+final_zip_name="BugOS_${device_code}_${base_rom_code}_${build_date}${branch_suffix}.zip"
 
 find "$target_out_dir" | xargs touch
 pushd "$target_out_dir/" || exit
