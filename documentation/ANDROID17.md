@@ -50,7 +50,7 @@ Không cần sửa `build.sh`, `patchpackage.sh`, `insupdate.sh`, `insfile.sh`.
 | `Fonts` (regex `^OS[3-9]`) | `COREPATCH/jar_patcher_a*.sh` |
 | `MultiLang` (regex `^OS[4-9]`) | `NOTIFICATION_FIX/A*/` |
 | `Settings_AdvancedTexture` (prop) | `FCM_NotificationFix` (engine chỉ có strategy A16) |
-| `Xiaomi_NoLowEnd` (prop) | `KernelSU/patch.sh` (KMI theo kernel) |
+| `Xiaomi_NoLowEnd` (prop) | `SukiSU/patch.sh` (KMI theo kernel) |
 | `Google_DefaultOn` (prop + APKEditor) | `thememanager` OS3/OS4 (APK ThemeManager) |
 | `DISABLE_AVB` (vbmeta) | `gmsservices/maps/A*` |
 | `Settings_ROMInformation` (APKEditor) | |
@@ -80,13 +80,20 @@ gỡ khỏi cây: `KaoriosHook.getSpoofedProperty` không có caller nào trong 
 tầng đó chưa bao giờ đổi được `ro.boot.*`, còn khối SELinux cho `AdvancedPolicyService`
 của nó đã hai lần làm máy rơi vào fastboot.
 
-Thay vào đó ROM **có root sẵn** — KernelSU Next 3.4.2, chế độ LKM:
+Thay vào đó ROM **có root sẵn** — SukiSU Ultra 4.3.0-r1, chế độ LKM:
 
 | Việc | File | Ghi chú |
 |---|---|---|
-| vá kernel | `KernelSU/patch.sh` | `ksud boot-patch-v2` nhúng `kernelsu.ko` vào `boot.img` |
-| KMI | tự dò từ chuỗi version kernel | override bằng `config.env: kernelsu_kmi` |
-| manager | `product/app/KernelSUNext` | APK 3.4.2, cùng tag với ksud và .ko |
+| vá kernel | `SukiSU/patch.sh` | `boot-patch-v2` nhúng `kernelsu.ko` của SukiSU vào `boot.img` |
+| KMI | tự dò từ chuỗi version kernel | override bằng `config.env: sukisu_kmi` |
+| manager | `product/app/SukiSUUltra` | `com.sukisu.ultra` 4.3.0-r1, cùng tag với .ko |
+
+`ksud` chạy trên host mượn của KernelSU-Next 3.4.2 vì SukiSU chỉ phát hành bản
+Android (link bionic). Phần sinh capsule của hai bên giống nhau 100% ở đúng hai
+tag đang dùng — xem chú thích đầu `bin/package/SukiSU/patch.sh`.
+
+Việc giả trạng thái/attestation chuyển sang module KSU (PIF, keybox). SUSFS đã
+nằm sẵn trong module của SukiSU nên không cần cài thêm.
 
 Việc giả trạng thái/attestation chuyển sang module KSU (PIF, keybox, SUSFS) — cài sau
 khi flash, không nhúng vào ROM.
