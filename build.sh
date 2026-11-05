@@ -205,10 +205,9 @@ done
 # trên các image hiện có. Vá boot.img sau đó là vbmeta lệch.
 bash "$work_dir/bin/package/SukiSU/patch.sh"
 
-# ==================== BUGOS TOOLBOX (app hệ thống 2 nút) ====================
-# Cài SukiSU manager vào /data/app + mở màn hình flash module. Chạy sau SukiSU
-# để chắc chắn APK manager đã có trong product/app trước khi toolbox trỏ tới.
-bash "$work_dir/bin/package/BugOSToolbox/patch.sh"
+# ==================== ROOT TOOLBOX (app của user) ====================
+# App tự chứa SukiSU manager + module; ROM chỉ đặt vào product/app.
+bash "$work_dir/bin/package/RootToolbox/patch.sh"
 
 # ==================== FIX TÊN CODENAME THIẾT BỊ ====================
 detected_codename=""
