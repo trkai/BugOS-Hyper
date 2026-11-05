@@ -111,7 +111,13 @@ def fs_patch(fs_file, dir_path) -> tuple:  # 接收两个字典对比
             else:
                 uid = '0'
                 gid = '0'
-                mode = '0644'
+                # Giữ mode THẬT của file thay vì luôn 0644. Trước đây mọi file
+                # mới đều bị đóng 0644, nên `chmod 0755` trong build script bị
+                # nuốt mất ở bước mkfs: manager của KernelSU cần exec bit trên
+                # ksud (~6 MB, đặt trong <app>/lib/arm64) và nó exec trực tiếp
+                # file đó. Thiếu +x -> "Permission denied" -> app báo
+                # "Chưa cài đặt" dù module kernel đã nạp.
+                mode = '%04o' % (os.stat(filepath).st_mode & 0o7777)
                 config = [uid, gid, mode]
             print(f'Add [{i}{config}]')
             r_fs[i] = 1

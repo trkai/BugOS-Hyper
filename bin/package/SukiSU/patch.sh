@@ -206,5 +206,81 @@ else
     warn "SukiSU: không thấy product/ - manager không được cài sẵn"
 fi
 
+# ---------------------------------------------------------------------------
+# Cài manager thành APP DỮ LIỆU (/data/app) ở lần boot đầu.
+#
+# VÌ SAO BẮT BUỘC - đọc từ source kernel, không phải thử mò:
+#   kernel/manager/throne_tracker.c -> track_throne() -> search_manager("/data/app", 2)
+#   Nó chỉ quét /data/app/<pkg>/base.apk, xác minh chữ ký rồi mới
+#   ksu_set_manager_appid(). App hệ thống ở /product/app KHÔNG BAO GIỜ được quét
+#   tới, nên ksu_manager_appid giữ KSU_INVALID_APPID, is_manager() luôn false,
+#   mọi supercall bị từ chối -> app hiện "Chưa cài đặt" dù kernelsu.ko đã nạp.
+#
+#   Đo trên máy 05/11: app ở /product/app -> "chưa cài đặt"; `pm install -r` đúng
+#   APK đó -> /data/app/~~xxx/com.sukisu.ultra-yyy/base.apk, flags có
+#   UPDATED_SYSTEM_APP, kernel crowning ngay (package observer) -> hết lỗi.
+#   Cài ở /data/app còn có lợi thứ hai: PackageManager tự giải nén lib ra
+#   lib/arm64 với mode 0755 và nhãn apk_data_file, nên ksud exec được.
+#
+# VÌ SAO KHÔNG dùng `exec` của init: domain init không có binder, `pm` cần
+# binder để gọi package service. Khuôn đã có sẵn trong init.miui.ext.rc
+# (pubcert_download): init exec /system/bin/sh với seclabel u:r:shell:s0 -
+# domain shell có binder. Dùng lại đúng khuôn đó, không cần thêm rule SELinux.
+#
+# Script chạy mỗi lần boot nhưng tự thoát nếu app đã nằm trong /data/app, nên
+# chỉ thực sự cài đúng một lần. Cài lỗi thì app hệ thống vẫn còn (chỉ là chưa
+# dùng được) - không mất app, không boot loop.
+# ---------------------------------------------------------------------------
+INSTALL_SH="$IMG/system_ext/bin/bugos_sukisu_manager.sh"
+INSTALL_RC="$IMG/system_ext/etc/init/init.bugos.sukisu.rc"
+if [ -d "$IMG/system_ext" ]; then
+    mkdir -p "$(dirname "$INSTALL_SH")" "$(dirname "$INSTALL_RC")"
+
+    cat > "$INSTALL_SH" << 'SHEOF'
+#!/system/bin/sh
+# BugOS - cài SukiSU Ultra thành app dữ liệu (/data/app) ở lần boot đầu.
+# Kernel chỉ nhận manager khi thấy base.apk trong /data/app; xem chú thích
+# trong bin/package/SukiSU/patch.sh.
+
+APK=/product/app/SukiSUUltra/SukiSUUltra.apk
+LOG=/data/local/tmp/bugos_sukisu_install.log
+
+[ -f "$APK" ] || exit 0
+
+# Đã là app dữ liệu rồi thì thôi (cài rồi, hoặc người dùng đã tự cài).
+case "$(pm path com.sukisu.ultra 2>/dev/null)" in
+    *"/data/app/"*) exit 0 ;;
+esac
+
+echo "--- $(date) pm install -r $APK" >> "$LOG"
+pm install -r "$APK" >> "$LOG" 2>&1
+echo "--- exit=$?" >> "$LOG"
+SHEOF
+    chmod 0755 "$INSTALL_SH"
+
+    cat > "$INSTALL_RC" << 'RCEOF'
+# BugOS - cài SukiSU Ultra vào /data/app ở lần boot đầu.
+# Xem bin/package/SukiSU/patch.sh.
+#
+# Dùng đúng khuôn của pubcert_download trong init.miui.ext.rc: init exec
+# /system/bin/sh với seclabel u:r:shell:s0. Domain shell có binder nên gọi
+# được `pm`; domain init thì không.
+service bugos_sukisu_manager /system/bin/sh /system_ext/bin/bugos_sukisu_manager.sh
+    user root
+    group root system
+    oneshot
+    disabled
+    seclabel u:r:shell:s0
+
+on property:sys.boot_completed=1
+    start bugos_sukisu_manager
+RCEOF
+    chmod 0644 "$INSTALL_RC"
+
+    mods "SukiSU: script cài manager vào /data/app ở boot đầu -> system_ext/bin"
+else
+    warn "SukiSU: không thấy system_ext/ - manager chỉ nằm ở /product/app và sẽ báo 'chưa cài đặt'"
+fi
+
 mods "SukiSU: xong - ROM có root sẵn, mở app SukiSU Ultra để cấp quyền"
 exit 0
