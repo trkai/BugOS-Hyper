@@ -26,6 +26,32 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     esac
 done < "$APPLIST"
 
+# ---------------------------------------------------------------------------
+# Nhóm tài khoản Mi - tuỳ chọn, bật bằng cờ remove_mi_account trong config.env.
+#
+# Bỏ ba package này thì ROM không còn đường đăng nhập Mi và không đăng ký máy
+# với Find Device, nên máy không bị gắn tài khoản sau khi flash.
+#
+# KHÔNG gỡ được máy ĐÃ bị khoá: bản ghi khoá nằm ở server Xiaomi theo IMEI,
+# không nằm trong file ROM. Cờ này chỉ có nghĩa với máy chưa gắn tài khoản.
+#
+# Hệ quả khi bật: mất Find Device (không khoá/xoá dữ liệu từ xa được), mất
+# Mi Cloud backup và đồng bộ, mất mục tài khoản Mi trong Cài đặt.
+#
+# Thêm vào sau khi đọc APPLIST để danh sách gốc vẫn là thứ duy nhất quyết định
+# debloat mặc định - cờ này chỉ chèn thêm, không sửa file.
+# ---------------------------------------------------------------------------
+REMOVE_MI_ACCOUNT=$(grep -m1 '^remove_mi_account=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+if [ "$REMOVE_MI_ACCOUNT" = "true" ]; then
+    mi_account_pkgs=(
+        com.xiaomi.account
+        com.xiaomi.finddevice
+        com.miui.cloudservice
+    )
+    debloat_pkgs+=("${mi_account_pkgs[@]}")
+    mods "Debloat: remove_mi_account=true - bỏ ${#mi_account_pkgs[@]} package tài khoản Mi"
+fi
+
 rm -rf "$MAIN_FOLDER/product/etc/auto-install"*
 rm -rf "$MAIN_FOLDER/product/app/Updater"
 rm -rf "$MAIN_FOLDER/product/etc/permissions/cn.google.services.xml"
