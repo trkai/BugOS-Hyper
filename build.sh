@@ -200,10 +200,10 @@ for must in vendor system product; do
     fi
 done
 
-# ==================== ROOT SẴN (KernelSU Next LKM) ====================
+# ==================== ROOT SẴN (SukiSU Ultra LKM) ====================
 # Phải chạy TRƯỚC patchpackage.sh: bước đó gọi DISABLE_AVB, tính lại vbmeta
 # trên các image hiện có. Vá boot.img sau đó là vbmeta lệch.
-bash "$work_dir/bin/package/KernelSU/patch.sh"
+bash "$work_dir/bin/package/SukiSU/patch.sh"
 
 # ==================== FIX TÊN CODENAME THIẾT BỊ ====================
 detected_codename=""
