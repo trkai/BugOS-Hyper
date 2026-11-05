@@ -50,6 +50,14 @@ if [ "$ENABLE" = "false" ]; then
     exit 0
 fi
 
+# Bản manager: "spoofed" (mặc định) hay "normal".
+#   spoofed: package ngẫu nhiên - ở v3.4.2 là kqvdie.zeykvw.hpbcyd - nên không
+#            có chữ "kernelsu" nào trong tên package hay tên app. Cùng một app,
+#            cùng kernel, cùng quyền; chỉ khác định danh.
+#   normal : com.rifsxd.ksunext, tên thật. Dễ nhận ra khi cần debug.
+MANAGER=$(grep -m1 '^kernelsu_manager=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+[ -z "$MANAGER" ] && MANAGER=spoofed
+
 BOOT="$IMG/boot.img"
 if [ ! -f "$BOOT" ]; then
     error "KernelSU: không thấy $BOOT - không có kernel để vá"
@@ -80,11 +88,19 @@ fetch() {
 }
 
 KSUSD="$CACHE/ksud"
-APK="$CACHE/KernelSUNext.apk"
+
+# Tên asset trên release đổi theo bản manager. Cache đặt theo đúng tên file nên
+# đổi cờ là tải lại, không dùng nhầm bản cũ.
+case "$MANAGER" in
+    normal) APK_NAME="KernelSU_Next_v${KSU_VER}_${KSU_BUILD}-release.apk" ;;
+    *)      APK_NAME="KernelSU_Next_v${KSU_VER}-spoofed_${KSU_BUILD}-release.apk" ;;
+esac
+APK="$CACHE/$APK_NAME"
 
 fetch "$BASE/ksud-x86_64-unknown-linux-musl" "$KSUSD" 5000000 || { error "KernelSU: không tải được ksud"; exit 1; }
-fetch "$BASE/KernelSU_Next_v${KSU_VER}_${KSU_BUILD}-release.apk" "$APK" 10000000 || { error "KernelSU: không tải được manager APK"; exit 1; }
+fetch "$BASE/$APK_NAME" "$APK" 10000000 || { error "KernelSU: không tải được manager APK ($APK_NAME)"; exit 1; }
 chmod 0755 "$KSUSD"
+mods "KernelSU: manager bản $MANAGER ($APK_NAME)"
 
 # ---------------------------------------------------------------------------
 # Dò KMI: kernel báo "6.6.118-android15-8-g0908354dac1b-ab...-4k", KMI của
