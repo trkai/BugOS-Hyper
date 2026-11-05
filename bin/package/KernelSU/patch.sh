@@ -141,11 +141,31 @@ mods "KernelSU: boot.img đã vá - $(stat -c%s "$BOOT") byte (gốc $(stat -c%s
 
 # Manager: product/app để PackageManager luôn thấy. product/data-app phụ thuộc
 # PreinstallApp của MIUI chạy đúng.
+#
+# Native lib PHẢI nằm NGOÀI apk, trong <appdir>/lib/arm64/. App hệ thống nằm
+# trên phân vùng chỉ đọc nên PackageManager không giải nén lib vào /data được,
+# mà APK này khai extractNativeLibs=false -> System.loadLibrary("kernelsu")
+# không thấy gì và manager chết ngay khi mở:
+#   UnsatisfiedLinkError: dlopen failed: library "libkernelsu.so" not found
+# Đã gặp thật trên máy 05/11 với bản chỉ copy mỗi APK.
+#
+# Tên thư mục là "arm64", KHÔNG phải "arm64-v8a" - đó là quy ước
+# nativeLibraryDir của app hệ thống (/product/app/X/lib/arm64).
 APP_DIR="$IMG/product/app/KernelSUNext"
 if [ -d "$IMG/product" ]; then
     mkdir -p "$APP_DIR"
     cp -f "$APK" "$APP_DIR/KernelSUNext.apk"
     chmod 0644 "$APP_DIR/KernelSUNext.apk"
+
+    mkdir -p "$APP_DIR/lib/arm64"
+    unzip -o -j -q "$APK" 'lib/arm64-v8a/*.so' -d "$APP_DIR/lib/arm64" >/dev/null 2>&1 || true
+    if [ -f "$APP_DIR/lib/arm64/libkernelsu.so" ]; then
+        chmod 0644 "$APP_DIR/lib/arm64/"*.so
+        mods "KernelSU: lib arm64 -> product/app/KernelSUNext/lib/arm64 ($(ls "$APP_DIR/lib/arm64" | wc -l) file)"
+    else
+        error "KernelSU: APK không có lib/arm64-v8a/libkernelsu.so - manager sẽ crash khi mở"
+        exit 1
+    fi
     mods "KernelSU: manager v$KSU_VER -> product/app/KernelSUNext"
 else
     warn "KernelSU: không thấy product/ - manager không được cài sẵn"
