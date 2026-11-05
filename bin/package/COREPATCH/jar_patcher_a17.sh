@@ -1196,6 +1196,55 @@ apply_services_disable_secure_flag() {
   log "Disable secure flag patches applied to services.jar (Android 16)"
 }
 
+# ---------------------------------------------------------------------------
+# Chèn bù method mà miui-services.jar gọi nhưng services.jar THIẾU.
+#
+# Triệu chứng trên máy (05/11): bấm chụp màn hình -> đơ một nhịp -> soft reboot.
+#   FATAL EXCEPTION IN SYSTEM PROCESS: binder:...
+#   java.lang.NoSuchMethodError: No static method isBypassSecureFlag()Z in
+#     class Lcom/android/server/wm/WindowState;
+#     at WindowManagerServiceImpl.notAllowCaptureDisplay(...)
+#     at WindowManagerService.captureDisplay(...)
+#
+# Nguyên nhân: WindowManagerServiceImpl (miui-services.jar) gọi
+# WindowState.isBypassSecureFlag() - method static do MIUI thêm - nhưng
+# services.jar của bản ROM này không có nó. Đã quét cả 4 dex của services.jar:
+# không có chuỗi "isBypassSecureFlag" ở đâu cả. Các method khác mà
+# miui-services gọi tưởng thiếu (getWindowingMode, inMultiWindowMode,
+# setBounds, getActivityType...) đều nằm ở lớp cha ConfigurationContainer nên
+# vẫn resolve được; riêng method static này không thừa kế được -> nổ.
+#
+# Vì sao chèn stub thay vì bỏ lời gọi: stub giữ nguyên logic của Xiaomi, chỉ
+# trả false = "không bỏ qua cờ secure", tức cửa sổ bảo mật vẫn không cho chụp -
+# đúng hành vi mặc định. Thay cả thân notAllowCaptureDisplay bằng return false
+# sẽ đổi hành vi (cho chụp cả màn hình secure) nên không dùng.
+inject_windowstate_bypass_stub() {
+  local decompile_dir="$1"
+  local f
+  f=$(find "$decompile_dir" -path "*/com/android/server/wm/WindowState.smali" 2>/dev/null | head -n 1)
+  if [ -z "$f" ]; then
+    warn "WindowState.smali không thấy trong $decompile_dir - bỏ qua stub"
+    return 0
+  fi
+  if grep -q "isBypassSecureFlag" "$f"; then
+    log "WindowState.isBypassSecureFlag đã có - không chèn"
+    return 0
+  fi
+  cat >> "$f" << 'SMALI'
+
+# BugOS: stub cho method miui-services.jar gọi nhưng services.jar thiếu.
+# Xem bin/package/COREPATCH/jar_patcher_a17.sh
+.method public static isBypassSecureFlag()Z
+    .registers 1
+
+    const/4 v0, 0x0
+
+    return v0
+.end method
+SMALI
+  log "Đã chèn WindowState.isBypassSecureFlag() -> false (chống crash khi chụp màn hình)"
+}
+
 # Main services patching function (Android 16)
 patch_services() {
   local services_path="$work_dir/build/baserom/images/system/system/framework/services.jar"
@@ -1228,6 +1277,7 @@ patch_services() {
   # Apply feature-specific patches based on flags
   apply_services_signature_patches "$decompile_dir"
   apply_a17_extra_services "$decompile_dir"
+  inject_windowstate_bypass_stub "$decompile_dir"
   #apply_services_disable_secure_flag "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
