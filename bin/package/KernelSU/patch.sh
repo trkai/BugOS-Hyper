@@ -185,7 +185,10 @@ if [ -d "$IMG/product" ]; then
     mkdir -p "$APP_DIR/lib/arm64"
     unzip -o -j -q "$APK" 'lib/arm64-v8a/*.so' -d "$APP_DIR/lib/arm64" >/dev/null 2>&1 || true
     if [ -f "$APP_DIR/lib/arm64/libkernelsu.so" ]; then
-        chmod 0644 "$APP_DIR/lib/arm64/"*.so
+        # 0755 chu khong 0644: libksud.so la binary ksud 7 MB, manager can chay no.
+        # De 0644 thi no khong exec duoc. (Tren /product con bi SELinux chan o
+        # tang nhan system_file, nhung 0755 van la mac dinh dung.)
+        chmod 0755 "$APP_DIR/lib/arm64/"*.so
         mods "KernelSU: lib arm64 -> product/app/KernelSUNext/lib/arm64 ($(ls "$APP_DIR/lib/arm64" | wc -l) file)"
     else
         error "KernelSU: APK không có lib/arm64-v8a/libkernelsu.so - manager sẽ crash khi mở"
