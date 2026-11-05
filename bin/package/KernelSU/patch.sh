@@ -56,7 +56,16 @@ fi
 #            cùng kernel, cùng quyền; chỉ khác định danh.
 #   normal : com.rifsxd.ksunext, tên thật. Dễ nhận ra khi cần debug.
 MANAGER=$(grep -m1 '^kernelsu_manager=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
-[ -z "$MANAGER" ] && MANAGER=spoofed
+# Mặc định phải là normal. Trước đây để trống thì rơi vào spoofed - mà spoofed
+# thì kernel không nhận (đã đo trên image sạch 05/11), nên một dòng config thiếu
+# hoặc gõ sai sẽ lặng lẽ tạo ra ROM không có root dùng được.
+case "$MANAGER" in
+    normal|spoofed) ;;
+    *)
+        [ -n "$MANAGER" ] && warn "KernelSU: kernelsu_manager='$MANAGER' không hợp lệ - dùng normal"
+        MANAGER=normal
+        ;;
+esac
 
 BOOT="$IMG/boot.img"
 if [ ! -f "$BOOT" ]; then
