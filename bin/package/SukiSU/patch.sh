@@ -180,7 +180,12 @@ mods "SukiSU: boot.img đã vá - $out_sz byte (gốc $stock_sz)"
 # kiểm tra tên cụ thể - chỉ kiểm tra có lib và lib lớn nhất đủ nặng (ksud ~6 MB
 # nằm trong đó). Tên lib đổi giữa các bản là chuyện bình thường.
 APP_DIR="$IMG/product/app/SukiSUUltra"
-if [ -d "$IMG/product" ]; then
+PREINSTALL=$(grep -m1 '^sukisu_preinstall_manager=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+if [ "$PREINSTALL" != "true" ]; then
+    # Không cài sẵn app: người dùng mở Root Toolbox bấm "Cài". Kernel trong
+    # boot.img vẫn có root sẵn, chỉ là chưa có manager nào để nói chuyện.
+    mods "SukiSU: không cài sẵn manager (sukisu_preinstall_manager=false) - Root Toolbox lo"
+elif [ -d "$IMG/product" ]; then
     mkdir -p "$APP_DIR"
     cp -f "$APK" "$APP_DIR/SukiSUUltra.apk"
     chmod 0644 "$APP_DIR/SukiSUUltra.apk"
@@ -233,7 +238,9 @@ fi
 # ---------------------------------------------------------------------------
 INSTALL_SH="$IMG/system_ext/bin/bugos_sukisu_manager.sh"
 INSTALL_RC="$IMG/system_ext/etc/init/init.bugos.sukisu.rc"
-if [ -d "$IMG/system_ext" ]; then
+if [ "$PREINSTALL" != "true" ]; then
+    mods "SukiSU: bỏ qua service tự cài manager (đã tắt preinstall)"
+elif [ -d "$IMG/system_ext" ]; then
     mkdir -p "$(dirname "$INSTALL_SH")" "$(dirname "$INSTALL_RC")"
 
     cat > "$INSTALL_SH" << 'SHEOF'
@@ -325,5 +332,5 @@ else
     warn "SukiSU: không thấy system_ext/ - manager chỉ nằm ở /product/app và sẽ báo 'chưa cài đặt'"
 fi
 
-mods "SukiSU: xong - ROM có root sẵn, mở app SukiSU Ultra để cấp quyền"
+mods "SukiSU: xong - kernel có root sẵn; manager do Root Toolbox cài khi người dùng bấm"
 exit 0
