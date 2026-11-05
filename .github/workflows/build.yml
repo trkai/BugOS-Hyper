@@ -205,12 +205,14 @@ jobs:
 
       - name: Success Notification
         if: success()
+        continue-on-error: true
         run: |
           pip install requests
           python notify.py success "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
 
       - name: Failure Notification
         if: failure()
+        continue-on-error: true
         run: |
           pip install requests
           python notify.py fail "${{ github.repository }}" "${{ inputs.input_url }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"

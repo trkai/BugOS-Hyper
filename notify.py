@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 import requests
 from datetime import datetime, timezone, timedelta
 
@@ -207,13 +208,30 @@ def send_notification(status, rom_link, channel_id, bot_token, builder_id="", do
     payload["chat_id"] = target_chat_id
     print(f"[notify] status={status} link={download_link!r} chat={target_chat_id}")
 
-    try:
-        response = requests.post(f"https://api.telegram.org/bot{bot_token}/sendMessage", json=payload)
-        if not response.ok:
-            print(f"Telegram trả lỗi: {response.status_code} {response.text}")
-        response.raise_for_status()
-    except Exception as e:
-        print(f"Lỗi khi gửi thông báo: {e}")
+    # Runner GitHub (Azure) KHÔNG phải lúc nào cũng có route tới api.telegram.org:
+    # gặp thật 05/11 - "Failed to establish a new connection: [Errno 101] Network
+    # is unreachable". Lần chạy khác lại được, nên thử lại vài lần là đủ.
+    #
+    # Hàm này KHÔNG bao giờ ném ra ngoài: thông báo hỏng không được phép biến một
+    # bản ROM đã build + upload thành công thành job đỏ.
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    attempts = 4
+    for i in range(1, attempts + 1):
+        try:
+            response = requests.post(url, json=payload, timeout=25)
+            if not response.ok:
+                print(f"Telegram trả lỗi: {response.status_code} {response.text}")
+            response.raise_for_status()
+            print("[notify] đã gửi")
+            return
+        except Exception as e:
+            print(f"Lỗi khi gửi thông báo (lần {i}/{attempts}): {e}")
+            if i < attempts:
+                delay = 5 * i
+                print(f"[notify] thử lại sau {delay}s…")
+                time.sleep(delay)
+
+    print("[notify] bỏ qua thông báo Telegram - ROM và link tải vẫn hợp lệ.")
 
 
 if __name__ == "__main__":
@@ -229,6 +247,7 @@ if __name__ == "__main__":
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
 
     if not bot_token:
-        sys.exit(1)
+        print("[notify] thiếu TELEGRAM_BOT_TOKEN - bỏ qua, không tính là build lỗi.")
+        sys.exit(0)
 
     send_notification(status, rom_link, channel_id, bot_token, builder_id, download_link)
