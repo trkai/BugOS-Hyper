@@ -39,10 +39,12 @@ store_dirs="MIUISuperMarket MiuiSuperMarket MIUIMiPicks"
 store_pkgs="com.xiaomi.market com.xiaomi.mipicks"
 
 # --- 1. bảo đảm kho nằm trong priv-app -------------------------------------
+store_found=0
 for name in $store_dirs; do
     hit=$(find "$MAIN_FOLDER/system" "$MAIN_FOLDER/product" "$MAIN_FOLDER/system_ext" \
                -maxdepth 3 -type d -name "$name" 2>/dev/null | head -n 1)
     [ -n "$hit" ] || continue
+    store_found=1
 
     parent=$(basename "$(dirname "$hit")")
     if [ "$parent" = "app" ]; then
@@ -55,9 +57,40 @@ for name in $store_dirs; do
     fi
 done
 
+# --- 1b. base ROM không có kho -> chèn APK vào priv-app --------------------
+# OS4.0.5.0.CN061126 không kèm GetApps (đã quét /product /mi_ext /system_ext
+# /system: không có thư mục MIUISuperMarket/MiuiSuperMarket/MIUIMiPicks, và
+# `pm list packages -s` trên máy không có com.xiaomi.market). Người dùng tự cài
+# GetApps từ ngoài -> nó nằm ở /data/app -> không privileged -> không có
+# INSTALL_PACKAGES -> mọi lần cập nhật đều fail (returnCode=17 ngay sau khi tải
+# xong, không mở nổi package installer).
+#
+# Nên nếu images không có kho mà có apks/com.xiaomi.market.apk thì chèn vào
+# product/priv-app/MIUISuperMarket/. Tên thư mục này nằm trong danh sách
+# keep của debloat nên không bị xoá, và file whitelist bên dưới mới có tác dụng.
+if [ "$store_found" -eq 0 ]; then
+    apk="$work_dir/bin/modfile/UpdateFile/Store_Permissions/apks/com.xiaomi.market.apk"
+    if [ -s "$apk" ]; then
+        dest="$MAIN_FOLDER/product/priv-app/MIUISuperMarket"
+        mkdir -p "$dest"
+        cp -f "$apk" "$dest/MIUISuperMarket.apk"
+        store_found=1
+        mods "StorePermissions: base ROM không có kho -> chèn $(basename "$apk") vào product/priv-app/MIUISuperMarket/"
+    else
+        warn "StorePermissions: base ROM không có kho và thiếu apks/com.xiaomi.market.apk - kho sẽ không cài được gì"
+    fi
+fi
+
 # --- 2. whitelist quyền privileged ----------------------------------------
 PERM_DIR="$MAIN_FOLDER/product/etc/permissions"
 mkdir -p "$PERM_DIR"
+
+# Chỉ app nằm trong priv-app mới dùng được whitelist này. Không có kho trong
+# images thì ghi file chỉ tạo cảm giác đã sửa - bỏ qua và báo rõ.
+if [ "$store_found" -eq 0 ]; then
+    warn "StorePermissions: không có kho trong images - bỏ qua whitelist quyền"
+    exit 0
+fi
 
 {
     echo '<?xml version="1.0" encoding="utf-8"?>'
