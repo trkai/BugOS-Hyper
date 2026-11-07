@@ -51,9 +51,12 @@ Không cần sửa `build.sh`, `patchpackage.sh`, `insupdate.sh`, `insfile.sh`.
 | `MultiLang` (regex `^OS[4-9]`) | `NOTIFICATION_FIX/A*/` |
 | `Settings_AdvancedTexture` (prop) | `FCM_NotificationFix` (engine chỉ có strategy A16) |
 | `Xiaomi_NoLowEnd` (prop) | `SukiSU/patch.sh` (KMI theo kernel) |
-| `Google_DefaultOn` (prop + APKEditor) | `thememanager` OS3/OS4 (APK ThemeManager) |
-| `DISABLE_AVB` (vbmeta) | `gmsservices/maps/A*` |
+| `Google_DefaultOn` (prop + APKEditor) | `gmsservices/maps/A*` |
+| `DISABLE_AVB` (vbmeta) | |
 | `Settings_ROMInformation` (APKEditor) | |
+
+Mod `thememanager` (thay APK ThemeManager) đã bị bỏ: app giữ nguyên bản ROM có
+sẵn, nên không còn thành phần phải tách theo phiên bản ở mục này.
 
 `Settings_ROMInformation`, `Settings_GoogleShowUpCN`, `System_MultiDisableFeature`,
 `Framework_Fix*` nằm ở nhóm "dùng chung nhưng **chưa kiểm chứng** trên A17" — chúng
