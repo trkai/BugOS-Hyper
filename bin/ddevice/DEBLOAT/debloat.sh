@@ -27,6 +27,53 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < "$APPLIST"
 
 # ---------------------------------------------------------------------------
+# Kho ứng dụng Xiaomi - tuỳ chọn, bật bằng cờ keep_getapps trong config.env.
+#
+# APPLIST debloat cả cụm kho (MIUISuperMarket / MiuiSuperMarket / MIUIMiPicks /
+# MIUISystemAppUpdater). Mất kho thì app hệ thống không có đường cập nhật nào,
+# kể cả khi máy có mạng và đã đăng nhập - đây là lỗi cấu hình, không phải lỗi
+# của Xiaomi.
+#
+# Cờ này chỉ LỌC BỎ tên khỏi danh sách vừa đọc, không sửa APPLIST.txt, nên danh
+# sách gốc vẫn là thứ duy nhất quyết định debloat mặc định.
+#
+# Vì sao cài cập nhật vẫn được dù app trong /product bị mod/ký lại: services.jar
+# đã patch matchSignaturesCompat -> 1 trong bước COREPATCH.
+# ---------------------------------------------------------------------------
+KEEP_GETAPPS=$(grep -m1 '^keep_getapps=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+keep_apps=()
+keep_pkgs=()
+if [ "$KEEP_GETAPPS" != "false" ]; then
+    keep_apps=( MIUISuperMarket MiuiSuperMarket MIUIMiPicks MIUISystemAppUpdater )
+    keep_pkgs=( com.xiaomi.market com.xiaomi.mipicks com.miui.systemAppUpdater )
+
+    filtered_apps=()
+    for a in "${debloat_apps[@]}"; do
+        keep=false
+        for k in "${keep_apps[@]}"; do
+            [ "$a" = "$k" ] && keep=true
+        done
+        [ "$keep" = true ] && continue
+        filtered_apps+=("$a")
+    done
+
+    filtered_pkgs=()
+    for p in "${debloat_pkgs[@]}"; do
+        keep=false
+        for k in "${keep_pkgs[@]}"; do
+            [ "$p" = "$k" ] && keep=true
+        done
+        [ "$keep" = true ] && continue
+        filtered_pkgs+=("$p")
+    done
+
+    dropped=$(( ${#debloat_apps[@]} + ${#debloat_pkgs[@]} - ${#filtered_apps[@]} - ${#filtered_pkgs[@]} ))
+    debloat_apps=("${filtered_apps[@]}")
+    debloat_pkgs=("${filtered_pkgs[@]}")
+    mods "Debloat: keep_getapps=true - giữ $dropped mục kho ứng dụng (GetApps / 应用商店)"
+fi
+
+# ---------------------------------------------------------------------------
 # Nhóm tài khoản Mi - tuỳ chọn, bật bằng cờ remove_mi_account trong config.env.
 #
 # Bỏ ba package này thì ROM không còn đường đăng nhập Mi và không đăng ký máy
@@ -119,6 +166,19 @@ for debloat_app in "${debloat_apps[@]}"; do
     while IFS= read -r app_dir; do
         [ -n "$app_dir" ] || continue
         [[ -d $app_dir ]] || continue
+        # keep_getapps: nhánh này khớp glob nên entry ngắn ăn cả thư mục kho.
+        # Ví dụ entry "Updater" (com.android.updater) khớp "*Updater*" ->
+        # xoá luôn MIUISystemAppUpdater, tức bỏ đúng cái app cập nhật hệ thống.
+        # Chặn theo tên thư mục ở đây, không chỉ lọc danh sách.
+        app_name=$(basename "$app_dir")
+        kept=false
+        for k in "${keep_apps[@]}"; do
+            [ "$app_name" = "$k" ] && kept=true
+        done
+        if [ "$kept" = true ]; then
+            mods "Debloat: giữ $app_name (keep_getapps)"
+            continue
+        fi
         case "$(basename "$(dirname "$app_dir")")" in
             app|priv-app|data-app|overlay)
                 info "Removing directory: $app_dir"
@@ -132,3 +192,18 @@ for debloat_app in "${debloat_apps[@]}"; do
 done
 
 info "Debloat Done"
+
+# Xác nhận kho ứng dụng còn thật sự trong images. Nếu base ROM không có sẵn
+# GetApps thì cờ keep_getapps không tạo ra được gì - báo ngay trong log build
+# thay vì để phát hiện sau khi flash.
+if [ "$KEEP_GETAPPS" != "false" ]; then
+    store_dir=$(find "$MAIN_FOLDER/system" "$MAIN_FOLDER/product" \
+                     "$MAIN_FOLDER/system_ext" "$MAIN_FOLDER/mi_ext" \
+                     -maxdepth 4 -type d \( -name MIUISuperMarket -o -name MiuiSuperMarket -o -name MIUIMiPicks \) \
+                     2>/dev/null | head -n 1)
+    if [ -n "$store_dir" ]; then
+        mods "Debloat: kho ứng dụng còn trong ROM -> ${store_dir#$MAIN_FOLDER/}"
+    else
+        warn "Debloat: keep_getapps=true nhưng KHÔNG thấy app kho nào trong images - base ROM không kèm GetApps"
+    fi
+fi
