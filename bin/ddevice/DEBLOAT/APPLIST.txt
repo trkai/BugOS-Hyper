@@ -139,3 +139,5 @@ pkg:com.xiaomi.gamecenter.sdk.service
 pkg:com.xiaomi.mis
 pkg:com.xiaomi.type
 pkg:com.unionpay.tsmservice.mi
+pkg:com.miui.guardprovider
+pkg:com.mobiletools.systemhelper

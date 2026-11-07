@@ -131,6 +131,13 @@ fix_hidden_launcher_icons() {
     want=$(grep -m1 '^keep_security_theme_icons=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
     [ "$want" = "false" ] && { mods "Launcher icons: keep_security_theme_icons=false - bỏ qua"; return 0; }
 
+    # debloat_securitycenter=true xoá hẳn Trung tâm An toàn, nên việc "giữ icon
+    # Bảo mật" thành vô nghĩa - chỉ còn icon Chủ đề. Prop vẫn phải đặt false vì
+    # cùng lệnh đó cũng tắt ThemeResourceTabActivity.
+    local sc_gone
+    sc_gone=$(grep -m1 '^debloat_securitycenter=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    [ "$sc_gone" = "true" ] && mods "Launcher icons: Trung tâm An toàn bị debloat - chỉ giữ icon Chủ đề"
+
     local prop=""
     local f
     while IFS= read -r f; do

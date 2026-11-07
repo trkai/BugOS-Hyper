@@ -73,6 +73,35 @@ if [ "$KEEP_GETAPPS" != "false" ]; then
     mods "Debloat: keep_getapps=true - giữ $dropped mục kho ứng dụng (GetApps / 应用商店)"
 fi
 
+# ---------------------------------------------------------------------------
+# Trung tâm An toàn (com.miui.securitycenter) - tuỳ chọn, cờ debloat_securitycenter.
+#
+# KHÔNG đặt nó trong APPLIST: đây là app lõi của MIUI, xoá là mất rất nhiều thứ,
+# nên phải bật bằng cờ để người đọc config thấy ngay mình đang đổi cái gì.
+#
+# Đo trên máy (13.6.5-261003.0.1):
+#   - `pm disable-user` bị chặn: "Cannot disable miui core packages" - MIUI bảo
+#     vệ nó ở tầng runtime, nên chỉ xoá được lúc build (xoá thư mục trong images),
+#     không tắt được sau khi flash.
+#   - KHÔNG có cờ coreApp trong dumpsys, nên máy vẫn boot nếu thiếu (coreApp mới
+#     là thứ PMS bắt buộc phải có để boot).
+#   - 50 tham chiếu từ Settings: content://com.miui.securitycenter.provider,
+#     remoteprovider, action.ADB_INSTALL_VERIFY, WNCheckManager.
+#   - provider `authority=antispam` đang được system_server (uid 1000) giữ.
+#   - packageinstaller KHÔNG tham chiếu (đã grep dex: 0 hit) nên cài app vẫn được.
+#
+# Những gì MẤT khi xoá:
+#   icon 手机管家; quản lý quyền ứng dụng; bảo vệ quyền riêng tư; khoá app;
+#   tiết kiệm pin/Power Center; quản lý dữ liệu mạng + tường lửa; dọn rác;
+#   Game Booster; chống spam SMS; xác minh cài đặt qua ADB.
+#   Vài mục trong Cài đặt trỏ tới nó sẽ báo "không tìm thấy ứng dụng" khi bấm.
+# ---------------------------------------------------------------------------
+DEBLOAT_SECURITYCENTER=$(grep -m1 '^debloat_securitycenter=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+if [ "$DEBLOAT_SECURITYCENTER" = "true" ]; then
+    debloat_pkgs+=("com.miui.securitycenter")
+    warn "Debloat: debloat_securitycenter=true - xoá Trung tâm An toàn (mất quyền riêng tư, pin, mạng, chống spam)"
+fi
+
 rm -rf "$MAIN_FOLDER/product/etc/auto-install"*
 rm -rf "$MAIN_FOLDER/product/app/Updater"
 rm -rf "$MAIN_FOLDER/product/etc/permissions/cn.google.services.xml"
