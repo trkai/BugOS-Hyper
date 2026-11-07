@@ -16,6 +16,19 @@ rom_os=$(cat $work_dir/bin/ddevice/rom_os.txt 2>/dev/null | tr -d '\r\n ')
 KEEP_BUILD_REGION=$(grep -m1 '^keep_build_region=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
 [ -z "$KEEP_BUILD_REGION" ] && KEEP_BUILD_REGION=true
 
+# ---------------------------------------------------------------------------
+# miui_region: quốc gia khai với app Xiaomi. Khác hoàn toàn với ngôn ngữ.
+#
+# App Xiaomi đọc qua PolicyManager.isCnModel() -> false khi region != CN (đã đối
+# chiếu trong PowerKeeper.sh). Kho 应用商店 của base XPKCNXM chỉ phục vụ thị
+# trường China, nên máy khai VN thì kho không trả danh sách cập nhật - app vẫn mở,
+# vẫn đăng nhập, chỉ là trống.
+#
+# Không đặt thì giữ VN như hành vi cũ.
+# ---------------------------------------------------------------------------
+MIUI_REGION=$(grep -m1 '^miui_region=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+[ -z "$MIUI_REGION" ] && MIUI_REGION=VN
+
 if [[ $deviceTYPE == "China" ]]; then
     mods "Adding MultiLanguage / Vietnamese To ROM..."
     if [ "$KEEP_BUILD_REGION" = "true" ]; then
@@ -36,11 +49,17 @@ if [[ $deviceTYPE == "China" ]]; then
         cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource/* $MAIN_FOLDER/product/overlay/
     fi
 
-    # 2. Thiết lập cấu hình vùng Việt Nam (cust.prop) cho First-Boot OOBE
+    # 2. Thiết lập cấu hình vùng cho First-Boot OOBE
     if [ -d "$MAIN_FOLDER/system_ext" ] && [ -f "$work_dir/bin/modfile/UpdateFile/MultiLang/cust.prop" ]; then
         mkdir -p "$MAIN_FOLDER/system_ext/cust/vn"
         cp -rf "$work_dir/bin/modfile/UpdateFile/MultiLang/cust.prop" "$MAIN_FOLDER/system_ext/cust/vn/cust.prop"
-        mods "Configured system_ext/cust/vn/cust.prop"
+        # cust.prop gốc ghi cứng VN; region phải khớp miui_region, nếu không thì
+        # app Xiaomi đọc cust.prop thấy VN còn build.prop thấy CN -> tùy chỗ đọc.
+        if [ "$MIUI_REGION" != "VN" ]; then
+            sed -i "s|^ro\.miui\.region=.*|ro.miui.region=$MIUI_REGION|; s|^ro\.vendor\.miui\.region=.*|ro.vendor.miui.region=$MIUI_REGION|" \
+                "$MAIN_FOLDER/system_ext/cust/vn/cust.prop"
+        fi
+        mods "Configured system_ext/cust/vn/cust.prop (miui_region=$MIUI_REGION)"
     fi
 
     # 3. Xóa cấu hình ngôn ngữ China và kích hoạt Tiếng Việt mặc định trong build.prop
@@ -82,7 +101,7 @@ if [[ $deviceTYPE == "China" ]]; then
                 echo "ro.product.locale.language=vi"
                 echo "ro.product.locale.region=VN"
                 echo "persist.sys.timezone=Asia/Ho_Chi_Minh"
-                echo "ro.miui.region=VN"
+                echo "ro.miui.region=$MIUI_REGION"
                 [ "$KEEP_BUILD_REGION" = "true" ] || echo "ro.miui.build.region=global"
                 echo "ro.miui.cust_variant=vn"
                 echo "ro.vendor.audio.spk.clean=true"
@@ -135,6 +154,7 @@ if [[ $deviceTYPE == "China" ]]; then
         else
             mods "Region: build.region=${br:-cn} -> IS_INTERNATIONAL_BUILD=false (giữ tính năng China)"
         fi
+        mods "Region: miui_region=$MIUI_REGION -> app Xiaomi coi máy là $( [ "$MIUI_REGION" = "CN" ] && echo 'bản China (kho có cập nhật)' || echo 'bản quốc tế (kho China không trả cập nhật)' )"
     }
     region_summary
 

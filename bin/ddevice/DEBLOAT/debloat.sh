@@ -99,6 +99,13 @@ if [ "$REMOVE_MI_ACCOUNT" = "true" ]; then
     mods "Debloat: remove_mi_account=true - bỏ ${#mi_account_pkgs[@]} package tài khoản Mi"
 fi
 
+# Kho China cần đăng nhập Mi mới tải/cập nhật được. remove_mi_account bỏ hẳn
+# com.xiaomi.account nên hai cờ này đá nhau - cảnh báo để không mất thời gian
+# flash rồi mới thấy kho trống.
+if [ "$KEEP_GETAPPS" != "false" ] && [ "$REMOVE_MI_ACCOUNT" = "true" ]; then
+    warn "Debloat: keep_getapps=true nhưng remove_mi_account=true - kho China cần đăng nhập Mi, app tài khoản đã bị bỏ -> không cập nhật được"
+fi
+
 rm -rf "$MAIN_FOLDER/product/etc/auto-install"*
 rm -rf "$MAIN_FOLDER/product/app/Updater"
 rm -rf "$MAIN_FOLDER/product/etc/permissions/cn.google.services.xml"
