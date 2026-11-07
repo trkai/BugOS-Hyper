@@ -7,7 +7,9 @@ mods "Starting Apply OS3 Custom Mods File..."
 TARGET_DIR="$work_dir/bin/modfile/OS3"
 noexecute=( "insmod" )
 
-find "$TARGET_DIR" -type f -name "*.sh" | while read -r script; do
+# sort: `find` không đảm bảo thứ tự giữa các lần build hay giữa các máy. OS3 hiện
+# chỉ có một mod nên chưa lộ, nhưng thêm mod thứ hai là thứ tự thành ngẫu nhiên.
+find "$TARGET_DIR" -type f -name "*.sh" | sort | while read -r script; do
     base="$(basename "$script" .sh)"
 
     skip=false

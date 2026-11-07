@@ -3,3 +3,31 @@ __pycache__/
 .workbuddy-ai/
 .ksu_cache/
 .sukisu_cache/
+
+# Output của build - không bao giờ commit. build/ chứa images đã bung (hàng GB),
+# out/ chứa zip ROM thành phẩm. Một `git add -A` lúc đang build sẽ nuốt cả hai.
+build/
+out/
+*.zip
+
+# Không dùng *.img / *.bin chung: repo có bin/script2flash/cust.img và
+# bin/package/DISABLE_AVB/.../testkey_rsa4096_pub.bin là asset thật, ignore
+# rộng sẽ đẩy chúng ra khỏi repo.
+
+# Trạng thái build do fetchINFO.sh / build.sh sinh ra, đổi theo từng base ROM.
+# Track chúng chỉ tạo commit rác và có thể khiến build nhầm target khi quên
+# cập nhật. Bản mới luôn được sinh lại ở đầu build.sh.
+bin/ddevice/androidver.txt
+bin/ddevice/base_rom_code.txt
+bin/ddevice/device_code.txt
+bin/ddevice/device_f.txt
+bin/ddevice/device_type.txt
+bin/ddevice/fstype.txt
+bin/ddevice/name_devices.txt
+bin/ddevice/os_code.txt
+bin/ddevice/os_type.txt
+bin/ddevice/rom_os.txt
+bin/ddevice/romtype.txt
+bin/ddevice/sdkLevel.txt
+bin/ddevice/superSize.txt
+bin/ddevice/ximi_type.txt

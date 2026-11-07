@@ -5,13 +5,23 @@ androidVER=$(cat $work_dir/bin/ddevice/androidver.txt)
 regionTYPE=$(cat $work_dir/bin/ddevice/device_type.txt)
 MAIN_FOLDER="$work_dir/build/baserom/images"
 
+# Payload dùng chung cho OS3 và OS4: bin/modfile/ThemeManager/.
+# Trước đây mỗi OS giữ một bản sao 93 MB mà 14/15 file giống hệt nhau (chỉ update.sh
+# khác tên OS). Gộp lại để một APK, một whitelist. Khi OS3 cần bản ThemeManager
+# riêng thì tách lại bằng cách trỏ PAYLOAD về thư mục của chính nó.
+PAYLOAD="$work_dir/bin/modfile/ThemeManager"
+
 isOriginThemeMng=$(find "$MAIN_FOLDER" -type d \( -name "MIUIThemeManager" -o -name "MIUIThemeManagerT" -o -name "MIUIThemeManagerGlobal" -o -name "ThemeManager" \))
 
 if [[ $rom_os == "OS3" ]] ;then
+  if [ ! -d "$PAYLOAD/MIUIThemeManager" ]; then
+    warn "ThemeManager: thiếu payload $PAYLOAD/MIUIThemeManager - bỏ qua, giữ APK gốc"
+    exit 0
+  fi
   rm -rf $isOriginThemeMng
   mkdir -p $work_dir/build/baserom/images/product/priv-app/MIUIThemeManager
-  cp -rf $work_dir/bin/modfile/OS3/thememanager/MIUIThemeManager/* $work_dir/build/baserom/images/product/priv-app/MIUIThemeManager
-  cp -rf $work_dir/bin/modfile/OS3/thememanager/permissions/privapp_whitelist_com.android.thememanager.xml $work_dir/build/baserom/images/product/etc/permissions/
+  cp -rf $PAYLOAD/MIUIThemeManager/* $work_dir/build/baserom/images/product/priv-app/MIUIThemeManager
+  cp -rf $PAYLOAD/permissions/privapp_whitelist_com.android.thememanager.xml $work_dir/build/baserom/images/product/etc/permissions/
   mods "Modify ThemeManager Done"
 
   # Ghim versionCode để kho không chào cập nhật đè bản mod - cùng cơ chế với
