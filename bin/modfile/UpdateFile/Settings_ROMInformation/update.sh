@@ -12,6 +12,17 @@
 #
 # There is NO <out>/res and NO apktool.yml.  Older versions of this script
 # looked for those, so the logo replacement silently never ran.
+#
+# LOGO - hai chế độ:
+#   PNG (mặc định, đang dùng): logo_light.png + logo_dark.png là artwork thật
+#     của BugOS. Script ghi .png vào đúng thư mục, ĐÚNG TÊN resource của asset
+#     gốc rồi xoá .xml - id drawable không đổi nên code/layout không cần sửa.
+#     Biến thể tối (drawable-night*/tên có white|dark) nhận logo_dark.png.
+#     Hai file sinh từ "Logo Xiaomi BugOS chính thức nền trắng.png": nền trắng
+#     được tách thành alpha, crop sát mực, scale về đúng bề rộng 3094px của
+#     asset gốc (giữ nguyên kích thước intrinsic mà layout đang dựa vào).
+#     Bản tối = bản sáng đổi các pixel trung tính sang trắng, giữ nguyên cam.
+#   VECTOR (dự phòng): nếu thiếu logo_light.png thì dùng ic_hyper_os*.xml như cũ.
 # ---------------------------------------------------------------------------
 WORK_DIR=$(pwd)
 source "$WORK_DIR/functions.sh"
@@ -460,10 +471,57 @@ patch_settings_apk() {
         fi
 
         # ---- replace -------------------------------------------------------
+        # Ưu tiên logo PNG (logo_light.png / logo_dark.png). Có PNG thì thay
+        # thẳng asset vector bằng ảnh, giữ nguyên TÊN resource và THƯ MỤC để
+        # id drawable không đổi - code/layout đang trỏ tới id đó không cần sửa.
+        # Không có PNG thì quay lại đường vector cũ (ic_hyper_os*.xml).
+        local png_mode=false
+        [ -s "$SRC_DIR/logo_light.png" ] && png_mode=true
+
         for f in "${cands[@]}"; do
             local base rel kind template
             base=$(basename "$f")
             rel="res/${f#$resroot/}"
+
+            if [ "$png_mode" = true ]; then
+                # biến thể tối: thư mục night / tên có white|dark
+                local png="$SRC_DIR/logo_light.png"
+                case "$f" in
+                    *white*|*night*|*dark*) png="$SRC_DIR/logo_dark.png" ;;
+                esac
+
+                case "$base" in
+                    *.xml)
+                        # Ghi .png cùng thư mục rồi xoá .xml. Cùng tên resource
+                        # nên id giữ nguyên, chỉ đổi định dạng file.
+                        local dest="${f%.xml}.png"
+                        if cp -f "$png" "$dest"; then
+                            rm -f "$f"
+                            mods "Settings: replaced $rel -> $(basename "$dest") (PNG, $(basename "$png"))"
+                            replaced_rel+=("res/${dest#$resroot/}")
+                            hide_names+=("${base%.xml}")
+                            total=$((total + 1))
+                        else
+                            warn "Settings: $rel - ghi PNG thất bại"
+                        fi
+                        continue
+                        ;;
+                    *.png)
+                        if cp -f "$png" "$f"; then
+                            mods "Settings: replaced $rel (PNG in place)"
+                            hide_names+=("${base%.png}")
+                            total=$((total + 1))
+                        else
+                            warn "Settings: $rel - ghi PNG thất bại"
+                        fi
+                        continue
+                        ;;
+                    *)
+                        warn "Settings: $rel là $base - không thay bằng PNG được, giữ nguyên"
+                        continue
+                        ;;
+                esac
+            fi
 
             case "$base" in
                 *.xml) kind="vector" ;;
@@ -539,18 +597,52 @@ patch_settings_apk() {
     # NOTE: resource file names are often obfuscated inside the APK (res/hu.xml),
     # so we cannot look the entry up by its decoded name.  The pathData string is
     # stored verbatim in the binary XML string pool -> scan every res xml instead.
-    local ok=0 ok_str=0
-    # marker 1: pathData của logo (drawable)
+    local ok=0 ok_str=0 ok_png=0
+    # marker 1: pathData của logo (drawable vector - chỉ có khi KHÔNG dùng PNG)
     ok=$(unzip -p "$work/new.apk" 'res/*.xml' 2>/dev/null | grep -ac "M 106.32 72.58 Q 99.29 80.61")
     # marker 2: chữ đã đổi (strings) - "Xiaomi Bug" nằm trong string pool
     ok_str=$(unzip -p "$work/new.apk" 'resources.arsc' 2>/dev/null | grep -ac "Xiaomi Bug")
-    if [ "${ok:-0}" -eq 0 ] && [ "${ok_str:-0}" -eq 0 ]; then
-        warn "Settings: Verify thất bại (không thấy marker drawable lẫn string) - giữ APK gốc"
+    # marker 3: PNG logo có mặt trong APK. Tên file trong res/ bị obfuscate nên
+    # phải so theo nội dung: đếm entry .png có sha256 trùng logo nguồn.
+    if [ -f "$SRC_DIR/logo_light.png" ]; then
+        ok_png=$(python3 - "$work/new.apk" "$SRC_DIR/logo_light.png" "$SRC_DIR/logo_dark.png" <<'PY'
+import hashlib, sys, zipfile
+apk, *logos = sys.argv[1:]
+want = {hashlib.sha256(open(p, 'rb').read()).hexdigest() for p in logos if p}
+n = 0
+with zipfile.ZipFile(apk) as z:
+    for i in z.infolist():
+        if not i.filename.endswith('.png'):
+            continue
+        try:
+            if hashlib.sha256(z.read(i.filename)).hexdigest() in want:
+                n += 1
+        except Exception:
+            pass
+print(n)
+PY
+)
+    fi
+    if [ "${ok:-0}" -eq 0 ] && [ "${ok_str:-0}" -eq 0 ] && [ "${ok_png:-0}" -eq 0 ]; then
+        warn "Settings: Verify thất bại (không thấy marker drawable/PNG lẫn string) - giữ APK gốc"
         return 1
     fi
 
+    # Chốt thêm cho chế độ PNG: tên resource phải còn trong bảng resource.
+    # Nếu bước build làm rơi mất drawable (đổi đuôi .xml -> .png hỏng) thì tên
+    # sẽ biến mất khỏi resources.arsc -> giữ APK gốc thay vì để Settings trắng.
+    if [ "${ok_png:-0}" -gt 0 ]; then
+        local ok_name
+        ok_name=$(unzip -p "$work/new.apk" 'resources.arsc' 2>/dev/null | grep -ac "xiaomi_os_logo")
+        if [ "${ok_name:-0}" -eq 0 ]; then
+            warn "Settings: PNG có trong APK nhưng resource 'xiaomi_os_logo' biến mất - giữ APK gốc"
+            return 1
+        fi
+        mods "Settings: resource name còn trong ARSC (verify $ok_name)"
+    fi
+
     cp -f "$work/new.apk" "$apk"
-    mods "Settings: DONE - drawable=$total (verify $ok), string=$strings_done (verify $ok_str) trong ${apk#$MAIN_FOLDER/}"
+    mods "Settings: DONE - drawable=$total (verify $ok vector, $ok_png png), string=$strings_done (verify $ok_str) trong ${apk#$MAIN_FOLDER/}"
     rm -rf "$work"
     return 0
 }
