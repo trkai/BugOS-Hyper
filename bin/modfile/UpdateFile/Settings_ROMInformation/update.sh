@@ -403,6 +403,7 @@ patch_settings_apk() {
 
     local total=0
     local strings_done=0
+    local png_used=0
     local -a replaced_rel=()
 
     local resroot
@@ -495,12 +496,16 @@ patch_settings_apk() {
                         # Ghi .png cùng thư mục rồi xoá .xml. Cùng tên resource
                         # nên id giữ nguyên, chỉ đổi định dạng file.
                         local dest="${f%.xml}.png"
+                        # giữ bản .xml để còn đường lùi nếu rebuild thất bại
+                        mkdir -p "$work/logo_bak/$(dirname "${f#$resroot/}")"
+                        cp -f "$f" "$work/logo_bak/${f#$resroot/}" 2>/dev/null
                         if cp -f "$png" "$dest"; then
                             rm -f "$f"
                             mods "Settings: replaced $rel -> $(basename "$dest") (PNG, $(basename "$png"))"
                             replaced_rel+=("res/${dest#$resroot/}")
                             hide_names+=("${base%.xml}")
                             total=$((total + 1))
+                            png_used=$((png_used + 1))
                         else
                             warn "Settings: $rel - ghi PNG thất bại"
                         fi
@@ -588,9 +593,47 @@ patch_settings_apk() {
     # ---- rebuild ----------------------------------------------------------
     mods "Settings: Rebuild..."
     if ! $APKEDITOR b -f -i "$out" -o "$work/new.apk" > "$work/build.log" 2>&1 || [ ! -s "$work/new.apk" ]; then
-        warn "Settings: Rebuild FAILED - giữ APK gốc"
-        tail -n 5 "$work/build.log" 2>/dev/null
-        return 1
+        # Đổi đuôi .xml -> .png là thao tác ít gặp; nếu bộ biên dịch resource
+        # của APKEditor từ chối thì quay lại logo vector để KHÔNG mất logo.
+        if [ "$png_used" -gt 0 ] && [ -d "$work/logo_bak" ]; then
+            warn "Settings: rebuild với PNG thất bại - thử lại bằng logo vector"
+            tail -n 3 "$work/build.log" 2>/dev/null
+            (
+                cd "$work/logo_bak" || exit 1
+                find . -type f -name "*.xml" | while IFS= read -r r; do
+                    mkdir -p "$resroot/$(dirname "$r")"
+                    cp -f "$r" "$resroot/$r"
+                done
+            )
+            for rel in "${replaced_rel[@]}"; do
+                case "$rel" in *.png) rm -f "$resroot/${rel#res/}" ;; esac
+            done
+            local fb=0 ff ow2 oh2 size2 tpl
+            for ff in "${cands[@]}"; do
+                [ -f "$ff" ] || continue
+                case "$(basename "$ff")" in *.xml) ;; *) continue ;; esac
+                tpl="$SRC_DIR/ic_hyper_os.xml"
+                case "$ff" in *white*|*night*|*dark*) tpl="$SRC_DIR/ic_hyper_os_white.xml" ;; esac
+                ow2=$(grep -oE 'android:width="[^"]+"' "$ff" 2>/dev/null | head -1 | sed 's/.*="//;s/"$//')
+                oh2=$(grep -oE 'android:height="[^"]+"' "$ff" 2>/dev/null | head -1 | sed 's/.*="//;s/"$//')
+                size2=$(make_drawable "$tpl" "$ff" "$ow2" "$oh2" "$aspect")
+                mods "Settings: (fallback) $ff -> ${size2}dp"
+                fb=$((fb + 1))
+            done
+            png_used=0
+            total=$fb
+            rm -f "$work/new.apk"
+            if ! $APKEDITOR b -f -i "$out" -o "$work/new.apk" > "$work/build.log" 2>&1 || [ ! -s "$work/new.apk" ]; then
+                warn "Settings: Rebuild FAILED (cả PNG lẫn vector) - giữ APK gốc"
+                tail -n 5 "$work/build.log" 2>/dev/null
+                return 1
+            fi
+            mods "Settings: Rebuild lại bằng vector OK"
+        else
+            warn "Settings: Rebuild FAILED - giữ APK gốc"
+            tail -n 5 "$work/build.log" 2>/dev/null
+            return 1
+        fi
     fi
 
     # ---- verify the replacement really landed inside the new APK ----------
