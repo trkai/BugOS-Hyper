@@ -73,39 +73,6 @@ if [ "$KEEP_GETAPPS" != "false" ]; then
     mods "Debloat: keep_getapps=true - giữ $dropped mục kho ứng dụng (GetApps / 应用商店)"
 fi
 
-# ---------------------------------------------------------------------------
-# Nhóm tài khoản Mi - tuỳ chọn, bật bằng cờ remove_mi_account trong config.env.
-#
-# Bỏ ba package này thì ROM không còn đường đăng nhập Mi và không đăng ký máy
-# với Find Device, nên máy không bị gắn tài khoản sau khi flash.
-#
-# KHÔNG gỡ được máy ĐÃ bị khoá: bản ghi khoá nằm ở server Xiaomi theo IMEI,
-# không nằm trong file ROM. Cờ này chỉ có nghĩa với máy chưa gắn tài khoản.
-#
-# Hệ quả khi bật: mất Find Device (không khoá/xoá dữ liệu từ xa được), mất
-# Mi Cloud backup và đồng bộ, mất mục tài khoản Mi trong Cài đặt.
-#
-# Thêm vào sau khi đọc APPLIST để danh sách gốc vẫn là thứ duy nhất quyết định
-# debloat mặc định - cờ này chỉ chèn thêm, không sửa file.
-# ---------------------------------------------------------------------------
-REMOVE_MI_ACCOUNT=$(grep -m1 '^remove_mi_account=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
-if [ "$REMOVE_MI_ACCOUNT" = "true" ]; then
-    mi_account_pkgs=(
-        com.xiaomi.account
-        com.xiaomi.finddevice
-        com.miui.cloudservice
-    )
-    debloat_pkgs+=("${mi_account_pkgs[@]}")
-    mods "Debloat: remove_mi_account=true - bỏ ${#mi_account_pkgs[@]} package tài khoản Mi"
-fi
-
-# Kho China cần đăng nhập Mi mới tải/cập nhật được. remove_mi_account bỏ hẳn
-# com.xiaomi.account nên hai cờ này đá nhau - cảnh báo để không mất thời gian
-# flash rồi mới thấy kho trống.
-if [ "$KEEP_GETAPPS" != "false" ] && [ "$REMOVE_MI_ACCOUNT" = "true" ]; then
-    warn "Debloat: keep_getapps=true nhưng remove_mi_account=true - kho China cần đăng nhập Mi, app tài khoản đã bị bỏ -> không cập nhật được"
-fi
-
 rm -rf "$MAIN_FOLDER/product/etc/auto-install"*
 rm -rf "$MAIN_FOLDER/product/app/Updater"
 rm -rf "$MAIN_FOLDER/product/etc/permissions/cn.google.services.xml"
