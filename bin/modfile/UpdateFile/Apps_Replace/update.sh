@@ -19,6 +19,13 @@ MAIN_FOLDER="$WORK_DIR/build/baserom/images"
 SRC_DIR="$WORK_DIR/bin/modfile/UpdateFile/Apps_Replace"
 FINDER="$SRC_DIR/find_apk_by_package.py"
 
+# App đã thay thì không cho kho cập nhật đè (xem khối bump bên dưới).
+# pin_app_versions trong config.env: danh sách package, cách nhau bởi dấu cách.
+PIN_PKGS=$(grep -m1 '^pin_app_versions=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2- | tr -d '"')
+[ -z "$PIN_PKGS" ] && PIN_PKGS="com.miui.gallery com.miui.weather2"
+PIN_CODE=$(grep -m1 '^pin_app_versioncode=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+[ -z "$PIN_CODE" ] && PIN_CODE=2000000000
+
 if [ ! -d "$MAIN_FOLDER" ]; then
     warn "Apps_Replace: không thấy images - bỏ qua"
     exit 0
@@ -81,6 +88,33 @@ for apk in "${apks[@]}"; do
 
     if cp -f "$apk" "$appdir/$base"; then
         mods "Apps_Replace: $rel  ($((old_size/1024))KB -> $((new_size/1024))KB)"
+
+        # Giữ app đã thay khỏi bị kho ghi đè. Kho so versionCode máy với bản nó
+        # phục vụ; nâng versionCode lên rất cao thì kho không còn chào bản mới,
+        # và nếu bị ép cài thì đó là downgrade nên PackageManager tự chặn.
+        #
+        # Cần vì bản CN của 2 app này KHÔNG chọn được tiếng Việt: resources có
+        # values-vi thật, nhưng khi system locale là vi/vi-VN app lại hiện tiếng
+        # Ả Rập (đo trên máy 07/11). Bản global trong apks/ thì hiện đúng.
+        pinned=false
+        for pk in $PIN_PKGS; do
+            [ "$pkg" = "$pk" ] && pinned=true
+        done
+        if [ "$pinned" = true ]; then
+            if python3 "$SRC_DIR/bump_versioncode.py" "$appdir/$base" "$PIN_CODE" >/dev/null 2>&1; then
+                got=$(python3 "$SRC_DIR/bump_versioncode.py" --show "$appdir/$base" 2>/dev/null)
+                case "$got" in
+                    *"=$PIN_CODE"*)
+                        mods "Apps_Replace: $pkg -> versionCode $PIN_CODE, kho sẽ không chào cập nhật"
+                        ;;
+                    *)
+                        warn "Apps_Replace: $pkg - bump versionCode không đọc lại được ($got)"
+                        ;;
+                esac
+            else
+                warn "Apps_Replace: $pkg - bump versionCode thất bại, kho vẫn có thể ghi đè"
+            fi
+        fi
     else
         warn "Apps_Replace: $pkg - copy thất bại"
     fi
