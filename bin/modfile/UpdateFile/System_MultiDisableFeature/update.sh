@@ -100,6 +100,55 @@ fix_themereset() {
     mods "Done"
 }
 
+# ---------------------------------------------------------------------------
+# fix_hidden_launcher_icons: giữ icon "Bảo mật" và "Chủ đề" trên màn hình chính.
+#
+# TRIỆU CHỨNG: sau khi flash, hai app này biến mất khỏi launcher, bấm không mở
+# được. Không phải do debloat (2 package vẫn còn), mà activity bị DISABLE.
+#
+# NGUYÊN NHÂN (đọc smali của MIUISecurityCenter 13.6.5, không đoán):
+#   com.miui.common.i.<clinit>:
+#       a = pr.a.a || SystemProperties.getBoolean(
+#               "ro.miui.support.system.app.uninstall.v2", false)
+#   pr.a.a = ro.product.mod_device chứa "_global"  -> trên annibale là false.
+#   ll.b.m() "processSecurityCenterLauncherState":
+#       if (mod_device global) { ...; return; }
+#       if (!com.miui.common.i.a) { restore(); return; }   // không có prop -> bật
+#       else { disable(MainActivity, ThemeResourceTabActivity, voiceassist) }
+#   Bản đồ bị disable nằm ở ll.b.<clinit> và gồm ĐÚNG 3 activity đó — nên mất
+#   icon Bảo mật KÉO THEO mất icon Chủ đề (cùng một lệnh).
+#
+#   Prop đó = true trong /mi_ext/etc/build.prop (dòng
+#   "ro.miui.support.system.app.uninstall.v2=true") của base ROM, không phải do
+#   mod nào của BugOS. Đã kiểm trên máy: đặt false bằng resetprop thì cả hai icon
+#   trở lại và GIỮ nguyên sau nhiều phút (activity không bị tắt lại).
+#
+# Đánh đổi: mất tính năng "gỡ cài đặt app hệ thống" kiểu v2 của MIUI. Đổi lại
+# icon hiện đúng như bản ROM gốc.
+# ---------------------------------------------------------------------------
+fix_hidden_launcher_icons() {
+    local want
+    want=$(grep -m1 '^keep_security_theme_icons=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    [ "$want" = "false" ] && { mods "Launcher icons: keep_security_theme_icons=false - bỏ qua"; return 0; }
+
+    local prop=""
+    local f
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        if grep -q "ro.miui.support.system.app.uninstall.v2" "$f" 2>/dev/null; then
+            prop="$f"
+            break
+        fi
+    done < <(find "$work_dir/build/baserom/images" -maxdepth 4 -type f -name "build.prop" 2>/dev/null)
+    if [ -z "$prop" ]; then
+        warn "Launcher icons: không thấy prop uninstall.v2 trong images - bỏ qua"
+        return 0
+    fi
+
+    sed -i 's|^ro\.miui\.support\.system\.app\.uninstall\.v2=.*|ro.miui.support.system.app.uninstall.v2=false|' "$prop"
+    mods "Launcher icons: ${prop#$work_dir/build/baserom/images/} -> uninstall.v2=false (giữ icon Bảo mật + Chủ đề)"
+}
+
 # Tổng kết các prop ảnh hưởng RAM để nhìn được ngay trong log build
 ram_summary() {
     local p="$work_dir/build/baserom/images/system/system/build.prop"
@@ -120,4 +169,5 @@ disable_memory_extenstion
 disable_privapp_control_enforce
 disable_privapp_control_disable
 fix_themereset
+fix_hidden_launcher_icons
 ram_summary
