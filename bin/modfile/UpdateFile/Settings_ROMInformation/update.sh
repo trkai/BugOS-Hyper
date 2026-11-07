@@ -564,6 +564,30 @@ patch_settings_apk() {
         fi
     done
 
+    # ---- nới ô logo ------------------------------------------------------
+    # miui_version_card.xml đặt logo vào ImageView 280dp x 40dp, scaleType
+    # FIT_XY. Ô 40dp thì bề rộng 280dp chỉ cao 40dp => artwork 3:1 bị bóp còn
+    # 42% chiều cao. Nâng dimen lên đúng tỉ lệ artwork thì logo to gấp 2.35 lần
+    # mà không méo (đo trên máy: ô 824x277 px, khít artwork 280:94).
+    #
+    # Đã kiểm dimen này CÓ tác dụng: 40dp -> 118px, 5dp -> 15px, 94dp -> 277px.
+    local logo_h
+    logo_h=$(grep -m1 '^settings_logo_height_dp=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    if [ -n "$logo_h" ]; then
+        for resroot in "${resroots[@]}"; do
+            local dx old found=0
+            while IFS= read -r dx; do
+                [ -n "$dx" ] || continue
+                grep -q 'name="my_device_os_logo_height"' "$dx" 2>/dev/null || continue
+                old=$(grep -oE 'name="my_device_os_logo_height">[^<]+' "$dx" | head -1 | sed 's/.*>//')
+                sed -i -E "s|(<dimen name=\"my_device_os_logo_height\">)[^<]*(</dimen>)|\1${logo_h}dp\2|" "$dx"
+                mods "Settings: my_device_os_logo_height ${old:-?} -> ${logo_h}dp"
+                found=$((found + 1))
+            done < <(find "$resroot" -type f -name "dimens.xml" -path "*/values*/*" 2>/dev/null)
+            [ "$found" -eq 0 ] && warn "Settings: không thấy dimen my_device_os_logo_height - logo giữ cỡ cũ"
+        done
+    fi
+
     if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ]; then
         warn "Settings: không thay được asset lẫn string nào - giữ APK gốc"
         return 1
