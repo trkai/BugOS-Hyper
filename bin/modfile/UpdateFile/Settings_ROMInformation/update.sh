@@ -584,7 +584,20 @@ patch_settings_apk() {
                 mods "Settings: my_device_os_logo_height ${old:-?} -> ${logo_h}dp"
                 found=$((found + 1))
             done < <(find "$resroot" -type f -name "dimens.xml" -path "*/values*/*" 2>/dev/null)
-            [ "$found" -eq 0 ] && warn "Settings: không thấy dimen my_device_os_logo_height - logo giữ cỡ cũ"
+            if [ "$found" -eq 0 ]; then
+                # Tên dimen đọc được trên Settings OS4 (a17); OS3 (a16) chưa kiểm
+                # trực tiếp. Nếu bản ROM đang build đặt tên khác thì logo không
+                # to lên - in ra các dimen nghi vấn để lần sau sửa đúng chỗ,
+                # thay vì chỉ nói "không thấy".
+                warn "Settings: không thấy dimen my_device_os_logo_height - logo giữ cỡ cũ"
+                local sus
+                sus=$(grep -rhoE 'name="[^"]*(os_logo|logo_view)[^"]*_height"[^>]*>[^<]*' \
+                          "$resroot" --include=dimens.xml 2>/dev/null | sort -u | head -n 6)
+                if [ -n "$sus" ]; then
+                    warn "Settings: dimen nghi vấn trong bản ROM này:"
+                    printf '%s\n' "$sus" | sed 's/^/    /'
+                fi
+            fi
         done
     fi
 
