@@ -137,6 +137,69 @@ case "$RESULT" in
         ;;
 esac
 
+# Ẩn hẳn mục đó khỏi Settings: đặt android:enabled="false" cho activity
+# com.miui.googlebase.ui.GmsCoreSettings.
+#
+# Vì sao cách này là đủ và gọn:
+#   SettingsFeatures.isNeedRemoveGmsCoreSettings() trả TRUE (= ẩn mục) khi
+#   activity không resolve được. Nó resolve bằng
+#   Intent("miui.intent.action.APP_SETTINGS").setClassName(securitycenter,
+#   GmsCoreSettings).resolveActivityInfo(pm, MATCH_DEFAULT_ONLY) và nếu kết quả
+#   null thì trả true. Component bị disable thì resolve trả null.
+#   => Settings tự bỏ mục "Dịch vụ cơ bản của Google", kể cả trong kết quả tìm
+#      kiếm (SyncSettingsTree.getStatus cũng dùng đúng hàm đó).
+#   Không phải sửa Settings.apk (138 MB) nên build không chậm thêm.
+MANIFEST="$DEC/AndroidManifest.xml"
+MF_RESULT=$(python3 - "$MANIFEST" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+src = open(path, encoding='utf-8').read()
+
+NAME = 'android:name="com.miui.googlebase.ui.GmsCoreSettings"'
+pos = src.find(NAME)
+if pos < 0:
+    print('NO_ACTIVITY')
+    sys.exit(1)
+
+# Lùi về đầu thẻ <activity chứa attribute này (chỉ trong phạm vi 800 ký tự để
+# không lùi nhầm sang thẻ khác nếu name xuất hiện ở nơi khác).
+start = src.rfind('<activity', max(0, pos - 800), pos)
+if start < 0:
+    print('NO_TAG')
+    sys.exit(1)
+
+end = src.find('>', pos)
+if end < 0:
+    print('NO_END')
+    sys.exit(1)
+
+tag = src[start:end + 1]
+if 'android:enabled=' in tag:
+    new_tag = re.sub(r'android:enabled="[^"]*"', 'android:enabled="false"', tag)
+else:
+    if tag.endswith('/>'):
+        new_tag = tag[:-2].rstrip() + '\n              android:enabled="false" />'
+    else:
+        new_tag = tag[:-1].rstrip() + '\n              android:enabled="false">'
+
+src = src[:start] + new_tag + src[end + 1:]
+open(path, 'w', encoding='utf-8').write(src)
+print('OK')
+PY
+)
+
+case "$MF_RESULT" in
+    OK)
+        mods "GmsCore: activity GmsCoreSettings -> enabled=false (mục trong Settings sẽ tự ẩn)"
+        ;;
+    *)
+        # Không ẩn được mục thì vẫn giữ patch g(); chỉ cảnh báo.
+        warn "GmsCore: không sửa được manifest ($MF_RESULT) - mục trong Settings vẫn hiện"
+        ;;
+esac
+
 if ! $APKEDITOR b -f -i "$DEC" -o "$OUT/SecurityCenter.apk" > "$WORK_ROOT/build.log" 2>&1; then
     warn "GmsCore: build lại APK thất bại - bỏ qua. $(tail -n 3 "$WORK_ROOT/build.log" | tr '\n' ' ')"
     rm -rf "$WORK_ROOT"
