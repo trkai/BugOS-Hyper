@@ -17,13 +17,15 @@
 #        updateGmsNetStatus(true) -> handler.post(lambda) -> triggerGMSLimitAction()
 #    và triggerGMSLimitAction() mở đầu bằng:
 #        if (!PolicyManager.isCnModel()) return;   // thoát ngay
-#    ROM này đặt ro.miui.region=VN nên isCnModel()=false -> cả chuỗi là no-op.
-#    Vá thêm vào đây không thay đổi gì, chỉ làm mất chữ ký APK và buộc ART biên
-#    dịch lại - không có lợi.
+#    Trên annibale isCnModel() hiện là false, do patchMIUIServices.sh ép
+#    PolicyManagerConfig.isCnModel() = false (xem patch_cn_model). Prop
+#    ro.miui.region vẫn là CN, nhưng giá trị runtime đã bị vá nên chuỗi trên
+#    là no-op. Vá thêm vào đây không thay đổi gì, chỉ làm mất chữ ký APK và
+#    buộc ART biên dịch lại - không có lợi.
 #
-# 3. Trường hợp ROM region CN (isCnModel()=true) thì triggerGMSLimitAction có
-#    chạy, nhưng vector V3 của FCM_NotificationFix đã vá chính phương thức đó
-#    thành return-void. Nên vẫn không cần PowerKeeper.
+# 3. Nếu isCnModel() là true (patch_cn_model không chạy được, hoặc ROM khác)
+#    thì triggerGMSLimitAction có chạy, nhưng vector V3 của FCM_NotificationFix
+#    đã vá chính phương thức đó thành return-void. Nên vẫn không cần PowerKeeper.
 #
 # 4. Trạng thái thật lấy từ máy (dumpsys greezer):
 #        [com.google.android.gms] frozen=0s  bg=376s  reason=block:whiteapp
@@ -53,6 +55,7 @@ if [ -z "$APK" ]; then
 fi
 
 log_msg "PowerKeeper: A17 không cần vá - MilletConfig/isGmsControlEnabled đã bị xoá,"
-log_msg "PowerKeeper: và triggerGMSLimitAction tự bỏ qua khi isCnModel()=false (region VN)."
+log_msg "PowerKeeper: và triggerGMSLimitAction không chạy được (isCnModel bị ép false;"
+log_msg "PowerKeeper: nếu là true thì FCM vector V3 đã vá hàm đó thành return-void)."
 log_msg "PowerKeeper: giữ nguyên APK gốc."
 exit 0
