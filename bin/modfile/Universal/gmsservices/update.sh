@@ -6,13 +6,12 @@ regionTYPE=$(cat $work_dir/bin/ddevice/device_type.txt)
 MAIN_FOLDER="$work_dir/build/baserom/images"
 
 if [[ $regionTYPE == "China" ]]; then 
-  # Google (Velvet) KHÔNG tải ở đây nữa. Bản tải từ release ngoài là APK đơn, không
-  # có config split, và nếu tải được thì nó tạo product/priv-app/GoogleVelvet_CTS
-  # song song với product/priv-app/GoogleVelvet của GApps_Preinstall -> hai thư mục
-  # cùng package com.google.android.googlequicksearchbox, PackageManager bỏ một gói
-  # và có thể lệch version giữa base với split.
-  # Bản đặt sẵn (kèm split config.xxhdpi đúng requiredSplitTypes) nằm trong
-  # bin/modfile/UpdateFile/GApps_Preinstall/apks/GoogleVelvet/.
+  # Google (Velvet) KHÔNG tải ở đây. Bản tải từ release ngoài là APK đơn, không có
+  # config split, nên nếu đặt vào product/priv-app/GoogleVelvet thì manifest khai
+  # requiredSplitTypes mà thiếu split -> PackageManager từ chối cả gói.
+  # Mod GApps_Preinstall (từng đặt sẵn Velvet kèm split) đã bị bỏ, nên Velvet không
+  # còn trong ROM: người dùng cài từ Play. Play Store thì vẫn ở product/priv-app/
+  # Phonesky ngay bên dưới, do chính mod này chép vào.
   cp -rf $work_dir/bin/modfile/Universal/gmsservices/product/* $work_dir/build/baserom/images/product/
   cp -rf $work_dir/bin/modfile/Universal/gmsservices/system_ext/* $work_dir/build/baserom/images/system_ext/
   echo "ro.miui.has_gmscore=1" >> $work_dir/build/baserom/images/system/system/build.prop
