@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 """Tích hợp toàn bộ BugOS Toolbox vào Settings -> Mod (Settings.apk).
 
-Thực hiện:
-  1. Trích xuất 2 asset (sukisu_ultra.apk, ZygiskNext+AlwaysStrongInject.zip)
-     từ bin/package/RootToolbox/RootToolbox.apk vào <out>/root/assets/.
-  2. Sao chép các file smali (BugOSModActivity, ToolboxFileProvider) vào
-     <out>/smali/classes/com/android/settings/mod/.
-  3. Tạo giao diện activity_bugos_mod.xml với phong cách Settings/Miuix bo góc.
-  4. Tạo các drawable bo góc có mask ripple chống vệt mờ vuông:
-     - bg_mod_card.xml
-     - bg_mod_btn_primary.xml
-     - bg_mod_btn_outline.xml
-  5. Tạo màu sắc tương thích Light/Dark mode (values và values-night).
-  6. Khai báo Activity, Provider, queries và permission trong AndroidManifest.xml.
-  7. Cập nhật settings_headers.xml và top_level_settings*.xml với Intent mở Mod.
+Thiết kế giao diện:
+  - Bố cục thẻ ngang (horizontal row):
+    * Bên trái: Tiêu đề ("SukiSU Ultra") và mô tả.
+    * Bên phải: Nút hành động dạng capsule nhỏ gọn.
+  - Nút tự đổi trạng thái: "Cài đặt" -> "Đang cài..." -> "Mở" sau khi cài thành công.
+  - Thẻ Bước 2: Trạng thái tự chuyển từ "Cần SukiSU Ultra trước" -> "✓ Sẵn sàng", nút "Flash" tự mở khóa.
+  - Thích ứng hoàn toàn Light/Dark mode, bo góc 18dp, nút bo tròn 17dp, ripple có mask không lộ viền vuông mờ.
 """
 
 import os
@@ -51,7 +45,6 @@ def copy_assets_to_apk(work_dir, out_dir):
 
     toolbox_apk = os.path.join(work_dir, "bin", "package", "RootToolbox", "RootToolbox.apk")
     if not os.path.isfile(toolbox_apk):
-        # Fallback check
         alt_apk = r"C:\Users\Khai\Downloads\toolbox\RootToolbox.apk"
         if os.path.isfile(alt_apk):
             toolbox_apk = alt_apk
@@ -82,10 +75,8 @@ def copy_smali_to_apk(src_dir, out_dir):
         print(f"  [WARN] Không thấy thư mục smali nguồn: {smali_src}", file=sys.stderr)
         return
 
-    # Tìm thư mục smali trong out (ưu tiên classes, nếu không thì classes2/...)
     smali_target_base = os.path.join(out_dir, "smali", "classes")
     if not os.path.isdir(smali_target_base):
-        # Tìm bất kỳ thư mục classes nào
         smali_root = os.path.join(out_dir, "smali")
         if os.path.isdir(smali_root):
             cand = [os.path.join(smali_root, d) for d in os.listdir(smali_root) if d.startswith("classes")]
@@ -106,10 +97,9 @@ def copy_smali_to_apk(src_dir, out_dir):
 
 
 def setup_resources(out_dir):
-    """Tạo layout, drawable và color tương thích chuẩn HyperOS Miuix."""
+    """Tạo layout, drawable và color theo phong cách thẻ ngang nhỏ gọn."""
     res_root = os.path.join(out_dir, "resources", "package_1", "res")
     if not os.path.isdir(res_root):
-        # Tìm thư mục res thực tế
         for root, dirs, _ in os.walk(out_dir):
             if os.path.basename(root) == "res" and "drawable" in dirs:
                 res_root = root
@@ -125,7 +115,7 @@ def setup_resources(out_dir):
     os.makedirs(values_dir, exist_ok=True)
     os.makedirs(values_night_dir, exist_ok=True)
 
-    # 1. Layout activity_bugos_mod.xml
+    # 1. Layout activity_bugos_mod.xml (bố cục ngang, thẻ gọn)
     layout_content = '''<?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -142,117 +132,116 @@ def setup_resources(out_dir):
         android:paddingTop="16dp"
         android:paddingBottom="36dp">
 
+        <!-- Card 1: SukiSU Ultra -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
             android:background="@drawable/bg_mod_card"
-            android:padding="20dp"
-            android:layout_marginBottom="16dp">
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:paddingTop="18dp"
+            android:paddingBottom="18dp"
+            android:layout_marginBottom="14dp">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="01"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="#1BA784" />
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingEnd="12dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Cài đặt SukiSU Ultra"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:textColor="?android:attr/textColorPrimary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SukiSU Ultra"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="18dp"
-                android:text="Cài đặt trình quản lý SukiSU Ultra để cấp quyền root cho kernel."
-                android:textSize="13sp"
-                android:textColor="?android:attr/textColorSecondary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Quản lý cấp quyền root cho kernel"
+                    android:textSize="12sp"
+                    android:textColor="?android:attr/textColorSecondary" />
+            </LinearLayout>
 
             <Button
-                android:id="@+id/btn_install"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_mod_btn_primary"
+                android:id="@+id/btn_action_sukisu"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:minWidth="76dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:background="@drawable/bg_mod_btn_pill_primary"
                 android:text="Cài đặt"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
                 android:textAllCaps="false"
-                android:stateListAnimator="@null" />
-
-            <Button
-                android:id="@+id/btn_open_sukisu"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_mod_btn_outline"
-                android:text="Mở SukiSU Ultra"
-                android:textColor="#1BA784"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textAllCaps="false"
-                android:visibility="gone"
                 android:stateListAnimator="@null" />
         </LinearLayout>
 
+        <!-- Card 2: Flash Module -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
             android:background="@drawable/bg_mod_card"
-            android:padding="20dp">
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:paddingTop="18dp"
+            android:paddingBottom="18dp">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="02"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="#1BA784" />
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingEnd="12dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Flash Module có sẵn"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:textColor="?android:attr/textColorPrimary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Flash Module có sẵn"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="SukiSU hỏi xác nhận, rồi vào màn hình flash."
-                android:textSize="13sp"
-                android:textColor="?android:attr/textColorSecondary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Zygisk Next + AlwaysStrong Inject"
+                    android:textSize="12sp"
+                    android:textColor="?android:attr/textColorSecondary" />
 
-            <TextView
-                android:id="@+id/tv_step2_status"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="18dp"
-                android:text="Bật chức năng 1 trước đã."
-                android:textSize="13sp"
-                android:textColor="#FF5252" />
+                <TextView
+                    android:id="@+id/tv_step2_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Cần SukiSU Ultra trước"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="#FF5252" />
+            </LinearLayout>
 
             <Button
                 android:id="@+id/btn_flash"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_mod_btn_primary"
-                android:text="Flash module"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:minWidth="76dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:background="@drawable/bg_mod_btn_pill_primary"
+                android:text="Flash"
                 android:textColor="#FFFFFF"
-                android:textSize="15sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
                 android:textAllCaps="false"
                 android:enabled="false"
@@ -274,13 +263,13 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "bg_mod_card.xml"), card_drawable)
 
-    # 3. bg_mod_btn_primary.xml (Ripple with mask corners to avoid square bleed)
-    btn_primary = '''<?xml version="1.0" encoding="utf-8"?>
+    # 3. bg_mod_btn_pill_primary.xml (Capsule ripple with mask corners)
+    btn_pill_primary = '''<?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#33FFFFFF">
     <item android:id="@android:id/mask">
         <shape android:shape="rectangle">
-            <corners android:radius="24dp" />
+            <corners android:radius="17dp" />
             <solid android:color="#FFFFFF" />
         </shape>
     </item>
@@ -289,34 +278,34 @@ def setup_resources(out_dir):
             <item android:state_enabled="false">
                 <shape android:shape="rectangle">
                     <solid android:color="@color/mod_btn_disabled" />
-                    <corners android:radius="24dp" />
+                    <corners android:radius="17dp" />
                 </shape>
             </item>
             <item android:state_pressed="true">
                 <shape android:shape="rectangle">
                     <solid android:color="@color/mod_teal_pressed" />
-                    <corners android:radius="24dp" />
+                    <corners android:radius="17dp" />
                 </shape>
             </item>
             <item>
                 <shape android:shape="rectangle">
                     <solid android:color="@color/mod_teal_primary" />
-                    <corners android:radius="24dp" />
+                    <corners android:radius="17dp" />
                 </shape>
             </item>
         </selector>
     </item>
 </ripple>
 '''
-    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_primary.xml"), btn_primary)
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_primary.xml"), btn_pill_primary)
 
-    # 4. bg_mod_btn_outline.xml
-    btn_outline = '''<?xml version="1.0" encoding="utf-8"?>
+    # 4. bg_mod_btn_pill_outline.xml
+    btn_pill_outline = '''<?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#221BA784">
     <item android:id="@android:id/mask">
         <shape android:shape="rectangle">
-            <corners android:radius="24dp" />
+            <corners android:radius="17dp" />
             <solid android:color="#FFFFFF" />
         </shape>
     </item>
@@ -326,57 +315,67 @@ def setup_resources(out_dir):
                 <shape android:shape="rectangle">
                     <solid android:color="@color/mod_outline_pressed" />
                     <stroke android:width="1.5dp" android:color="@color/mod_outline_stroke" />
-                    <corners android:radius="24dp" />
+                    <corners android:radius="17dp" />
                 </shape>
             </item>
             <item>
                 <shape android:shape="rectangle">
                     <solid android:color="@color/mod_outline_bg" />
                     <stroke android:width="1dp" android:color="@color/mod_outline_stroke" />
-                    <corners android:radius="24dp" />
+                    <corners android:radius="17dp" />
                 </shape>
             </item>
         </selector>
     </item>
 </ripple>
 '''
-    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_outline.xml"), btn_outline)
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_outline.xml"), btn_pill_outline)
 
-    # 5. bugos_mod_colors.xml (Light)
+    # 5. bg_mod_btn_pill_disabled.xml
+    btn_pill_disabled = '''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/mod_btn_disabled" />
+    <corners android:radius="17dp" />
+</shape>
+'''
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_disabled.xml"), btn_pill_disabled)
+
+    # 6. bugos_mod_colors.xml (Light)
     colors_light = '''<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="mod_card_bg">#FFFFFF</color>
     <color name="mod_card_stroke">#EAEAEA</color>
     <color name="mod_teal_primary">#1BA784</color>
     <color name="mod_teal_pressed">#158569</color>
-    <color name="mod_btn_disabled">#CCCCCC</color>
-    <color name="mod_outline_bg">#F7FBF9</color>
-    <color name="mod_outline_pressed">#E8F4F0</color>
+    <color name="mod_btn_disabled">#E0E0E0</color>
+    <color name="mod_outline_bg">#F0FAF7</color>
+    <color name="mod_outline_pressed">#E2F4ED</color>
     <color name="mod_outline_stroke">#1BA784</color>
 </resources>
 '''
     write_file_validated(os.path.join(values_dir, "bugos_mod_colors.xml"), colors_light)
 
-    # 6. bugos_mod_colors.xml (Night / Dark)
+    # 7. bugos_mod_colors.xml (Night / Dark)
     colors_dark = '''<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="mod_card_bg">#242424</color>
-    <color name="mod_card_stroke">#333333</color>
+    <color name="mod_card_bg">#202227</color>
+    <color name="mod_card_stroke">#2D3036</color>
     <color name="mod_teal_primary">#1BA784</color>
     <color name="mod_teal_pressed">#158569</color>
-    <color name="mod_btn_disabled">#383838</color>
-    <color name="mod_outline_bg">#1F2926</color>
-    <color name="mod_outline_pressed">#283833</color>
+    <color name="mod_btn_disabled">#33353A</color>
+    <color name="mod_outline_bg">#182622</color>
+    <color name="mod_outline_pressed">#223731</color>
     <color name="mod_outline_stroke">#1BA784</color>
 </resources>
 '''
     write_file_validated(os.path.join(values_night_dir, "bugos_mod_colors.xml"), colors_dark)
 
-    # 7. IDs registration in ids.xml
+    # 8. IDs registration in ids.xml
     ids_xml = os.path.join(values_dir, "ids.xml")
     if os.path.isfile(ids_xml):
         c = read_file(ids_xml)
-        for id_name in ["btn_install", "btn_open_sukisu", "tv_step2_status", "btn_flash", "mod_settings", "top_level_mod_settings"]:
+        for id_name in ["btn_action_sukisu", "tv_step2_status", "btn_flash", "mod_settings", "top_level_mod_settings"]:
             if id_name not in c:
                 idx = c.rfind("</resources>")
                 if idx != -1:
@@ -396,14 +395,12 @@ def patch_manifest(manifest_path):
     if "com.android.settings.mod.BugOSModActivity" in content:
         return True
 
-    # 1. uses-permission
     if "REQUEST_INSTALL_PACKAGES" not in content:
         idx = content.find("<application")
         if idx != -1:
             perm = '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n'
             content = content[:idx] + perm + content[idx:]
 
-    # 2. queries package com.sukisu.ultra
     if "com.sukisu.ultra" not in content:
         q_idx = content.find("</queries>")
         if q_idx != -1:
@@ -415,7 +412,6 @@ def patch_manifest(manifest_path):
                 q_tag = '    <queries>\n        <package android:name="com.sukisu.ultra" />\n    </queries>\n'
                 content = content[:app_idx] + q_tag + content[app_idx:]
 
-    # 3. activity & provider inside <application>
     app_close = content.rfind("</application>")
     if app_close != -1:
         mod_components = (
@@ -445,7 +441,6 @@ def patch_settings_headers(file_path):
     if "com.android.settings.mod.BugOSModActivity" in content:
         return True
 
-    # Gỡ bỏ thẻ cũ nếu chưa có Intent
     content = re.sub(
         r'\s*<header\b[^>]*?android:id="@\+?id/mod_settings"[^>]*?(?:/>|>.*?</header>)',
         '',
