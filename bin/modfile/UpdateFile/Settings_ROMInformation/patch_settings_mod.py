@@ -78,19 +78,23 @@ def copy_assets_to_apk(work_dir, out_dir):
 
 
 def copy_smali_to_apk(src_dir, out_dir):
-    """Sao chép các file smali vào <out>/smali/classes/com/android/settings/mod/."""
+    """Sao chép các file smali vào thư mục classesN có nhiều slot trống nhất (classes12...)."""
     smali_src = os.path.join(src_dir, "smali", "com", "android", "settings", "mod")
     if not os.path.isdir(smali_src):
         print(f"  [WARN] Không thấy thư mục smali nguồn: {smali_src}", file=sys.stderr)
         return
 
-    smali_target_base = os.path.join(out_dir, "smali", "classes")
-    if not os.path.isdir(smali_target_base):
-        smali_root = os.path.join(out_dir, "smali")
-        if os.path.isdir(smali_root):
-            cand = [os.path.join(smali_root, d) for d in os.listdir(smali_root) if d.startswith("classes")]
-            if cand:
-                smali_target_base = cand[0]
+    smali_root = os.path.join(out_dir, "smali")
+    smali_target_base = os.path.join(smali_root, "classes")
+    if os.path.isdir(smali_root):
+        cand = [d for d in os.listdir(smali_root) if d.startswith("classes")]
+        if cand:
+            def key_func(d):
+                m = re.search(r"classes(\d+)", d)
+                return int(m.group(1)) if m else 1
+            # Chọn classes có số lớn nhất (classes12 chỉ có ~800 methods, tránh tràn 65K methods ở classes1)
+            best_dir = max(cand, key=key_func)
+            smali_target_base = os.path.join(smali_root, best_dir)
 
     dest_dir = os.path.join(smali_target_base, "com", "android", "settings", "mod")
     os.makedirs(dest_dir, exist_ok=True)
