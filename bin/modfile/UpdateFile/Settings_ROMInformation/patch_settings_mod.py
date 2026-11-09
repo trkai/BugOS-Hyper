@@ -2,12 +2,19 @@
 """Tích hợp toàn bộ BugOS Toolbox vào Settings -> Mod (Settings.apk).
 
 Thiết kế giao diện:
-  - Bố cục thẻ ngang (horizontal row):
-    * Bên trái: Tiêu đề ("SukiSU Ultra") và mô tả.
-    * Bên phải: Nút hành động dạng capsule nhỏ gọn.
-  - Nút tự đổi trạng thái: "Cài đặt" -> "Đang cài..." -> "Mở" sau khi cài thành công.
-  - Thẻ Bước 2: Trạng thái tự chuyển từ "Cần SukiSU Ultra trước" -> "✓ Sẵn sàng", nút "Flash" tự mở khóa.
-  - Thích ứng hoàn toàn Light/Dark mode, bo góc 18dp, nút bo tròn 17dp, ripple có mask không lộ viền vuông mờ.
+  1. Thẻ Banner trên cùng (Device Banner Card):
+     - Chiều cao vừa vặn (136dp), bo góc 18dp.
+     - Tên thiết bị ở giữa góc trên (`ro.product.marketname` / Settings / Build.MODEL).
+     - Nút tròn nhỏ góc dưới cùng bên phải có hình chiếc bút (pencil icon):
+       * Nhấn vào: Mở bộ chọn ảnh (`ACTION_GET_CONTENT`) để đổi ảnh nền banner.
+       * Nhấn giữ: Đặt lại ảnh nền mặc định.
+       * Nhấn giữ cả thẻ card banner cũng hỗ trợ mở bộ chọn ảnh.
+       * Ảnh tùy chọn lưu tự động vào bộ nhớ ứng dụng và giữ nguyên sau khởi động lại.
+  2. Các thẻ chức năng Mod bên dưới:
+     - Bố cục dạng hàng ngang nhỏ gọn.
+     - SukiSU Ultra: Nút capsule góc phải tự chuyển đổi trạng thái "Cài đặt" -> "Đang cài..." -> "Mở".
+     - Flash Module: Nút "Flash" góc phải tự mở khóa khi SukiSU đã cài.
+  3. Thích ứng hoàn hảo Light/Dark mode, bo góc 18dp, ripple có mask không lộ viền vuông mờ.
 """
 
 import os
@@ -97,7 +104,7 @@ def copy_smali_to_apk(src_dir, out_dir):
 
 
 def setup_resources(out_dir):
-    """Tạo layout, drawable và color theo phong cách thẻ ngang nhỏ gọn."""
+    """Tạo layout, drawable và color cho trang Mod."""
     res_root = os.path.join(out_dir, "resources", "package_1", "res")
     if not os.path.isdir(res_root):
         for root, dirs, _ in os.walk(out_dir):
@@ -115,7 +122,7 @@ def setup_resources(out_dir):
     os.makedirs(values_dir, exist_ok=True)
     os.makedirs(values_night_dir, exist_ok=True)
 
-    # 1. Layout activity_bugos_mod.xml (bố cục ngang, thẻ gọn)
+    # 1. Layout activity_bugos_mod.xml (Banner + 2 Card ngang gọn)
     layout_content = '''<?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -129,8 +136,83 @@ def setup_resources(out_dir):
         android:orientation="vertical"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingTop="16dp"
+        android:paddingTop="14dp"
         android:paddingBottom="36dp">
+
+        <!-- Banner Card (Top-center device name + Bottom-right pencil button) -->
+        <FrameLayout
+            android:id="@+id/card_banner"
+            android:layout_width="match_parent"
+            android:layout_height="136dp"
+            android:background="@drawable/bg_mod_banner_frame"
+            android:layout_marginBottom="14dp">
+
+            <ImageView
+                android:id="@+id/iv_mod_banner"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/bg_mod_banner_default" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_mod_banner_scrim" />
+
+            <!-- Device Name at Top Center -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|center_horizontal"
+                android:layout_marginTop="18dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_device_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Xiaomi HyperOS"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="1"
+                    android:shadowRadius="4" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="BugOS Edition"
+                    android:textColor="#DDFFFFFF"
+                    android:textSize="12sp"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="0"
+                    android:shadowDy="1"
+                    android:shadowRadius="4" />
+            </LinearLayout>
+
+            <!-- Bottom-right Circle Pencil Button -->
+            <FrameLayout
+                android:id="@+id/btn_edit_banner"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="12dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_mod_btn_circle"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_mod_pencil" />
+            </FrameLayout>
+        </FrameLayout>
 
         <!-- Card 1: SukiSU Ultra -->
         <LinearLayout
@@ -252,7 +334,82 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(layout_dir, "activity_bugos_mod.xml"), layout_content)
 
-    # 2. bg_mod_card.xml
+    # 2. Drawables cho Banner
+    banner_frame = '''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="#202227" />
+</shape>
+'''
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_banner_frame.xml"), banner_frame)
+
+    banner_default = '''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <gradient
+        android:startColor="#14302C"
+        android:centerColor="#1B4D3E"
+        android:endColor="#116D52"
+        android:angle="45" />
+</shape>
+'''
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_banner_default.xml"), banner_default)
+
+    banner_scrim = '''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <gradient
+        android:startColor="#66000000"
+        android:centerColor="#15000000"
+        android:endColor="#44000000"
+        android:angle="270" />
+</shape>
+'''
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_banner_scrim.xml"), banner_scrim)
+
+    btn_circle = '''<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#44FFFFFF">
+    <item android:id="@android:id/mask">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFF" />
+        </shape>
+    </item>
+    <item>
+        <selector>
+            <item android:state_pressed="true">
+                <shape android:shape="oval">
+                    <solid android:color="#88000000" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="oval">
+                    <solid android:color="#4D000000" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</ripple>
+'''
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_circle.xml"), btn_circle)
+
+    pencil_vector = '''<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,17.25V21h3.75L17.81,9.94l-3.75,-3.75L3,17.25zM20.71,7.04c0.39,-0.39 0.39,-1.02 0,-1.41l-2.34,-2.34c-0.39,-0.39 -1.02,-0.39 -1.41,0l-1.83,1.83 3.75,3.75 1.83,-1.83z" />
+</vector>
+'''
+    write_file_validated(os.path.join(drawable_dir, "ic_mod_pencil.xml"), pencil_vector)
+
+    # 3. Drawables cho thẻ Card & Button Pills
     card_drawable = '''<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
@@ -263,7 +420,6 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "bg_mod_card.xml"), card_drawable)
 
-    # 3. bg_mod_btn_pill_primary.xml (Capsule ripple with mask corners)
     btn_pill_primary = '''<?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#33FFFFFF">
@@ -299,7 +455,6 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_primary.xml"), btn_pill_primary)
 
-    # 4. bg_mod_btn_pill_outline.xml
     btn_pill_outline = '''<?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#221BA784">
@@ -331,7 +486,6 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_outline.xml"), btn_pill_outline)
 
-    # 5. bg_mod_btn_pill_disabled.xml
     btn_pill_disabled = '''<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
@@ -341,7 +495,7 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_disabled.xml"), btn_pill_disabled)
 
-    # 6. bugos_mod_colors.xml (Light)
+    # 4. Colors
     colors_light = '''<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="mod_card_bg">#FFFFFF</color>
@@ -356,7 +510,6 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(values_dir, "bugos_mod_colors.xml"), colors_light)
 
-    # 7. bugos_mod_colors.xml (Night / Dark)
     colors_dark = '''<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="mod_card_bg">#202227</color>
@@ -371,11 +524,15 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(values_night_dir, "bugos_mod_colors.xml"), colors_dark)
 
-    # 8. IDs registration in ids.xml
+    # 5. Đăng ký ID vào ids.xml
     ids_xml = os.path.join(values_dir, "ids.xml")
     if os.path.isfile(ids_xml):
         c = read_file(ids_xml)
-        for id_name in ["btn_action_sukisu", "tv_step2_status", "btn_flash", "mod_settings", "top_level_mod_settings"]:
+        for id_name in [
+            "card_banner", "iv_mod_banner", "tv_device_name", "btn_edit_banner",
+            "btn_action_sukisu", "tv_step2_status", "btn_flash",
+            "mod_settings", "top_level_mod_settings"
+        ]:
             if id_name not in c:
                 idx = c.rfind("</resources>")
                 if idx != -1:

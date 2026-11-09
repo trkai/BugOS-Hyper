@@ -30,7 +30,7 @@
     .line 0
     iget-object v0, p0, Lcom/android/settings/mod/BugOSModActivity$$ExternalSyntheticLambda4;->f$0:Lcom/android/settings/mod/BugOSModActivity;
 
-    invoke-static {v0, p1}, Lcom/android/settings/mod/BugOSModActivity;->$r8$lambda$AWEMXkwElnxBlL0lewP-bpXi-BM(Lcom/android/settings/mod/BugOSModActivity;Landroid/view/View;)V
+    invoke-static {v0, p1}, Lcom/android/settings/mod/BugOSModActivity;->$r8$lambda$_O6jR4tOAUSVUys-TodoY42UWTw(Lcom/android/settings/mod/BugOSModActivity;Landroid/view/View;)V
 
     return-void
 .end method

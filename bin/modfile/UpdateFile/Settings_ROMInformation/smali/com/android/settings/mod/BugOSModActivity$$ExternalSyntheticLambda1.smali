@@ -9,15 +9,19 @@
 # instance fields
 .field public final synthetic f$0:Lcom/android/settings/mod/BugOSModActivity;
 
+.field public final synthetic f$1:Ljava/lang/Exception;
+
 
 # direct methods
-.method public synthetic constructor <init>(Lcom/android/settings/mod/BugOSModActivity;)V
-    .registers 2
+.method public synthetic constructor <init>(Lcom/android/settings/mod/BugOSModActivity;Ljava/lang/Exception;)V
+    .registers 3
 
     .line 0
     invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     iput-object p1, p0, Lcom/android/settings/mod/BugOSModActivity$$ExternalSyntheticLambda1;->f$0:Lcom/android/settings/mod/BugOSModActivity;
+
+    iput-object p2, p0, Lcom/android/settings/mod/BugOSModActivity$$ExternalSyntheticLambda1;->f$1:Ljava/lang/Exception;
 
     return-void
 .end method
@@ -25,12 +29,14 @@
 
 # virtual methods
 .method public final run()V
-    .registers 2
+    .registers 3
 
     .line 0
     iget-object v0, p0, Lcom/android/settings/mod/BugOSModActivity$$ExternalSyntheticLambda1;->f$0:Lcom/android/settings/mod/BugOSModActivity;
 
-    invoke-static {v0}, Lcom/android/settings/mod/BugOSModActivity;->$r8$lambda$hvzYBtgw8uexFKKZPjjc08lDnME(Lcom/android/settings/mod/BugOSModActivity;)V
+    iget-object v1, p0, Lcom/android/settings/mod/BugOSModActivity$$ExternalSyntheticLambda1;->f$1:Ljava/lang/Exception;
+
+    invoke-static {v0, v1}, Lcom/android/settings/mod/BugOSModActivity;->$r8$lambda$CA5hfe9D1FwRv6-639DXFoa___g(Lcom/android/settings/mod/BugOSModActivity;Ljava/lang/Exception;)V
 
     return-void
 .end method

@@ -3,7 +3,7 @@
 .source "D8$$SyntheticClass"
 
 # interfaces
-.implements Ljava/lang/Runnable;
+.implements Landroid/view/View$OnClickListener;
 
 
 # instance fields
@@ -24,13 +24,13 @@
 
 
 # virtual methods
-.method public final run()V
-    .registers 2
+.method public final onClick(Landroid/view/View;)V
+    .registers 3
 
     .line 0
     iget-object v0, p0, Lcom/android/settings/mod/BugOSModActivity$$ExternalSyntheticLambda6;->f$0:Lcom/android/settings/mod/BugOSModActivity;
 
-    invoke-static {v0}, Lcom/android/settings/mod/BugOSModActivity;->$r8$lambda$KTXU2SMtyPNoPsxDrbRP1JaaqLA(Lcom/android/settings/mod/BugOSModActivity;)V
+    invoke-static {v0, p1}, Lcom/android/settings/mod/BugOSModActivity;->$r8$lambda$AWEMXkwElnxBlL0lewP-bpXi-BM(Lcom/android/settings/mod/BugOSModActivity;Landroid/view/View;)V
 
     return-void
 .end method
