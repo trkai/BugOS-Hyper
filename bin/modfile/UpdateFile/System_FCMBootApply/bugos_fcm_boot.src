@@ -21,6 +21,16 @@ log_msg() { log -t "$TAG" "$*"; }
 log_msg "start (uid=$(id -u), ctx=$(cat /proc/self/attr/current 2>/dev/null))"
 
 # -----------------------------------------------------------------------------
+# 0. Kích hoạt CH Play và dịch vụ Google (com.android.vending, gms, gsf)
+#    Trên ROM China, 3 gói này mặc định bị disable, khiến CH Play không hiện icon.
+# -----------------------------------------------------------------------------
+for pkg in com.android.vending com.google.android.gms com.google.android.gsf; do
+    pm enable "$pkg" >/dev/null 2>&1
+    pm enable --user 0 "$pkg" >/dev/null 2>&1
+done
+log_msg "google services enabled"
+
+# -----------------------------------------------------------------------------
 # 1. GMS surgical exemption
 # -----------------------------------------------------------------------------
 GMS_UID=$(pm list packages -U com.google.android.gms 2>/dev/null \
