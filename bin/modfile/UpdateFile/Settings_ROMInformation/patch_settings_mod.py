@@ -143,7 +143,7 @@ def setup_resources(out_dir):
         <FrameLayout
             android:id="@+id/card_banner"
             android:layout_width="match_parent"
-            android:layout_height="136dp"
+            android:layout_height="165dp"
             android:background="@drawable/bg_mod_banner_frame"
             android:layout_marginBottom="14dp">
 
