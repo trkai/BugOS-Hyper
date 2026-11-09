@@ -601,15 +601,17 @@ patch_settings_apk() {
         done
     fi
 
-    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ]; then
-        warn "Settings: không thay được asset lẫn string nào - giữ APK gốc"
-        return 1
-    fi
     mods "Settings: drawable=$total  string=$strings_done"
 
-    # ---- Menu: Thêm mục "Mod" ngay dưới Thiết bị của tôi --------------
+    # ---- Menu: Tích hợp Toolbox vào Cài đặt -> Mod ------------------------
+    local mod_ok=0
     if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
-        python3 "$SRC_DIR/patch_settings_mod.py" "$out" || warn "Settings: chèn mục 'Mod' thất bại"
+        python3 "$SRC_DIR/patch_settings_mod.py" "$out" && mod_ok=1 || warn "Settings: tích hợp 'Mod' thất bại"
+    fi
+
+    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ] && [ "$mod_ok" -eq 0 ]; then
+        warn "Settings: không thay đổi được asset, string lẫn mục Mod - giữ APK gốc"
+        return 1
     fi
 
     # ---- smali: OS version ------------------------------------------------
