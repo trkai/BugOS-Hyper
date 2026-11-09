@@ -56,13 +56,13 @@ public class BugOSModActivity extends Activity {
             actionBar.setTitle("Toolbox");
         }
 
-        int idBanner = getResources().getIdentifier("iv_mod_banner", "id", getPackageName());
-        int idDevName = getResources().getIdentifier("tv_device_name", "id", getPackageName());
-        int idEditBanner = getResources().getIdentifier("btn_edit_banner", "id", getPackageName());
-        int idBannerCard = getResources().getIdentifier("card_banner", "id", getPackageName());
-        int idActionSukiSU = getResources().getIdentifier("btn_action_sukisu", "id", getPackageName());
-        int idStatus = getResources().getIdentifier("tv_step2_status", "id", getPackageName());
-        int idFlash = getResources().getIdentifier("btn_flash", "id", getPackageName());
+        int idBanner = getResources().getIdentifier("banner_background", "id", getPackageName());
+        int idDevName = getResources().getIdentifier("device_name", "id", getPackageName());
+        int idEditBanner = getResources().getIdentifier("edit_button", "id", getPackageName());
+        int idBannerCard = getResources().getIdentifier("banner", "id", getPackageName());
+        int idActionSukiSU = getResources().getIdentifier("action_button", "id", getPackageName());
+        int idStatus = getResources().getIdentifier("status", "id", getPackageName());
+        int idFlash = getResources().getIdentifier("button1", "id", getPackageName());
 
         if (idBanner != 0) ivBanner = findViewById(idBanner);
         if (idDevName != 0) tvDeviceName = findViewById(idDevName);

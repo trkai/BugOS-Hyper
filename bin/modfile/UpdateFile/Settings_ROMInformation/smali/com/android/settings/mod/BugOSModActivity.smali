@@ -1902,7 +1902,7 @@
 
     move-result-object p1
 
-    const-string v0, "iv_mod_banner"
+    const-string v0, "banner_background"
 
     invoke-virtual {p0}, Lcom/android/settings/mod/BugOSModActivity;->getPackageName()Ljava/lang/String;
 
@@ -1919,7 +1919,7 @@
 
     move-result-object v0
 
-    const-string v1, "tv_device_name"
+    const-string v1, "device_name"
 
     invoke-virtual {p0}, Lcom/android/settings/mod/BugOSModActivity;->getPackageName()Ljava/lang/String;
 
@@ -1934,7 +1934,7 @@
 
     move-result-object v1
 
-    const-string v3, "btn_edit_banner"
+    const-string v3, "edit_button"
 
     invoke-virtual {p0}, Lcom/android/settings/mod/BugOSModActivity;->getPackageName()Ljava/lang/String;
 
@@ -1949,7 +1949,7 @@
 
     move-result-object v3
 
-    const-string v4, "card_banner"
+    const-string v4, "banner"
 
     invoke-virtual {p0}, Lcom/android/settings/mod/BugOSModActivity;->getPackageName()Ljava/lang/String;
 
@@ -1964,7 +1964,7 @@
 
     move-result-object v4
 
-    const-string v5, "btn_action_sukisu"
+    const-string v5, "action_button"
 
     invoke-virtual {p0}, Lcom/android/settings/mod/BugOSModActivity;->getPackageName()Ljava/lang/String;
 
@@ -1979,7 +1979,7 @@
 
     move-result-object v5
 
-    const-string v6, "tv_step2_status"
+    const-string v6, "status"
 
     invoke-virtual {p0}, Lcom/android/settings/mod/BugOSModActivity;->getPackageName()Ljava/lang/String;
 
@@ -1994,7 +1994,7 @@
 
     move-result-object v6
 
-    const-string v7, "btn_flash"
+    const-string v7, "button1"
 
     invoke-virtual {p0}, Lcom/android/settings/mod/BugOSModActivity;->getPackageName()Ljava/lang/String;
 

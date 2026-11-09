@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""Tích hợp toàn bộ BugOS Toolbox vào Settings -> Mod (Settings.apk).
+"""Tích hợp toàn bộ BugOS Toolbox vào Settings -> Toolbox (Settings.apk).
 
 Thiết kế giao diện:
   1. Thẻ Banner trên cùng (Device Banner Card):
-     - Chiều cao vừa vặn (136dp), bo góc 18dp.
-     - Tên thiết bị ở giữa góc trên (`ro.product.marketname` / Settings / Build.MODEL).
-     - Nút tròn nhỏ góc dưới cùng bên phải có hình chiếc bút (pencil icon):
-       * Nhấn vào: Mở bộ chọn ảnh (`ACTION_GET_CONTENT`) để đổi ảnh nền banner.
-       * Nhấn giữ: Đặt lại ảnh nền mặc định.
-       * Nhấn giữ cả thẻ card banner cũng hỗ trợ mở bộ chọn ảnh.
-       * Ảnh tùy chọn lưu tự động vào bộ nhớ ứng dụng và giữ nguyên sau khởi động lại.
-  2. Các thẻ chức năng Mod bên dưới:
+     - Chiều cao 200dp, bo góc 18dp.
+     - Tên thiết bị hiển thị ở giữa, cách đỉnh 38dp, đọc động từ hệ thống.
+     - Nút tròn cây bút ở góc dưới bên phải (chạm để đổi ảnh, giữ để đặt lại ảnh Gojo mặc định).
+     - Ảnh nền mặc định: Hình Gojo Satoru (@drawable/bg_mod_banner_default).
+  2. Hai thẻ chức năng bên dưới:
      - Bố cục dạng hàng ngang nhỏ gọn.
      - SukiSU Ultra: Nút capsule góc phải tự chuyển đổi trạng thái "Cài đặt" -> "Đang cài..." -> "Mở".
      - Flash Module: Nút "Flash" góc phải tự mở khóa khi SukiSU đã cài.
-  3. Thích ứng hoàn hảo Light/Dark mode, bo góc 18dp, ripple có mask không lộ viền vuông mờ.
+  3. Kỹ thuật APKEditor:
+     - Sử dụng các View ID có sẵn của Settings.apk (banner, banner_background, device_name,
+       edit_button, action_button, status, button1, other_advanced_settings).
+     - KHÔNG chèn ID mới vào ids.xml để tránh lỗi 'Undefined entry name'.
+     - Tự động đăng ký các drawable/layout mới vào public.xml với ID tuần tự hợp lệ.
+     - Tương thích hoàn hảo Light/Dark mode qua drawable/ và drawable-night/.
 """
 
 import os
@@ -103,8 +105,66 @@ def copy_smali_to_apk(src_dir, out_dir):
     print(f"  [OK] Đã sao chép {copied} file smali vào {dest_dir}")
 
 
+def register_public_resources(res_root):
+    """Đăng ký các file layout và drawable mới vào public.xml để APKEditor gán ID hợp lệ."""
+    pub_path = os.path.join(res_root, "values", "public.xml")
+    if not os.path.isfile(pub_path):
+        return
+
+    try:
+        tree = ET.parse(pub_path)
+        root = tree.getroot()
+    except Exception as e:
+        print(f"  [WARN] Lỗi đọc public.xml: {e}", file=sys.stderr)
+        return
+
+    max_ids = {}
+    existing = set()
+    for elem in root.findall("public"):
+        t = elem.get("type")
+        name = elem.get("name")
+        existing.add((t, name))
+        raw_id_str = elem.get("id", "0")
+        try:
+            raw_id = int(raw_id_str, 16)
+            max_ids[t] = max(max_ids.get(t, 0), raw_id)
+        except ValueError:
+            pass
+
+    new_items = [
+        ("layout", "activity_bugos_mod"),
+        ("drawable", "bg_mod_banner_frame"),
+        ("drawable", "bg_mod_banner_default"),
+        ("drawable", "bg_mod_banner_scrim"),
+        ("drawable", "bg_mod_btn_circle"),
+        ("drawable", "ic_mod_pencil"),
+        ("drawable", "bg_mod_card"),
+        ("drawable", "bg_mod_btn_pill_primary"),
+        ("drawable", "bg_mod_btn_pill_outline"),
+        ("drawable", "bg_mod_btn_pill_disabled"),
+    ]
+
+    added = 0
+    for res_type, res_name in new_items:
+        if (res_type, res_name) not in existing:
+            curr_max = max_ids.get(res_type, 0x7f000000)
+            new_id = curr_max + 1
+            max_ids[res_type] = new_id
+            ET.SubElement(root, "public", {
+                "id": f"0x{new_id:08x}",
+                "type": res_type,
+                "name": res_name
+            })
+            existing.add((res_type, res_name))
+            added += 1
+
+    if added > 0:
+        tree.write(pub_path, encoding="utf-8", xml_declaration=True)
+        print(f"  [OK] Đã đăng ký {added} resource mới vào public.xml")
+
+
 def setup_resources(src_dir, out_dir):
-    """Tạo layout, drawable và color cho trang Mod."""
+    """Tạo layout và drawable cho trang Toolbox."""
     res_root = os.path.join(out_dir, "resources", "package_1", "res")
     if not os.path.isdir(res_root):
         for root, dirs, _ in os.walk(out_dir):
@@ -114,15 +174,13 @@ def setup_resources(src_dir, out_dir):
 
     layout_dir = os.path.join(res_root, "layout")
     drawable_dir = os.path.join(res_root, "drawable")
-    values_dir = os.path.join(res_root, "values")
-    values_night_dir = os.path.join(res_root, "values-night")
+    drawable_night_dir = os.path.join(res_root, "drawable-night")
 
     os.makedirs(layout_dir, exist_ok=True)
     os.makedirs(drawable_dir, exist_ok=True)
-    os.makedirs(values_dir, exist_ok=True)
-    os.makedirs(values_night_dir, exist_ok=True)
+    os.makedirs(drawable_night_dir, exist_ok=True)
 
-    # 1. Layout activity_bugos_mod.xml (Banner + 2 Card ngang gọn)
+    # 1. Layout activity_bugos_mod.xml (Dùng các View ID có sẵn của Settings.apk)
     layout_content = '''<?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -139,16 +197,16 @@ def setup_resources(src_dir, out_dir):
         android:paddingTop="14dp"
         android:paddingBottom="36dp">
 
-        <!-- Banner Card (Top-center device name + Bottom-right pencil button) -->
+        <!-- Banner Card -->
         <FrameLayout
-            android:id="@+id/card_banner"
+            android:id="@id/banner"
             android:layout_width="match_parent"
             android:layout_height="200dp"
             android:background="@drawable/bg_mod_banner_frame"
             android:layout_marginBottom="14dp">
 
             <ImageView
-                android:id="@+id/iv_mod_banner"
+                android:id="@id/banner_background"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
@@ -159,9 +217,9 @@ def setup_resources(src_dir, out_dir):
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_mod_banner_scrim" />
 
-            <!-- Device Name at Top Center -->
+            <!-- Tên máy ở giữa, dịch xuống 38dp -->
             <TextView
-                android:id="@+id/tv_device_name"
+                android:id="@id/device_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|center_horizontal"
@@ -176,9 +234,9 @@ def setup_resources(src_dir, out_dir):
                 android:shadowDy="1"
                 android:shadowRadius="4" />
 
-            <!-- Bottom-right Circle Pencil Button -->
+            <!-- Nút tròn cây bút góc dưới bên phải -->
             <FrameLayout
-                android:id="@+id/btn_edit_banner"
+                android:id="@id/edit_button"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:layout_gravity="bottom|end"
@@ -234,7 +292,7 @@ def setup_resources(src_dir, out_dir):
             </LinearLayout>
 
             <Button
-                android:id="@+id/btn_action_sukisu"
+                android:id="@id/action_button"
                 android:layout_width="wrap_content"
                 android:layout_height="34dp"
                 android:minWidth="76dp"
@@ -285,7 +343,7 @@ def setup_resources(src_dir, out_dir):
                     android:textColor="?android:attr/textColorSecondary" />
 
                 <TextView
-                    android:id="@+id/tv_step2_status"
+                    android:id="@id/status"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
@@ -296,7 +354,7 @@ def setup_resources(src_dir, out_dir):
             </LinearLayout>
 
             <Button
-                android:id="@+id/btn_flash"
+                android:id="@id/button1"
                 android:layout_width="wrap_content"
                 android:layout_height="34dp"
                 android:minWidth="76dp"
@@ -326,6 +384,7 @@ def setup_resources(src_dir, out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "bg_mod_banner_frame.xml"), banner_frame)
 
+    # Ảnh Gojo mặc định
     banner_img_src = os.path.join(src_dir, "bg_mod_banner_default.jpg")
     banner_img_dest = os.path.join(drawable_dir, "bg_mod_banner_default.jpg")
     if os.path.isfile(banner_img_src):
@@ -333,20 +392,7 @@ def setup_resources(src_dir, out_dir):
         xml_fallback = os.path.join(drawable_dir, "bg_mod_banner_default.xml")
         if os.path.isfile(xml_fallback):
             os.remove(xml_fallback)
-        print(f"  [OK] Đã chép ảnh bìa mặc định vào {os.path.basename(banner_img_dest)}")
-    else:
-        banner_default = '''<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <corners android:radius="18dp" />
-    <gradient
-        android:startColor="#14302C"
-        android:centerColor="#1B4D3E"
-        android:endColor="#116D52"
-        android:angle="45" />
-</shape>
-'''
-        write_file_validated(os.path.join(drawable_dir, "bg_mod_banner_default.xml"), banner_default)
+        print(f"  [OK] Đã chép ảnh bìa Gojo mặc định vào {os.path.basename(banner_img_dest)}")
 
     banner_scrim = '''<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
@@ -400,17 +446,28 @@ def setup_resources(src_dir, out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "ic_mod_pencil.xml"), pencil_vector)
 
-    # 3. Drawables cho thẻ Card & Button Pills
-    card_drawable = '''<?xml version="1.0" encoding="utf-8"?>
+    # 3. Drawables cho thẻ Card (Light & Dark mode tách theo thư mục)
+    card_light = '''<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="@color/mod_card_bg" />
+    <solid android:color="#FFFFFF" />
     <corners android:radius="18dp" />
-    <stroke android:width="1dp" android:color="@color/mod_card_stroke" />
+    <stroke android:width="1dp" android:color="#EAEAEA" />
 </shape>
 '''
-    write_file_validated(os.path.join(drawable_dir, "bg_mod_card.xml"), card_drawable)
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_card.xml"), card_light)
 
+    card_dark = '''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#202227" />
+    <corners android:radius="18dp" />
+    <stroke android:width="1dp" android:color="#2D3036" />
+</shape>
+'''
+    write_file_validated(os.path.join(drawable_night_dir, "bg_mod_card.xml"), card_dark)
+
+    # 4. Buttons: Pill Primary
     btn_pill_primary = '''<?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#33FFFFFF">
@@ -424,19 +481,19 @@ def setup_resources(src_dir, out_dir):
         <selector>
             <item android:state_enabled="false">
                 <shape android:shape="rectangle">
-                    <solid android:color="@color/mod_btn_disabled" />
+                    <solid android:color="#E0E0E0" />
                     <corners android:radius="17dp" />
                 </shape>
             </item>
             <item android:state_pressed="true">
                 <shape android:shape="rectangle">
-                    <solid android:color="@color/mod_teal_pressed" />
+                    <solid android:color="#158569" />
                     <corners android:radius="17dp" />
                 </shape>
             </item>
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="@color/mod_teal_primary" />
+                    <solid android:color="#1BA784" />
                     <corners android:radius="17dp" />
                 </shape>
             </item>
@@ -446,7 +503,8 @@ def setup_resources(src_dir, out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_primary.xml"), btn_pill_primary)
 
-    btn_pill_outline = '''<?xml version="1.0" encoding="utf-8"?>
+    # Pill Outline (Light & Dark)
+    btn_outline_light = '''<?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#221BA784">
     <item android:id="@android:id/mask">
@@ -459,15 +517,15 @@ def setup_resources(src_dir, out_dir):
         <selector>
             <item android:state_pressed="true">
                 <shape android:shape="rectangle">
-                    <solid android:color="@color/mod_outline_pressed" />
-                    <stroke android:width="1.5dp" android:color="@color/mod_outline_stroke" />
+                    <solid android:color="#E2F4ED" />
+                    <stroke android:width="1.5dp" android:color="#1BA784" />
                     <corners android:radius="17dp" />
                 </shape>
             </item>
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="@color/mod_outline_bg" />
-                    <stroke android:width="1dp" android:color="@color/mod_outline_stroke" />
+                    <solid android:color="#F0FAF7" />
+                    <stroke android:width="1dp" android:color="#1BA784" />
                     <corners android:radius="17dp" />
                 </shape>
             </item>
@@ -475,63 +533,61 @@ def setup_resources(src_dir, out_dir):
     </item>
 </ripple>
 '''
-    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_outline.xml"), btn_pill_outline)
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_outline.xml"), btn_outline_light)
 
-    btn_pill_disabled = '''<?xml version="1.0" encoding="utf-8"?>
+    btn_outline_dark = '''<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#221BA784">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="17dp" />
+            <solid android:color="#FFFFFF" />
+        </shape>
+    </item>
+    <item>
+        <selector>
+            <item android:state_pressed="true">
+                <shape android:shape="rectangle">
+                    <solid android:color="#223731" />
+                    <stroke android:width="1.5dp" android:color="#1BA784" />
+                    <corners android:radius="17dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#182622" />
+                    <stroke android:width="1dp" android:color="#1BA784" />
+                    <corners android:radius="17dp" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</ripple>
+'''
+    write_file_validated(os.path.join(drawable_night_dir, "bg_mod_btn_pill_outline.xml"), btn_outline_dark)
+
+    # Pill Disabled (Light & Dark)
+    btn_disabled_light = '''<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="@color/mod_btn_disabled" />
+    <solid android:color="#E0E0E0" />
     <corners android:radius="17dp" />
 </shape>
 '''
-    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_disabled.xml"), btn_pill_disabled)
+    write_file_validated(os.path.join(drawable_dir, "bg_mod_btn_pill_disabled.xml"), btn_disabled_light)
 
-    # 4. Colors
-    colors_light = '''<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="mod_card_bg">#FFFFFF</color>
-    <color name="mod_card_stroke">#EAEAEA</color>
-    <color name="mod_teal_primary">#1BA784</color>
-    <color name="mod_teal_pressed">#158569</color>
-    <color name="mod_btn_disabled">#E0E0E0</color>
-    <color name="mod_outline_bg">#F0FAF7</color>
-    <color name="mod_outline_pressed">#E2F4ED</color>
-    <color name="mod_outline_stroke">#1BA784</color>
-</resources>
+    btn_disabled_dark = '''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#33353A" />
+    <corners android:radius="17dp" />
+</shape>
 '''
-    write_file_validated(os.path.join(values_dir, "bugos_mod_colors.xml"), colors_light)
+    write_file_validated(os.path.join(drawable_night_dir, "bg_mod_btn_pill_disabled.xml"), btn_disabled_dark)
 
-    colors_dark = '''<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="mod_card_bg">#202227</color>
-    <color name="mod_card_stroke">#2D3036</color>
-    <color name="mod_teal_primary">#1BA784</color>
-    <color name="mod_teal_pressed">#158569</color>
-    <color name="mod_btn_disabled">#33353A</color>
-    <color name="mod_outline_bg">#182622</color>
-    <color name="mod_outline_pressed">#223731</color>
-    <color name="mod_outline_stroke">#1BA784</color>
-</resources>
-'''
-    write_file_validated(os.path.join(values_night_dir, "bugos_mod_colors.xml"), colors_dark)
-
-    # 5. Đăng ký ID vào ids.xml
-    ids_xml = os.path.join(values_dir, "ids.xml")
-    if os.path.isfile(ids_xml):
-        c = read_file(ids_xml)
-        for id_name in [
-            "card_banner", "iv_mod_banner", "tv_device_name", "btn_edit_banner",
-            "btn_action_sukisu", "tv_step2_status", "btn_flash",
-            "mod_settings", "top_level_mod_settings"
-        ]:
-            if id_name not in c:
-                idx = c.rfind("</resources>")
-                if idx != -1:
-                    item = f'    <item type="id" name="{id_name}" />\n'
-                    c = c[:idx] + item + c[idx:]
-        write_file_validated(ids_xml, c)
-
-    print("  [OK] Đã thiết lập toàn bộ tài nguyên UI cho Mod")
+    # 5. Đăng ký tất cả tài nguyên mới vào public.xml
+    register_public_resources(res_root)
+    print("  [OK] Đã thiết lập toàn bộ tài nguyên UI cho Toolbox")
 
 
 def patch_manifest(manifest_path):
@@ -581,7 +637,7 @@ def patch_manifest(manifest_path):
 
 
 def patch_settings_headers(file_path):
-    """Gắn header Mod có Intent vào settings_headers.xml ngay dưới my_device."""
+    """Gắn header Toolbox vào settings_headers.xml ngay dưới my_device."""
     content = read_file(file_path)
     if not content:
         return False
@@ -607,7 +663,7 @@ def patch_settings_headers(file_path):
 
     mod_header = (
         '\n  <header android:icon="@drawable/ic_other_advanced_settings"'
-        '\n          android:id="@+id/mod_settings"'
+        '\n          android:id="@id/other_advanced_settings"'
         '\n          android:title="Toolbox">'
         '\n    <intent android:targetPackage="com.android.settings"'
         '\n            android:targetClass="com.android.settings.mod.BugOSModActivity" />'
@@ -618,13 +674,13 @@ def patch_settings_headers(file_path):
     new_content = content[:insert_pos] + mod_header + content[insert_pos:]
 
     if write_file_validated(file_path, new_content):
-        print(f"  [OK] Đã gắn Intent mở Mod vào {os.path.basename(file_path)}")
+        print(f"  [OK] Đã gắn Intent mở Toolbox vào {os.path.basename(file_path)}")
         return True
     return False
 
 
 def patch_top_level_settings(file_path):
-    """Gắn Preference Mod có Intent vào top_level_settings*.xml."""
+    """Gắn Preference Toolbox có Intent vào top_level_settings*.xml."""
     content = read_file(file_path)
     if not content:
         return False
@@ -651,7 +707,7 @@ def patch_top_level_settings(file_path):
     mod_pref = (
         '\n    <com.android.settings.widget.HomepagePreference android:icon="@drawable/ic_other_advanced_settings"'
         '\n                          android:title="Toolbox"'
-        '\n                          android:key="top_level_mod_settings"'
+        '\n                          android:key="top_level_toolbox"'
         '\n                          android:order="-9">'
         '\n        <intent android:targetPackage="com.android.settings"'
         '\n                android:targetClass="com.android.settings.mod.BugOSModActivity" />'
@@ -662,7 +718,7 @@ def patch_top_level_settings(file_path):
     new_content = content[:insert_pos] + mod_pref + content[insert_pos:]
 
     if write_file_validated(file_path, new_content):
-        print(f"  [OK] Đã gắn Intent mở Mod vào {os.path.basename(file_path)}")
+        print(f"  [OK] Đã gắn Intent mở Toolbox vào {os.path.basename(file_path)}")
         return True
     return False
 
@@ -680,7 +736,7 @@ def main():
     work_dir = os.getcwd()
     src_dir = os.path.join(work_dir, "bin", "modfile", "UpdateFile", "Settings_ROMInformation")
 
-    print("Settings: Bắt đầu tích hợp Toolbox vào Settings -> Mod...")
+    print("Settings: Bắt đầu tích hợp Toolbox vào Settings -> Toolbox...")
 
     # 1. Assets
     copy_assets_to_apk(work_dir, out_dir)
@@ -688,7 +744,7 @@ def main():
     # 2. Smali
     copy_smali_to_apk(src_dir, out_dir)
 
-    # 3. Resources (layout, drawable, color, ids)
+    # 3. Resources (layout, drawables, public.xml)
     setup_resources(src_dir, out_dir)
 
     # 4. AndroidManifest.xml
@@ -706,7 +762,7 @@ def main():
                 full_p = os.path.join(root, fn)
                 patch_top_level_settings(full_p)
 
-    print("Settings: Tích hợp Toolbox vào Settings -> Mod hoàn tất.")
+    print("Settings: Tích hợp Toolbox vào Settings -> Toolbox hoàn tất.")
     return 0
 
 
