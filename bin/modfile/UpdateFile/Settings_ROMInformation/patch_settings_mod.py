@@ -143,7 +143,7 @@ def setup_resources(out_dir):
         <FrameLayout
             android:id="@+id/card_banner"
             android:layout_width="match_parent"
-            android:layout_height="165dp"
+            android:layout_height="200dp"
             android:background="@drawable/bg_mod_banner_frame"
             android:layout_marginBottom="14dp">
 
@@ -164,7 +164,7 @@ def setup_resources(out_dir):
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|center_horizontal"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="22dp"
                 android:gravity="center_horizontal"
                 android:orientation="vertical">
 
