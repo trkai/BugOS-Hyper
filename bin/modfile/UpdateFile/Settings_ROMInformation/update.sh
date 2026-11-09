@@ -607,6 +607,11 @@ patch_settings_apk() {
     fi
     mods "Settings: drawable=$total  string=$strings_done"
 
+    # ---- Menu: Thêm mục "Mod" ngay dưới Thiết bị của tôi --------------
+    if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
+        python3 "$SRC_DIR/patch_settings_mod.py" "$out" || warn "Settings: chèn mục 'Mod' thất bại"
+    fi
+
     # ---- smali: OS version ------------------------------------------------
     local p1
     p1=$(find "$out" -type f -name "MiuiAboutPhoneUtils.smali" 2>/dev/null | head -n 1)
