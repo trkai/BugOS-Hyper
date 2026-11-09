@@ -555,7 +555,7 @@ def patch_manifest(manifest_path):
     if app_close != -1:
         mod_components = (
             '        <activity android:name="com.android.settings.mod.BugOSModActivity"\n'
-            '                  android:label="Mod"\n'
+            '                  android:label="Toolbox"\n'
             '                  android:exported="true"\n'
             '                  android:configChanges="orientation|screenSize" />\n'
             '        <provider android:name="com.android.settings.mod.ToolboxFileProvider"\n'
@@ -599,8 +599,7 @@ def patch_settings_headers(file_path):
     mod_header = (
         '\n  <header android:icon="@drawable/ic_other_advanced_settings"'
         '\n          android:id="@+id/mod_settings"'
-        '\n          android:title="Mod"'
-        '\n          android:summary="Toolbox">'
+        '\n          android:title="Toolbox">'
         '\n    <intent android:targetPackage="com.android.settings"'
         '\n            android:targetClass="com.android.settings.mod.BugOSModActivity" />'
         '\n  </header>'
@@ -642,8 +641,7 @@ def patch_top_level_settings(file_path):
 
     mod_pref = (
         '\n    <com.android.settings.widget.HomepagePreference android:icon="@drawable/ic_other_advanced_settings"'
-        '\n                          android:title="Mod"'
-        '\n                          android:summary="Toolbox"'
+        '\n                          android:title="Toolbox"'
         '\n                          android:key="top_level_mod_settings"'
         '\n                          android:order="-9">'
         '\n        <intent android:targetPackage="com.android.settings"'

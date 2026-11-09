@@ -53,7 +53,7 @@ public class BugOSModActivity extends Activity {
         ActionBar actionBar = getActionBar();
         if (actionBar != null) {
             actionBar.setDisplayHomeAsUpEnabled(true);
-            actionBar.setTitle("Mod");
+            actionBar.setTitle("Toolbox");
         }
 
         int idBanner = getResources().getIdentifier("iv_mod_banner", "id", getPackageName());

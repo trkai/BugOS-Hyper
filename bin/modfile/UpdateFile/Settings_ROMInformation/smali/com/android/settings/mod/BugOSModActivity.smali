@@ -1892,7 +1892,7 @@
     invoke-virtual {p1, v0}, Landroid/app/ActionBar;->setDisplayHomeAsUpEnabled(Z)V
 
     .line 56
-    const-string v0, "Mod"
+    const-string v0, "Toolbox"
 
     invoke-virtual {p1, v0}, Landroid/app/ActionBar;->setTitle(Ljava/lang/CharSequence;)V
 
