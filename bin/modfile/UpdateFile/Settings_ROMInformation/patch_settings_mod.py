@@ -103,7 +103,7 @@ def copy_smali_to_apk(src_dir, out_dir):
     print(f"  [OK] Đã sao chép {copied} file smali vào {dest_dir}")
 
 
-def setup_resources(out_dir):
+def setup_resources(src_dir, out_dir):
     """Tạo layout, drawable và color cho trang Mod."""
     res_root = os.path.join(out_dir, "resources", "package_1", "res")
     if not os.path.isdir(res_root):
@@ -326,7 +326,16 @@ def setup_resources(out_dir):
 '''
     write_file_validated(os.path.join(drawable_dir, "bg_mod_banner_frame.xml"), banner_frame)
 
-    banner_default = '''<?xml version="1.0" encoding="utf-8"?>
+    banner_img_src = os.path.join(src_dir, "bg_mod_banner_default.jpg")
+    banner_img_dest = os.path.join(drawable_dir, "bg_mod_banner_default.jpg")
+    if os.path.isfile(banner_img_src):
+        shutil.copy2(banner_img_src, banner_img_dest)
+        xml_fallback = os.path.join(drawable_dir, "bg_mod_banner_default.xml")
+        if os.path.isfile(xml_fallback):
+            os.remove(xml_fallback)
+        print(f"  [OK] Đã chép ảnh bìa mặc định vào {os.path.basename(banner_img_dest)}")
+    else:
+        banner_default = '''<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <corners android:radius="18dp" />
@@ -337,7 +346,7 @@ def setup_resources(out_dir):
         android:angle="45" />
 </shape>
 '''
-    write_file_validated(os.path.join(drawable_dir, "bg_mod_banner_default.xml"), banner_default)
+        write_file_validated(os.path.join(drawable_dir, "bg_mod_banner_default.xml"), banner_default)
 
     banner_scrim = '''<?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
@@ -680,7 +689,7 @@ def main():
     copy_smali_to_apk(src_dir, out_dir)
 
     # 3. Resources (layout, drawable, color, ids)
-    setup_resources(out_dir)
+    setup_resources(src_dir, out_dir)
 
     # 4. AndroidManifest.xml
     manifest_path = os.path.join(out_dir, "AndroidManifest.xml")
