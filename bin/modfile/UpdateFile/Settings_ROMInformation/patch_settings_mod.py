@@ -160,39 +160,21 @@ def setup_resources(out_dir):
                 android:background="@drawable/bg_mod_banner_scrim" />
 
             <!-- Device Name at Top Center -->
-            <LinearLayout
+            <TextView
+                android:id="@+id/tv_device_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|center_horizontal"
-                android:layout_marginTop="22dp"
-                android:gravity="center_horizontal"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tv_device_name"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Xiaomi HyperOS"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:shadowColor="#99000000"
-                    android:shadowDx="0"
-                    android:shadowDy="1"
-                    android:shadowRadius="4" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="BugOS Edition"
-                    android:textColor="#DDFFFFFF"
-                    android:textSize="12sp"
-                    android:shadowColor="#99000000"
-                    android:shadowDx="0"
-                    android:shadowDy="1"
-                    android:shadowRadius="4" />
-            </LinearLayout>
+                android:layout_marginTop="38dp"
+                android:gravity="center"
+                android:text="Xiaomi HyperOS"
+                android:textColor="#FFFFFF"
+                android:textSize="19sp"
+                android:textStyle="bold"
+                android:shadowColor="#99000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="4" />
 
             <!-- Bottom-right Circle Pencil Button -->
             <FrameLayout
