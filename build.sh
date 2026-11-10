@@ -234,20 +234,49 @@ if [ -z "$detected_codename" ]; then
         if [ -f "$prop" ]; then
             val=$(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device|ro\.build\.product)=" "$prop" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
             case "$val" in
-                ""|missi|miproduct|product|generic|unknown|xiaomi|device|phone) ;;
+                ""|missi|miproduct|mivendor|product|generic|unknown|xiaomi|device|phone) ;;
                 *) detected_codename="$val"; break ;;
             esac
         fi
     done
 fi
 
+# Codename phải là tên CÓ THẬT trong danh sách thiết bị.
+#
+# Bản cũ chỉ chặn vài giá trị cụ thể (YourDevice / missi) nên mọi giá trị rác
+# khác vẫn lọt vào device_code.txt và cuối cùng thành tên file zip. Ca thật
+# (10/11): base ROM tên miui_mivendor_OS4.0.5.0.XGNCNXM_*.zip -> getROM.sh lấy
+# field 2 = "mivendor" -> ROM ra tên BugOS_mivendor_OS4.0.5.0.XGNCNXM_*.zip,
+# không cho biết máy nào.
+is_known_codename() {
+    local c f
+    c=$(echo "$1" | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
+    [ -n "$c" ] || return 1
+    for f in devices_data.txt pad_data.txt; do
+        [ -f "$work_dir/bin/ddevice/data/$f" ] || continue
+        grep -qix "$c" "$work_dir/bin/ddevice/data/$f" 2>/dev/null && return 0
+    done
+    if [ -f "$work_dir/bin/ddevice/data/devices.json" ] && command -v jq >/dev/null 2>&1; then
+        jq -e --arg k "$c" 'has($k)' "$work_dir/bin/ddevice/data/devices.json" >/dev/null 2>&1 && return 0
+    fi
+    return 1
+}
+
 if [ -n "$detected_codename" ]; then
     device_f="$detected_codename"
     echo "$device_f" > "$work_dir/bin/ddevice/device_f.txt"
     curr_dc=$(cat "$work_dir/bin/ddevice/device_code.txt" 2>/dev/null)
-    if [ -z "$curr_dc" ] || [ "$curr_dc" = "YourDevice" ] || [ "$curr_dc" = "missi" ]; then
+    if ! is_known_codename "$curr_dc"; then
         echo "$device_f" > "$work_dir/bin/ddevice/device_code.txt"
     fi
+fi
+
+# Cảnh báo sớm: nếu codename vẫn không xác định được thì tên file zip sẽ vô
+# nghĩa (vd "mivendor"). In rõ ngay trong log thay vì để phát hiện sau khi flash.
+final_dc=$(cat "$work_dir/bin/ddevice/device_code.txt" 2>/dev/null | tr -d '\r\n ')
+if ! is_known_codename "$final_dc"; then
+    warn "Codename '$final_dc' không nằm trong danh sách thiết bị."
+    warn "Tên file ROM sẽ không cho biết máy nào. Kiểm tra base ROM (gói 'mivendor' không chứa codename)."
 fi
 
 getvar=$(cat "$work_dir/bin/ddevice/device_f.txt" 2>/dev/null)

@@ -13,7 +13,7 @@ IS_CHINA=0
 # Giá trị rác hay gặp trong build.prop, không phải tên bán của máy
 is_placeholder() {
   case "$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -d '\r\n ')" in
-    ""|null|unknown|xiaomidevice|miui|hyperos|bugos|missi|miproduct|product|generic|phone|device) return 0 ;;
+    ""|null|unknown|xiaomidevice|miui|hyperos|bugos|missi|miproduct|mivendor|product|generic|phone|device) return 0 ;;
     *) return 1 ;;
   esac
 }
