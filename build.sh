@@ -241,116 +241,92 @@ if [ -z "$detected_codename" ]; then
     done
 fi
 
-# Codename: KHÔNG dùng danh sách thiết bị làm cổng chặn.
+# ==================== CHỐT CODENAME ====================
+# Nguyên tắc: CHỈ dùng codename có thật, đọc được từ chính ROM. Không suy đoán,
+# không lấy tên thương mại thay thế. Không xác định được -> DỪNG BUILD.
 #
-# Máy mới (vd K100 Pro Max - "songyuan") chưa có trong devices_data.txt; nếu
-# đòi "phải có trong DB" thì codename đúng sẽ bị loại oan. Ở đây chỉ loại các
-# giá trị rác đã biết, còn lại giữ nguyên.
-is_known_codename() {
-    local c f
-    c=$(echo "$1" | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
-    [ -n "$c" ] || return 1
-    for f in devices_data.txt pad_data.txt; do
-        [ -f "$work_dir/bin/ddevice/data/$f" ] || continue
-        grep -qix "$c" "$work_dir/bin/ddevice/data/$f" 2>/dev/null && return 0
-    done
-    if [ -f "$work_dir/bin/ddevice/data/devices.json" ] && command -v jq >/dev/null 2>&1; then
-        jq -e --arg k "$c" 'has($k)' "$work_dir/bin/ddevice/data/devices.json" >/dev/null 2>&1 && return 0
-    fi
-    return 1
-}
-
+# Vì sao phải dừng: tên file zip là thứ duy nhất cho biết ROM dành cho máy nào.
+# Một cái tên sai (hoặc "mivendor") sẽ khiến người dùng flash nhầm máy.
 is_junk_codename() {
     case "$(echo "$1" | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')" in
-        ""|yourdevice|missi|miproduct|mivendor|miui|hyperos|bugos|product|generic|unknown|xiaomi|device|phone|vendor|system|android) return 0 ;;
+        ""|yourdevice|missi|miproduct|mivendor|miui|hyperos|bugos|product|generic|unknown|xiaomi|device|phone|vendor|system|android|qssi|qssi64|qssi_64|emulator|goldfish|mainline) return 0 ;;
     esac
     return 1
 }
 
-# Nếu vẫn không có codename hợp lệ: suy ngược từ tên thương mại.
-#
-# Nhiều base ROM dạng "mivendor" đã bị thay ro.product.device bằng chính chữ
-# "mivendor" nhưng vẫn giữ ro.product.marketname thật (vd "REDMI K100 Pro Max").
-# Khi đó: tra ngược devices.json (tên máy -> codename); không có thì lấy luôn
-# tên máy đã bỏ dấu cách làm định danh, thay vì để "mivendor" vô nghĩa.
-rom_marketname_build() {
+norm_codename() { echo "$1" | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]'; }
+
+# Nguồn 1: metadata OTA trong zip gốc - chuẩn nhất, do Xiaomi ghi lúc đóng gói.
+#   pre-device=songyuan
+#   post-build=Xiaomi/songyuan/songyuan:16/...
+codename_from_ota_metadata() {
+    local meta val
+    [ -f "$baserom" ] || return 0
+    meta=$(unzip -p "$baserom" META-INF/com/android/metadata 2>/dev/null) || return 0
+    [ -n "$meta" ] || return 0
+    val=$(printf '%s\n' "$meta" | grep -m1 '^pre-device=' | cut -d'=' -f2-)
+    if [ -z "$val" ]; then
+        val=$(printf '%s\n' "$meta" | grep -m1 '^post-build=' | cut -d'=' -f2- | cut -d'/' -f2)
+    fi
+    printf '%s' "$val"
+}
+
+# Nguồn 2: build.prop của ROM đã giải nén
+codename_from_props() {
     local prop val
     for prop in \
         "$work_dir/build/baserom/images/product/etc/build.prop" \
-        "$work_dir/build/baserom/images/system/system/build.prop" \
-        "$work_dir/build/baserom/images/system_ext/etc/build.prop" \
         "$work_dir/build/baserom/images/vendor/build.prop" \
+        "$work_dir/build/baserom/images/system/system/build.prop" \
         "$work_dir/build/baserom/images/odm/etc/build.prop"; do
         [ -f "$prop" ] || continue
-        val=$(grep -E "^ro\.(product|vendor|system|odm|system_ext)\.(product\.|vendor\.|system\.|odm\.|system_ext\.)?marketname=" "$prop" 2>/dev/null \
-            | head -n 1 | cut -d'=' -f2- | tr -d '\r\n' \
-            | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-        case "$val" in ""|null|unknown|miui|hyperos|bugos|mivendor) continue ;; esac
-        printf '%s' "$val"
-        return 0
+        while IFS= read -r val; do
+            val=$(printf '%s' "$val" | cut -d'=' -f2- | tr -d '\r\n ')
+            if ! is_junk_codename "$val"; then
+                printf '%s' "$val"
+                return 0
+            fi
+        done < <(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device|ro\.build\.product)=" "$prop" 2>/dev/null)
     done
 }
 
-slugify() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9'; }
+# Nguồn 3: field 2 trong tên file ROM (getROM.sh đã tách sẵn)
+ota_dc=$(norm_codename "$(codename_from_ota_metadata)")
+prop_dc=$(norm_codename "$(codename_from_props)")
+file_dc=$(norm_codename "$(cat "$work_dir/bin/ddevice/device_code.txt" 2>/dev/null)")
 
-# Tra ngược devices.json: tên máy (đã slug hoá) -> codename.
-# Dùng awk thay jq cho nhẹ và khỏi phụ thuộc; dữ liệu chỉ là
-#   "annibale": "POCO F8 Pro|REDMI K90|Redmi K90",
-reverse_codename_for() {
-    local want="$1" file="$2"
-    [ -n "$want" ] && [ -f "$file" ] || return 0
-    awk -v want="$want" '
-        {
-            if (!match($0, /^[[:space:]]*"[^"]+"/)) next
-            key = substr($0, RSTART, RLENGTH)
-            gsub(/[[:space:]"]/, "", key)
+cands=""
+for c in "$ota_dc" "$prop_dc" "$file_dc"; do
+    is_junk_codename "$c" && continue
+    case " $cands " in *" $c "*) continue ;; esac
+    cands="$cands $c"
+done
+cands=$(echo "$cands" | sed -e 's/^ *//' -e 's/ *$//')
+n_cands=$(echo "$cands" | wc -w)
 
-            if (!match($0, /:[[:space:]]*"[^"]*"/)) next
-            val = substr($0, RSTART + 1, RLENGTH - 1)
-            gsub(/^[[:space:]"]+/, "", val)
-            gsub(/[[:space:]"]+$/, "", val)
-
-            n = split(val, arr, "|")
-            for (i = 1; i <= n; i++) {
-                t = tolower(arr[i])
-                gsub(/[^a-z0-9]/, "", t)
-                if (t == want) { print key; exit }
-            }
-        }' "$file"
-}
-
-# Chốt codename theo thứ tự tin cậy:
-#   1. codename trong TÊN FILE ROM   (Xiaomi đặt tên file theo codename)
-#   2. codename đọc từ build.prop
-#   3. suy từ marketname (tra ngược devices.json) hoặc slug tên máy
-final_dc=$(cat "$work_dir/bin/ddevice/device_code.txt" 2>/dev/null | tr -d '\r\n ')
-
-if is_junk_codename "$final_dc"; then
-    if [ -n "$detected_codename" ] && ! is_junk_codename "$detected_codename"; then
-        mods "Codename '$final_dc' không dùng được -> lấy từ build.prop: '$detected_codename'"
-        final_dc="$detected_codename"
-    else
-        market=$(rom_marketname_build)
-        if [ -n "$market" ]; then
-            mslug=$(slugify "$market")
-            reverse=$(reverse_codename_for "$mslug" "$work_dir/bin/ddevice/data/devices.json")
-            if [ -n "$reverse" ] && is_known_codename "$reverse"; then
-                mods "Codename '$final_dc' không dùng được -> dùng '$reverse' (suy từ tên máy '$market')"
-                final_dc="$reverse"
-            elif [ -n "$mslug" ]; then
-                mods "ROM không có codename -> dùng tên máy '$market' làm định danh file"
-                final_dc="$mslug"
-            fi
-        else
-            warn "Codename '$final_dc' không dùng được và ROM không có marketname."
-            warn "Tên file ROM sẽ không cho biết máy nào. Kiểm tra base ROM."
-        fi
-    fi
+if [ "$n_cands" -eq 0 ]; then
+    error "Không xác định được codename của ROM - DỪNG để không đặt sai tên file."
+    error "  OTA metadata : '${ota_dc:-<không có>}'"
+    error "  build.prop   : '${prop_dc:-<không có>}'"
+    error "  tên file ROM : '${file_dc:-<không có>}'"
+    error "Kiểm tra lại base ROM (gói 'mivendor' không chứa codename thiết bị)."
+    exit 1
 fi
 
-# Ghi ĐỒNG BỘ cả 2 file: tên zip lấy từ device_f.txt, còn thông báo Telegram
-# (notify.py) lấy từ device_code.txt. Trước đây chỉ một file được cập nhật nên
-# zip ra "mivendor" trong khi thông báo vẫn ghi đúng "SONGYUAN".
+if [ "$n_cands" -gt 1 ]; then
+    error "Các nguồn trong ROM ghi codename khác nhau - DỪNG để tránh đặt sai tên."
+    error "  OTA metadata : '${ota_dc:-<không có>}'"
+    error "  build.prop   : '${prop_dc:-<không có>}'"
+    error "  tên file ROM : '${file_dc:-<không có>}'"
+    error "Sửa base ROM (hoặc đổi tên file cho khớp) rồi build lại."
+    exit 1
+fi
+
+final_dc="$cands"
+[ "$final_dc" != "$file_dc" ] && mods "Codename: tên file ghi '$file_dc' -> dùng '$final_dc' (nguồn trong ROM)"
+mods "Codename: $final_dc"
+
+# Ghi ĐỒNG BỘ: tên zip lấy từ device_f.txt, thông báo Telegram lấy từ device_code.txt.
 device_f="$final_dc"
 echo "$device_f" > "$work_dir/bin/ddevice/device_f.txt"
 echo "$final_dc" > "$work_dir/bin/ddevice/device_code.txt"
