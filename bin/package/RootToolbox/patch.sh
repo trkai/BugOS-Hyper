@@ -1,25 +1,13 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0
 # ---------------------------------------------------------------------------
-# Root Toolbox - app do user tự làm (com.khai.roottoolbox), đóng gói vào ROM.
+# Root Toolbox - Package hệ thống nội bộ cung cấp giao diện cho Settings -> Toolbox.
 #
-# App tự chứa mọi thứ, ROM chỉ cần đặt đúng chỗ:
-#   assets/sukisu_ultra.apk                  -> bản manager dùng cho nút "Cài"
-#   assets/ZygiskNext+AlwaysStrongInject.zip -> module dùng cho nút "Flash"
-#   FileProvider com.khai.roottoolbox.fileprovider -> cấp module cho SukiSU
-#
-# Luồng trong app:
-#   1. Cài SukiSU: chép asset ra file, rồi chạy
-#        su -c "cp <apk> /data/local/tmp/sukisu.apk && pm install -r -d ... && rm -f ..."
-#      Có su (đã root) thì cài ngầm; chưa có su thì rơi về installer hệ thống
-#      (một lần bấm xác nhận). Đó là giới hạn của app, không phải của ROM.
-#   2. Flash module: ACTION_VIEW + application/zip + content:// -> SukiSU mở
-#      thẳng màn hình cài module (đúng intent-filter nó khai báo).
-#
-# Không cần privapp-permissions: app không xin quyền privileged nào, chỉ
-# REQUEST_INSTALL_PACKAGES (normal) + quyền storage kiểu cũ.
-#
-# Bật/tắt bằng cờ bugos_toolbox trong config.env.
+# Đã gỡ bỏ category.LAUNCHER trong AndroidManifest.xml:
+#   - Không hiển thị biểu tượng nào ngoài màn hình chính (tránh trùng lặp).
+#   - Chỉ mở được thông qua Cài đặt -> Toolbox (settings_headers.xml).
+#   - Tự chứa SukiSU manager (assets/sukisu_ultra.apk) và module
+#     (assets/ZygiskNext+AlwaysStrongInject.zip).
 # ---------------------------------------------------------------------------
 
 work_dir=$(pwd)
@@ -50,8 +38,6 @@ mkdir -p "$APP_DIR" || { warn "Toolbox: tạo thư mục thất bại"; exit 0; 
 cp -f "$SRC" "$APP_DIR/RootToolbox.apk" || { warn "Toolbox: copy APK thất bại"; exit 0; }
 chmod 0644 "$APP_DIR/RootToolbox.apk"
 
-# fspatch.py mặc định 0644 cho file mới / 0755 cho thư mục, đúng ý. Ghi rõ để
-# không phụ thuộc hành vi mặc định (đã từng bị ép 0750 với file .sh dưới /bin).
 FS_CFG="$IMG/config/product_fs_config"
 if [ -f "$FS_CFG" ]; then
     {
@@ -60,5 +46,5 @@ if [ -f "$FS_CFG" ]; then
     } >> "$FS_CFG"
 fi
 
-mods "Toolbox: product/app/RootToolbox ($(stat -c%s "$SRC") byte) - com.khai.roottoolbox"
+mods "Toolbox: cài đặt internal package -> product/app/RootToolbox ($(stat -c%s "$SRC") byte, không icon launcher)"
 exit 0
