@@ -271,12 +271,77 @@ if [ -n "$detected_codename" ]; then
     fi
 fi
 
-# Cảnh báo sớm: nếu codename vẫn không xác định được thì tên file zip sẽ vô
-# nghĩa (vd "mivendor"). In rõ ngay trong log thay vì để phát hiện sau khi flash.
+# Nếu vẫn không có codename hợp lệ: suy ngược từ tên thương mại.
+#
+# Nhiều base ROM dạng "mivendor" đã bị thay ro.product.device bằng chính chữ
+# "mivendor" nhưng vẫn giữ ro.product.marketname thật (vd "REDMI K100 Pro Max").
+# Khi đó: tra ngược devices.json (tên máy -> codename); không có thì lấy luôn
+# tên máy đã bỏ dấu cách làm định danh, thay vì để "mivendor" vô nghĩa.
+rom_marketname_build() {
+    local prop val
+    for prop in \
+        "$work_dir/build/baserom/images/product/etc/build.prop" \
+        "$work_dir/build/baserom/images/system/system/build.prop" \
+        "$work_dir/build/baserom/images/system_ext/etc/build.prop" \
+        "$work_dir/build/baserom/images/vendor/build.prop" \
+        "$work_dir/build/baserom/images/odm/etc/build.prop"; do
+        [ -f "$prop" ] || continue
+        val=$(grep -E "^ro\.(product|vendor|system|odm|system_ext)\.(product\.|vendor\.|system\.|odm\.|system_ext\.)?marketname=" "$prop" 2>/dev/null \
+            | head -n 1 | cut -d'=' -f2- | tr -d '\r\n' \
+            | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+        case "$val" in ""|null|unknown|miui|hyperos|bugos|mivendor) continue ;; esac
+        printf '%s' "$val"
+        return 0
+    done
+}
+
+slugify() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9'; }
+
+# Tra ngược devices.json: tên máy (đã slug hoá) -> codename.
+# Dùng awk thay jq cho nhẹ và khỏi phụ thuộc; dữ liệu chỉ là
+#   "annibale": "POCO F8 Pro|REDMI K90|Redmi K90",
+reverse_codename_for() {
+    local want="$1" file="$2"
+    [ -n "$want" ] && [ -f "$file" ] || return 0
+    awk -v want="$want" '
+        {
+            if (!match($0, /^[[:space:]]*"[^"]+"/)) next
+            key = substr($0, RSTART, RLENGTH)
+            gsub(/[[:space:]"]/, "", key)
+
+            if (!match($0, /:[[:space:]]*"[^"]*"/)) next
+            val = substr($0, RSTART + 1, RLENGTH - 1)
+            gsub(/^[[:space:]"]+/, "", val)
+            gsub(/[[:space:]"]+$/, "", val)
+
+            n = split(val, arr, "|")
+            for (i = 1; i <= n; i++) {
+                t = tolower(arr[i])
+                gsub(/[^a-z0-9]/, "", t)
+                if (t == want) { print key; exit }
+            }
+        }' "$file"
+}
+
 final_dc=$(cat "$work_dir/bin/ddevice/device_code.txt" 2>/dev/null | tr -d '\r\n ')
 if ! is_known_codename "$final_dc"; then
-    warn "Codename '$final_dc' không nằm trong danh sách thiết bị."
-    warn "Tên file ROM sẽ không cho biết máy nào. Kiểm tra base ROM (gói 'mivendor' không chứa codename)."
+    market=$(rom_marketname_build)
+    if [ -n "$market" ]; then
+        mslug=$(slugify "$market")
+        reverse=$(reverse_codename_for "$mslug" "$work_dir/bin/ddevice/data/devices.json")
+        if [ -n "$reverse" ] && is_known_codename "$reverse"; then
+            mods "Codename '$final_dc' không hợp lệ -> dùng '$reverse' (suy từ tên máy '$market')"
+            final_dc="$reverse"
+        elif [ -n "$mslug" ]; then
+            mods "ROM không có codename -> dùng tên máy '$market' làm định danh file"
+            final_dc="$mslug"
+        fi
+        echo "$final_dc" > "$work_dir/bin/ddevice/device_code.txt"
+        echo "$final_dc" > "$work_dir/bin/ddevice/device_f.txt"
+    else
+        warn "Codename '$final_dc' không nằm trong danh sách thiết bị và ROM không có marketname."
+        warn "Tên file ROM sẽ không cho biết máy nào. Kiểm tra base ROM."
+    fi
 fi
 
 getvar=$(cat "$work_dir/bin/ddevice/device_f.txt" 2>/dev/null)
