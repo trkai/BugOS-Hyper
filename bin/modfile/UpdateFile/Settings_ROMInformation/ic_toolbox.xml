@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icon mục Toolbox trong Cài đặt.
+  Hình học lấy đúng theo folder-icon-clean.svg (viewBox 1024):
+    - nền vuông bo góc 220, màu #70706e
+    - 4 ô vuông trắng bo góc 44, kích thước 234, xếp 2x2
+  Kích thước 28dp giữ nguyên như drawable gốc ic_other_advanced_settings
+  để không lệch layout của danh sách header.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28.0dip"
+    android:height="28.0dip"
+    android:viewportWidth="1024.0"
+    android:viewportHeight="1024.0">
+
+    <path
+        android:fillColor="#ff70706e"
+        android:pathData="M292,72 L732,72 A220,220 0 0 1 952,292 L952,732 A220,220 0 0 1 732,952 L292,952 A220,220 0 0 1 72,732 L72,292 A220,220 0 0 1 292,72 Z" />
+
+    <path
+        android:fillColor="#ffffffff"
+        android:pathData="M284,240 L430,240 A44,44 0 0 1 474,284 L474,430 A44,44 0 0 1 430,474 L284,474 A44,44 0 0 1 240,430 L240,284 A44,44 0 0 1 284,240 Z" />
+    <path
+        android:fillColor="#ffffffff"
+        android:pathData="M602,240 L748,240 A44,44 0 0 1 792,284 L792,430 A44,44 0 0 1 748,474 L602,474 A44,44 0 0 1 558,430 L558,284 A44,44 0 0 1 602,240 Z" />
+    <path
+        android:fillColor="#ffffffff"
+        android:pathData="M284,558 L430,558 A44,44 0 0 1 474,602 L474,748 A44,44 0 0 1 430,792 L284,792 A44,44 0 0 1 240,748 L240,602 A44,44 0 0 1 284,558 Z" />
+    <path
+        android:fillColor="#ffffffff"
+        android:pathData="M602,558 L748,558 A44,44 0 0 1 792,602 L792,748 A44,44 0 0 1 748,792 L602,792 A44,44 0 0 1 558,748 L558,602 A44,44 0 0 1 602,558 Z" />
+</vector>
