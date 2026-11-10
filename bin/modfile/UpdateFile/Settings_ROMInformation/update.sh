@@ -601,11 +601,38 @@ patch_settings_apk() {
         done
     fi
 
-    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ]; then
-        warn "Settings: không thay được asset lẫn string nào - giữ APK gốc"
+    mods "Settings: drawable=$total  string=$strings_done"
+
+    # ---- Icon mục Toolbox ------------------------------------------------
+    # Thay drawable ic_other_advanced_settings bằng icon riêng.
+    # Drawable này chỉ được 4 file XML của mục Toolbox tham chiếu (đã kiểm tra
+    # trực tiếp trên Settings.apk: settings_headers + top_level_settings*), nên
+    # đổi không ảnh hưởng mục nào khác. Có cả bản drawable-night-v8 nên phải
+    # thay hết mọi biến thể tìm được.
+    local tb_icon="$SRC_DIR/ic_toolbox.xml"
+    if [ -f "$tb_icon" ]; then
+        local tb_n=0 tb_f
+        while IFS= read -r tb_f; do
+            [ -n "$tb_f" ] || continue
+            cp -f "$tb_icon" "$tb_f" && tb_n=$((tb_n + 1))
+        done < <(find "$out" -path '*/res/drawable*' -name 'ic_other_advanced_settings.xml' 2>/dev/null)
+        if [ "$tb_n" -gt 0 ]; then
+            mods "Settings: icon Toolbox -> $tb_n drawable"
+        else
+            warn "Settings: không thấy drawable ic_other_advanced_settings để thay icon"
+        fi
+    fi
+
+    # ---- Menu: Tích hợp Toolbox vào Cài đặt -> Mod ------------------------
+    local mod_ok=0
+    if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
+        python3 "$SRC_DIR/patch_settings_mod.py" "$out" && mod_ok=1 || warn "Settings: tích hợp 'Mod' thất bại"
+    fi
+
+    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ] && [ "$mod_ok" -eq 0 ]; then
+        warn "Settings: không thay đổi được asset, string lẫn mục Mod - giữ APK gốc"
         return 1
     fi
-    mods "Settings: drawable=$total  string=$strings_done"
 
     # ---- smali: OS version ------------------------------------------------
     local p1
