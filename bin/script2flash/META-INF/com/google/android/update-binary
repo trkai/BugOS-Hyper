@@ -18,7 +18,73 @@ OUTFD=/proc/self/fd/$2
 # Dùng `echo` thường, KHÔNG `echo -e`: /sbin/sh của TWRP là mksh, nó in ra
 # nguyên chuỗi "-e ui_print ..." và recovery hiện rác.
 ui_print() { echo "ui_print $1" >> "$OUTFD"; echo "ui_print" >> "$OUTFD"; }
-abort_install() { ui_print " "; ui_print "!! $1"; ui_print " "; exit 1; }
+
+# ---------------------------------------------------------------------------
+# Chế độ "chậm mà mát".
+#
+# Nhiệt khi flash KHÔNG đến từ việc ghi UFS (ghi tuần tự rất nhanh) mà từ CPU:
+# `7zz t` băm CRC toàn bộ super.img.zst, rồi `zstd -d` giải nén — cả hai đều
+# chạy đơn luồng ở xung cao nhất. Recovery không có mi_thermald nên không tự hạ
+# xung, SoC bị ghim max freq suốt 1-2 phút và dồn nhiệt vào một điểm trên chip.
+#
+# Hạ trần xung xuống CPU_CAP_PERCENT% làm thời gian flash dài hơn nhưng nhiệt
+# toả trải đều hơn, đỉnh nhiệt thấp hơn rõ rệt. Đặt 100 để tắt hoàn toàn.
+#   65 -> chậm hơn ~1.5 lần, mát hơn rõ
+#   50 -> chậm hơn ~2 lần, mát nhất
+# ---------------------------------------------------------------------------
+CPU_CAP_PERCENT=${CPU_CAP_PERCENT:-65}
+CPU_SAVED=/tmp/bugos_cpu_saved
+
+thermal_low() {
+    : > "$CPU_SAVED" 2>/dev/null
+    case "$CPU_CAP_PERCENT" in ''|*[!0-9]*) return 0 ;; esac
+    [ "$CPU_CAP_PERCENT" -ge 100 ] && return 0
+
+    for d in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+        [ -d "$d" ] || continue
+        hi=$(cat "$d/cpuinfo_max_freq" 2>/dev/null)
+        case "$hi" in ''|*[!0-9]*) continue ;; esac
+        mx=$(cat "$d/scaling_max_freq" 2>/dev/null)
+        gv=$(cat "$d/scaling_governor" 2>/dev/null)
+        echo "$d $mx $gv" >> "$CPU_SAVED" 2>/dev/null
+
+        # Governor `performance` luôn kéo trần lên cpuinfo_max_freq và ghi đè
+        # scaling_max_freq ngay sau đó -> phải đổi governor TRƯỚC khi hạ trần,
+        # nếu không việc giới hạn xung sẽ không có tác dụng gì.
+        if [ "$gv" = "performance" ]; then
+            for cand in schedutil interactive ondemand; do
+                if grep -qw "$cand" "$d/scaling_available_governors" 2>/dev/null; then
+                    echo "$cand" > "$d/scaling_governor" 2>/dev/null
+                    break
+                fi
+            done
+        fi
+
+        echo $((hi * CPU_CAP_PERCENT / 100)) > "$d/scaling_max_freq" 2>/dev/null
+    done
+
+    # Vài kernel Qualcomm chỉ cho chỉnh qua node này.
+    if [ -f /sys/power/cpufreq_max_limit ]; then
+        hi=$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq 2>/dev/null)
+        case "$hi" in ''|*[!0-9]*) ;; *)
+            echo $((hi * CPU_CAP_PERCENT / 100)) > /sys/power/cpufreq_max_limit 2>/dev/null ;;
+        esac
+    fi
+}
+
+thermal_restore() {
+    [ -f "$CPU_SAVED" ] || return 0
+    while read -r d mx gv; do
+        [ -n "$d" ] || continue
+        # Trả trần xung trước rồi mới trả governor, để `performance` không kéo
+        # trần xuống thấp khi được bật lại.
+        [ -n "$mx" ] && echo "$mx" > "$d/scaling_max_freq" 2>/dev/null
+        [ -n "$gv" ] && echo "$gv" > "$d/scaling_governor" 2>/dev/null
+    done < "$CPU_SAVED"
+    rm -f "$CPU_SAVED" 2>/dev/null
+}
+
+abort_install() { thermal_restore; ui_print " "; ui_print "!! $1"; ui_print " "; exit 1; }
 
 if [ -z "$ZIP" ] || [ ! -f "$ZIP" ]; then
     ui_print "!! Không thấy file zip - recovery gọi sai tham số"
@@ -147,6 +213,11 @@ done
 ui_print " "
 ui_print "----- Ghi các phân vùng firmware -----"
 
+# Bật giới hạn xung ngay từ đầu để nhiệt không dồn từ những bước sau.
+thermal_low
+ui_print "> Chế độ giảm nhiệt: giới hạn CPU ${CPU_CAP_PERCENT}% (flash chậm hơn, mát hơn)"
+ui_print " "
+
 is_vab=0
 [ "$structure" = "VAB" ] && is_vab=1
 
@@ -168,6 +239,9 @@ flash_one() {
         ui_print "> $part"
         unzip -p "$ZIP" "images/$src" > "$target" 2>/dev/null || abort_install "Ghi $part thất bại"
     fi
+    # Đẩy dữ liệu xuống UFS rồi nghỉ ngắn: giữ duty-cycle thấp để máy không dồn nhiệt.
+    sync 2>/dev/null
+    sleep 1
     return 0
 }
 
@@ -235,6 +309,11 @@ for s in $super_entries; do
     esac
 done
 
+# Verify vừa băm CRC toàn bộ super (đơn luồng, rất nóng). Nghỉ một nhịp để
+# nhiệt tản bớt trước khi vào giai đoạn giải nén + ghi.
+ui_print "> Nghỉ 5 giây cho máy hạ nhiệt..."
+sleep 5
+
 for s in $super_entries; do
     case "$s" in
         *super.img.zst)
@@ -259,6 +338,12 @@ for s in $super_entries; do
             ;;
     esac
 done
+
+# Chốt dữ liệu xuống UFS trước khi trả quyền điều khiển.
+ui_print "> Đồng bộ bộ nhớ..."
+sync 2>/dev/null
+sleep 2
+thermal_restore
 
 # ---------------------------------------------------------------------------
 # Xoá dalvik cache để lần boot đầu không dùng dex cũ của ROM trước.
