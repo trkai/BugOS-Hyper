@@ -241,13 +241,11 @@ if [ -z "$detected_codename" ]; then
     done
 fi
 
-# Codename phải là tên CÓ THẬT trong danh sách thiết bị.
+# Codename: KHÔNG dùng danh sách thiết bị làm cổng chặn.
 #
-# Bản cũ chỉ chặn vài giá trị cụ thể (YourDevice / missi) nên mọi giá trị rác
-# khác vẫn lọt vào device_code.txt và cuối cùng thành tên file zip. Ca thật
-# (10/11): base ROM tên miui_mivendor_OS4.0.5.0.XGNCNXM_*.zip -> getROM.sh lấy
-# field 2 = "mivendor" -> ROM ra tên BugOS_mivendor_OS4.0.5.0.XGNCNXM_*.zip,
-# không cho biết máy nào.
+# Máy mới (vd K100 Pro Max - "songyuan") chưa có trong devices_data.txt; nếu
+# đòi "phải có trong DB" thì codename đúng sẽ bị loại oan. Ở đây chỉ loại các
+# giá trị rác đã biết, còn lại giữ nguyên.
 is_known_codename() {
     local c f
     c=$(echo "$1" | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
@@ -262,14 +260,12 @@ is_known_codename() {
     return 1
 }
 
-if [ -n "$detected_codename" ]; then
-    device_f="$detected_codename"
-    echo "$device_f" > "$work_dir/bin/ddevice/device_f.txt"
-    curr_dc=$(cat "$work_dir/bin/ddevice/device_code.txt" 2>/dev/null)
-    if ! is_known_codename "$curr_dc"; then
-        echo "$device_f" > "$work_dir/bin/ddevice/device_code.txt"
-    fi
-fi
+is_junk_codename() {
+    case "$(echo "$1" | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')" in
+        ""|yourdevice|missi|miproduct|mivendor|miui|hyperos|bugos|product|generic|unknown|xiaomi|device|phone|vendor|system|android) return 0 ;;
+    esac
+    return 1
+}
 
 # Nếu vẫn không có codename hợp lệ: suy ngược từ tên thương mại.
 #
@@ -323,26 +319,41 @@ reverse_codename_for() {
         }' "$file"
 }
 
+# Chốt codename theo thứ tự tin cậy:
+#   1. codename trong TÊN FILE ROM   (Xiaomi đặt tên file theo codename)
+#   2. codename đọc từ build.prop
+#   3. suy từ marketname (tra ngược devices.json) hoặc slug tên máy
 final_dc=$(cat "$work_dir/bin/ddevice/device_code.txt" 2>/dev/null | tr -d '\r\n ')
-if ! is_known_codename "$final_dc"; then
-    market=$(rom_marketname_build)
-    if [ -n "$market" ]; then
-        mslug=$(slugify "$market")
-        reverse=$(reverse_codename_for "$mslug" "$work_dir/bin/ddevice/data/devices.json")
-        if [ -n "$reverse" ] && is_known_codename "$reverse"; then
-            mods "Codename '$final_dc' không hợp lệ -> dùng '$reverse' (suy từ tên máy '$market')"
-            final_dc="$reverse"
-        elif [ -n "$mslug" ]; then
-            mods "ROM không có codename -> dùng tên máy '$market' làm định danh file"
-            final_dc="$mslug"
-        fi
-        echo "$final_dc" > "$work_dir/bin/ddevice/device_code.txt"
-        echo "$final_dc" > "$work_dir/bin/ddevice/device_f.txt"
+
+if is_junk_codename "$final_dc"; then
+    if [ -n "$detected_codename" ] && ! is_junk_codename "$detected_codename"; then
+        mods "Codename '$final_dc' không dùng được -> lấy từ build.prop: '$detected_codename'"
+        final_dc="$detected_codename"
     else
-        warn "Codename '$final_dc' không nằm trong danh sách thiết bị và ROM không có marketname."
-        warn "Tên file ROM sẽ không cho biết máy nào. Kiểm tra base ROM."
+        market=$(rom_marketname_build)
+        if [ -n "$market" ]; then
+            mslug=$(slugify "$market")
+            reverse=$(reverse_codename_for "$mslug" "$work_dir/bin/ddevice/data/devices.json")
+            if [ -n "$reverse" ] && is_known_codename "$reverse"; then
+                mods "Codename '$final_dc' không dùng được -> dùng '$reverse' (suy từ tên máy '$market')"
+                final_dc="$reverse"
+            elif [ -n "$mslug" ]; then
+                mods "ROM không có codename -> dùng tên máy '$market' làm định danh file"
+                final_dc="$mslug"
+            fi
+        else
+            warn "Codename '$final_dc' không dùng được và ROM không có marketname."
+            warn "Tên file ROM sẽ không cho biết máy nào. Kiểm tra base ROM."
+        fi
     fi
 fi
+
+# Ghi ĐỒNG BỘ cả 2 file: tên zip lấy từ device_f.txt, còn thông báo Telegram
+# (notify.py) lấy từ device_code.txt. Trước đây chỉ một file được cập nhật nên
+# zip ra "mivendor" trong khi thông báo vẫn ghi đúng "SONGYUAN".
+device_f="$final_dc"
+echo "$device_f" > "$work_dir/bin/ddevice/device_f.txt"
+echo "$final_dc" > "$work_dir/bin/ddevice/device_code.txt"
 
 getvar=$(cat "$work_dir/bin/ddevice/device_f.txt" 2>/dev/null)
 [ -z "$getvar" ] && getvar="$device_f"
