@@ -168,11 +168,6 @@ def build_message(status, rom_link):
     lines.append(f"<b>{html_esc(title_line)}</b>")
     lines.append(f"<b>{html_esc(xiaomi_version or 'Đang đọc bản dựng…')}</b>")
 
-    mode = get_toolbox_mode()
-    if mode:
-        label = "Kaorios (không root)" if mode == "kaorios" else "Root (BugOS)"
-        lines.append(f"🧰 Toolbox: {html_esc(label)}")
-
     rom_size = get_rom_size() if status_l == "success" else ""
     if rom_size:
         lines.append(f"📦 Dung lượng: {rom_size}")
