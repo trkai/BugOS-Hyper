@@ -6,6 +6,10 @@ BACKUP_DIR="$WORK_DIR/backup"
 SCRIPT_DIR="$work_dir/bin/package/COREPATCH"
 TOOLS_DIR="$work_dir/bin/apktool"
 source "${SCRIPT_DIR}/helper.sh"
+
+# AppSpoof: hàm apply_app_spoof() dùng chung (xem bin/package/AppSpoof/apply.sh)
+source "$work_dir/bin/package/AppSpoof/apply.sh"
+
 # Create backup directory
 mkdir -p "$BACKUP_DIR"
 
@@ -690,6 +694,11 @@ patch_framework() {
 
   # Apply feature-specific patches based on flags
   apply_framework_signature_patches "$decompile_dir"
+
+  # Spoof Build props theo từng app (game / Google Photos / ứng dụng).
+  # Đặt sau signature patches và trước recompile để smali com.bugos.spoof
+  # nằm trong framework.jar xuất ra.
+  apply_app_spoof "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
   # modify_invoke_custom_methods "$decompile_dir"

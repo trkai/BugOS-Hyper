@@ -14,6 +14,11 @@ chmod 777 ${work_dir}/bin/*
 chmod 777 ${work_dir}/bin/Linux/x86_64/*
 source $work_dir/functions.sh
 
+# ==================== TOOLBOX MODE (root / kaorios) ====================
+# Ghi lại config.env TRƯỚC mọi bước patch, vì các script sau đọc file này
+# bằng grep chứ không đọc biến môi trường. Xem bin/ddevice/apply_mode.sh.
+bash "$work_dir/bin/ddevice/apply_mode.sh"
+
 if [[ $(git branch --show-current) == "beta" ]]; then
     polyxver="$(cat Version)"
     status="Development"
@@ -208,6 +213,16 @@ bash "$work_dir/bin/package/SukiSU/patch.sh"
 # ==================== ROOT TOOLBOX (app của user) ====================
 # App tự chứa SukiSU manager + module; ROM chỉ đặt vào product/app.
 bash "$work_dir/bin/package/RootToolbox/patch.sh"
+
+# ==================== KAORIOS TOOLBOX (mode không root) ====================
+# Chỉ chạy khi toolbox_mode=kaorios. APK giữ nguyên chữ ký của Kaorios.
+bash "$work_dir/bin/package/KaoriosToolbox/patch.sh"
+
+# ==================== APP SPOOF (game / Photos / ứng dụng) ====================
+# Đóng profile mặc định vào /system/etc/bugos/app-spoof.json.
+# Phần patch framework.jar nằm trong apply_app_spoof() - a17 có bản inline,
+# a15/a16 source từ bin/package/AppSpoof/apply.sh.
+bash "$work_dir/bin/package/AppSpoof/patch.sh"
 
 # ==================== FIX TÊN CODENAME THIẾT BỊ ====================
 detected_codename=""

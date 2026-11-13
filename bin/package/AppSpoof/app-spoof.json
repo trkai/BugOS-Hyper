@@ -1,0 +1,112 @@
+{
+  "com.google.android.apps.photos": {
+    "enabled": true,
+    "label": "Google Photos",
+    "BRAND": "google",
+    "DEVICE": "marlin",
+    "MANUFACTURER": "Google",
+    "MODEL": "Pixel XL",
+    "FINGERPRINT": "google/marlin/marlin:10/QP1A.191005.007.A3/5972272:user/release-keys",
+    "PRODUCT": "marlin"
+  },
+  "com.garena.game.kgvn": {
+    "enabled": false,
+    "label": "Liên Quân Mobile",
+    "BRAND": "realme",
+    "DEVICE": "RE60B4L1",
+    "MANUFACTURER": "realme",
+    "MODEL": "RMX5101",
+    "FINGERPRINT": "realme/RMX5101IN/RE60B4L1:15/AP3A.240617.008/V.R4T2.26cec0e-80bb4e-80b757:user/release-keys",
+    "PRODUCT": "RMX5101IN"
+  },
+  "com.tencent.ig": {
+    "enabled": false,
+    "label": "PUBG Mobile",
+    "BRAND": "samsung",
+    "DEVICE": "m3q",
+    "MANUFACTURER": "samsung",
+    "MODEL": "SM-S948B",
+    "FINGERPRINT": "samsung/m3qxeea/m3q:16/BP4A.251205.006/S948BXXS4AZG5_OXM4AZG5:user/release-keys",
+    "PRODUCT": "m3qxeea"
+  },
+  "com.vng.pubgmobile": {
+    "enabled": false,
+    "label": "PUBG Mobile VNG",
+    "BRAND": "OnePlus",
+    "DEVICE": "OP60FFL1",
+    "MANUFACTURER": "OnePlus",
+    "MODEL": "PLK110",
+    "FINGERPRINT": "OnePlus/PLK110/OP60FFL1:17/CP2A.260605.016/B.3e2f3d0-1859d0c-1859d08:user/release-keys",
+    "PRODUCT": "PLK110"
+  },
+  "com.dts.freefireth": {
+    "enabled": false,
+    "label": "Free Fire",
+    "BRAND": "Infinix",
+    "DEVICE": "Infinix-X6891",
+    "MANUFACTURER": "INFINIX",
+    "MODEL": "X6891",
+    "FINGERPRINT": "Infinix/X6891-OP/Infinix-X6891:16/BP2A.250605.031.A3/301550032:user/release-keys",
+    "PRODUCT": "X6891-OP"
+  },
+  "com.dts.freefiremax": {
+    "enabled": false,
+    "label": "Free Fire Max",
+    "BRAND": "Infinix",
+    "DEVICE": "Infinix-X6891",
+    "MANUFACTURER": "INFINIX",
+    "MODEL": "X6891",
+    "FINGERPRINT": "Infinix/X6891-OP/Infinix-X6891:16/BP2A.250605.031.A3/301550032:user/release-keys",
+    "PRODUCT": "X6891-OP"
+  },
+  "com.activision.callofduty.shooter": {
+    "enabled": false,
+    "label": "Call of Duty: Mobile",
+    "BRAND": "Lenovo",
+    "DEVICE": "TB321FU",
+    "MANUFACTURER": "LENOVO",
+    "MODEL": "TB321FU",
+    "FINGERPRINT": "Lenovo/TB321FU/TB321FU:16/BQ2A.250610.001-BP2A.250605.031.A3/ZUI_17.5.10.031_251125_ROW:user/release-keys",
+    "PRODUCT": "TB321FU"
+  },
+  "com.miHoYo.GenshinImpact": {
+    "enabled": false,
+    "label": "Genshin Impact",
+    "BRAND": "nubia",
+    "DEVICE": "NX789J",
+    "MANUFACTURER": "ZTE",
+    "MODEL": "NX789J",
+    "FINGERPRINT": "nubia/NX789J-UN/NX789J:15/AQ3A.240812.002/RedMagicOS10.0.15_NX789J_GB:user/release-keys",
+    "PRODUCT": "NX789J-UN"
+  },
+  "com.mobile.legends": {
+    "enabled": false,
+    "label": "Mobile Legends",
+    "BRAND": "Lenovo",
+    "DEVICE": "TB321FU",
+    "MANUFACTURER": "LENOVO",
+    "MODEL": "TB321FU",
+    "FINGERPRINT": "Lenovo/TB321FU/TB321FU:16/BQ2A.250610.001-BP2A.250605.031.A3/ZUI_17.5.10.031_251125_ROW:user/release-keys",
+    "PRODUCT": "TB321FU"
+  },
+  "com.roblox.client": {
+    "enabled": false,
+    "label": "Roblox",
+    "BRAND": "OnePlus",
+    "DEVICE": "OP60FFL1",
+    "MANUFACTURER": "OnePlus",
+    "MODEL": "PLK110",
+    "FINGERPRINT": "OnePlus/PLK110/OP60FFL1:17/CP2A.260605.016/B.3e2f3d0-1859d0c-1859d08:user/release-keys",
+    "PRODUCT": "PLK110"
+  },
+  "com.riotgames.league.teamfighttactics": {
+    "enabled": false,
+    "label": "TFT",
+    "BRAND": "OnePlus",
+    "DEVICE": "OP60FFL1",
+    "MANUFACTURER": "OnePlus",
+    "MODEL": "PLK110",
+    "FINGERPRINT": "OnePlus/PLK110/OP60FFL1:17/CP2A.260605.016/B.3e2f3d0-1859d0c-1859d08:user/release-keys",
+    "PRODUCT": "PLK110"
+  }
+}

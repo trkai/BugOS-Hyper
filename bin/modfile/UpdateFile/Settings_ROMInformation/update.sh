@@ -625,6 +625,13 @@ patch_settings_apk() {
 
     # ---- Menu: Tích hợp Toolbox vào Cài đặt -> Mod ------------------------
     local mod_ok=0
+    # Target của mục Toolbox do bin/ddevice/apply_mode.sh ghi vào config.env
+    # (root -> com.khai.roottoolbox, kaorios -> com.kousei.kaorios). Truyền qua
+    # env để patch_settings_mod.py không phụ thuộc thư mục đang đứng.
+    if [ -f "$(pwd)/config.env" ]; then
+        export TOOLBOX_TARGET_PACKAGE="$(grep -m1 '^toolbox_target_package=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
+        export TOOLBOX_TARGET_CLASS="$(grep -m1 '^toolbox_target_class=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
+    fi
     if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
         python3 "$SRC_DIR/patch_settings_mod.py" "$out" && mod_ok=1 || warn "Settings: tích hợp 'Mod' thất bại"
     fi

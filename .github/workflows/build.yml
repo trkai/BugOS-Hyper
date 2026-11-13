@@ -6,6 +6,13 @@ on:
       input_url:
         description: 'URL'
         required: true
+      toolbox_mode:
+        description: 'Toolbox trong Settings: root = có root + BugOS Toolbox; kaorios = không root + Kaorios Toolbox'
+        type: choice
+        options:
+          - root
+          - kaorios
+        default: root
 
 jobs:
   Initialize:
@@ -102,6 +109,22 @@ jobs:
           "$CC" -Os -Wall -fno-stack-protector -static -no-pie -s -o "$OUT" "$SRC"
           file "$OUT"
           ls -la "$OUT"
+
+      - name: Apply toolbox mode
+        run: |
+          MODE="${{ inputs.toolbox_mode }}"
+          if [ -z "$MODE" ]; then MODE=root; fi
+          case "$MODE" in
+            root|kaorios) ;;
+            *) echo "toolbox_mode không hợp lệ: $MODE"; exit 1 ;;
+          esac
+          if grep -q '^toolbox_mode=' config.env; then
+            sed -i "s/^toolbox_mode=.*/toolbox_mode=$MODE/" config.env
+          else
+            echo "toolbox_mode=$MODE" >> config.env
+          fi
+          echo "--- toolbox_mode trong config.env ---"
+          grep -n '^toolbox_mode=' config.env
 
       - name: Build ROM...
         timeout-minutes: 90

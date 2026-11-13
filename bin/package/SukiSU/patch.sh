@@ -138,12 +138,68 @@ mods "SukiSU: module lkm-${ARCH}-${KMI}_kernelsu.ko ($(stat -c%s "$KO") byte)"
 OUT="$CACHE/boot_sukisu.img"
 rm -f "$OUT"
 
-mods "SukiSU: vá boot.img bằng ksud boot-patch-v2 (capsule trong kernel) ..."
-if ! "$KSUSD" boot-patch-v2 --boot "$BOOT" --module "$KO" --output "$OUT" --force; then
-    error "SukiSU: boot-patch-v2 THẤT BẠI - không vá được kernel trong boot.img"
-    error "SukiSU: ROM sẽ không có root. Đặt sukisu=false trong config.env để bỏ qua bước này."
+# ---------------------------------------------------------------------------
+# Chọn cách vá boot.img.
+#
+#   v2   - boot-patch-v2: nhúng kernelsu.ko vào CHÍNH kernel (capsule).
+#          Yêu cầu kernel là ARM64 Image "sạch": số byte phải đúng bằng
+#          image_size trong header. Nhiều máy Qualcomm (vd marble / Redmi Note
+#          12 Turbo) có DTB hoặc metadata gắn sau kernel -> ksud từ chối:
+#            "input has bytes beyond ARM64 image_size; appended DTB/metadata
+#             is unsupported"
+#
+#   v1   - boot-patch: nhét ksuinit + kernelsu.ko vào RAMDISK, kernel giữ nguyên.
+#          Không quan tâm DTB gắn sau, nhưng cần boot.img có ramdisk thật và
+#          boot header v3+ (Android 13 trở lên).
+#
+#   auto - thử v2 trước, hỏng thì tự chuyển v1. Mặc định.
+#
+# Đặt sukisu_patch_mode=v1|v2 trong config.env để ép một đường.
+# ---------------------------------------------------------------------------
+PATCH_MODE=$(grep -m1 '^sukisu_patch_mode=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+[ -z "$PATCH_MODE" ] && PATCH_MODE=auto
+
+patch_v2() {
+    mods "SukiSU: vá boot.img bằng ksud boot-patch-v2 (capsule trong kernel) ..."
+    "$KSUSD" boot-patch-v2 --boot "$BOOT" --module "$KO" --output "$OUT" --force
+}
+
+patch_v1() {
+    local outdir="$CACHE/v1"
+    rm -rf "$outdir"
+    mkdir -p "$outdir"
+
+    mods "SukiSU: vá boot.img bằng ksud boot-patch (ramdisk, kernel giữ nguyên) ..."
+    "$KSUSD" boot-patch --boot "$BOOT" --module "$KO" --out "$outdir" --out-name boot_v1.img || return 1
+
+    if [ ! -s "$outdir/boot_v1.img" ]; then
+        warn "SukiSU: boot-patch báo xong nhưng không thấy boot_v1.img"
+        return 1
+    fi
+    mv -f "$outdir/boot_v1.img" "$OUT"
+}
+
+sukisu_fail() {
+    error "SukiSU: KHÔNG vá được boot.img - ROM sẽ không có root."
+    error "SukiSU: đặt sukisu=false trong config.env nếu muốn bỏ qua hẳn bước này."
     exit 1
-fi
+}
+
+case "$PATCH_MODE" in
+    v2)
+        patch_v2 || sukisu_fail
+        ;;
+    v1)
+        patch_v1 || sukisu_fail
+        ;;
+    auto|*)
+        if ! patch_v2; then
+            warn "SukiSU: boot-patch-v2 không dùng được cho boot.img này (thường do DTB gắn sau kernel)."
+            warn "SukiSU: chuyển sang boot-patch (ramdisk) ..."
+            patch_v1 || sukisu_fail
+        fi
+        ;;
+esac
 
 if [ ! -s "$OUT" ]; then
     error "SukiSU: ksud báo thành công nhưng không tạo ra file - dừng"

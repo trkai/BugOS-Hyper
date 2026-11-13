@@ -22,6 +22,33 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+DEFAULT_PKG = "com.khai.roottoolbox"
+DEFAULT_CLS = "com.khai.roottoolbox.MainActivity"
+
+# Mọi package từng dùng cho mục Toolbox — để gỡ bản cũ trước khi chèn bản mới.
+TOOLBOX_PKG_RE = r"(?:com\.khai\.roottoolbox|com\.kousei\.kaorios)"
+
+
+def _read_config_value(key):
+    """Đọc một dòng KEY=VALUE trong config.env (build.sh chạy từ repo root)."""
+    for path in ("config.env", os.path.join(os.getcwd(), "config.env")):
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith(key + "="):
+                        return line.split("=", 1)[1].strip()
+        except OSError:
+            continue
+    return ""
+
+
+def toolbox_target():
+    """Package/class cho mục Toolbox: env trước, rồi config.env, rồi mặc định."""
+    pkg = os.environ.get("TOOLBOX_TARGET_PACKAGE", "").strip() or _read_config_value("toolbox_target_package")
+    cls = os.environ.get("TOOLBOX_TARGET_CLASS", "").strip() or _read_config_value("toolbox_target_class")
+    return (pkg or DEFAULT_PKG), (cls or DEFAULT_CLS)
+
 
 def read_file(path):
     try:
@@ -49,17 +76,20 @@ def patch_settings_headers(file_path):
     if not content:
         return False
 
-    if "com.khai.roottoolbox" in content:
+    pkg, cls = toolbox_target()
+
+    if pkg in content:
         # Chỉ coi là "đã patch" khi header có android:id. Bản cũ thiếu id nên bị
         # MiuiSettings ẩn; gặp trường hợp đó thì gỡ ra rồi chèn lại bên dưới.
         has_id = re.search(
-            r'<header\b[^>]*android:id="[^"]*"[^>]*>\s*<intent[^>]*com\.khai\.roottoolbox',
+            r'<header\b[^>]*android:id="[^"]*"[^>]*>\s*<intent[^>]*' + re.escape(pkg),
             content, re.S)
         if has_id:
             return True
-        content = re.sub(
-            r'\s*<header\b[^>]*?>\s*<intent[^>]*?com\.khai\.roottoolbox[^>]*?/>\s*</header>',
-            '', content, flags=re.S)
+    # Gỡ header Toolbox cũ — bất kể package nào (đổi mode root <-> kaorios).
+    content = re.sub(
+        r'\s*<header\b[^>]*?>\s*<intent[^>]*?' + TOOLBOX_PKG_RE + r'[^>]*?/>\s*</header>',
+        '', content, flags=re.S)
 
     # Gỡ bỏ các thẻ cũ (nếu có)
     content = re.sub(
@@ -100,8 +130,8 @@ def patch_settings_headers(file_path):
         '\n  <header android:icon="@drawable/ic_other_advanced_settings"'
         '\n          android:id="@android:id/title"'
         '\n          android:title="Toolbox">'
-        '\n    <intent android:targetPackage="com.khai.roottoolbox"'
-        '\n            android:targetClass="com.khai.roottoolbox.MainActivity" />'
+        f'\n    <intent android:targetPackage="{pkg}"'
+        f'\n            android:targetClass="{cls}" />'
         '\n  </header>'
     )
 
@@ -120,7 +150,9 @@ def patch_top_level_settings(file_path):
     if not content:
         return False
 
-    if "com.khai.roottoolbox" in content:
+    pkg, cls = toolbox_target()
+
+    if pkg in content:
         return True
 
     # Gỡ bỏ các thẻ cũ (nếu có)
@@ -142,6 +174,16 @@ def patch_top_level_settings(file_path):
         content,
         flags=re.S
     )
+    # Preference Toolbox do bản trước chèn (không có android:key) — nhận diện
+    # bằng Intent trỏ tới package Toolbox, để đổi mode root <-> kaorios không
+    # sinh ra hai mục trùng.
+    content = re.sub(
+        r'\s*<com\.android\.settings\.widget\.HomepagePreference\b[^>]*?>\s*<intent[^>]*?'
+        + TOOLBOX_PKG_RE + r'[^>]*?/>\s*</com\.android\.settings\.widget\.HomepagePreference>',
+        '',
+        content,
+        flags=re.S
+    )
 
     pattern = re.compile(
         r'(<(?:com\.android\.settings\.widget\.(?:HomepagePreference|RestrictedHomepagePreference)|Preference)\b[^>]*?android:key="top_level_about_(?:device|phone)"[^>]*?(?:/>|>.*?</[^>]+>))',
@@ -156,8 +198,8 @@ def patch_top_level_settings(file_path):
         '\n    <com.android.settings.widget.HomepagePreference android:icon="@drawable/ic_other_advanced_settings"'
         '\n                          android:title="Toolbox"'
         '\n                          android:order="-9">'
-        '\n        <intent android:targetPackage="com.khai.roottoolbox"'
-        '\n                android:targetClass="com.khai.roottoolbox.MainActivity" />'
+        f'\n        <intent android:targetPackage="{pkg}"'
+        f'\n                android:targetClass="{cls}" />'
         '\n    </com.android.settings.widget.HomepagePreference>'
     )
 
