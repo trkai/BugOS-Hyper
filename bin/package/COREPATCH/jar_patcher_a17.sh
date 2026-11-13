@@ -15,6 +15,9 @@ BACKUP_DIR="$WORK_DIR/backup"
 SCRIPT_DIR="$work_dir/bin/package/COREPATCH"
 TOOLS_DIR="$work_dir/bin/apktool"
 source "${SCRIPT_DIR}/helper.sh"
+
+# SecureShot: cho phép chụp màn hình ở cửa sổ FLAG_SECURE
+source "${SCRIPT_DIR}/secure_windows.sh"
 # Create backup directory
 mkdir -p "$BACKUP_DIR"
 
@@ -1474,6 +1477,9 @@ patch_services() {
   apply_services_signature_patches "$decompile_dir"
   apply_a17_extra_services "$decompile_dir"
   inject_windowstate_bypass_stub "$decompile_dir"
+
+  # Cho phép chụp màn hình ở app có FLAG_SECURE (ngân hàng, DRM...)
+  apply_no_secure_windows "$decompile_dir"
   #apply_services_disable_secure_flag "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)

@@ -10,6 +10,9 @@ source "${SCRIPT_DIR}/helper.sh"
 # AppSpoof: hàm apply_app_spoof() dùng chung (xem bin/package/AppSpoof/apply.sh)
 source "$work_dir/bin/package/AppSpoof/apply.sh"
 
+# SecureShot: cho phép chụp màn hình ở cửa sổ FLAG_SECURE
+source "${SCRIPT_DIR}/secure_windows.sh"
+
 # Create backup directory
 mkdir -p "$BACKUP_DIR"
 INVOKE_DIR="$work_dir/bin/package/COREPATCH/INVOKE"
@@ -869,6 +872,9 @@ patch_services() {
 
   # Apply feature-specific patches based on flags
   apply_services_signature_patches "$decompile_dir"
+
+  # Cho phép chụp màn hình ở app có FLAG_SECURE (ngân hàng, DRM...)
+  apply_no_secure_windows "$decompile_dir"
 
   # Modify invoke-custom methods (common to all features)
   modify_invoke_custom_methods "$decompile_dir"
