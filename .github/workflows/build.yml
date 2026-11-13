@@ -13,6 +13,7 @@ jobs:
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+      TELEGRAM_GROUP_ID: ${{ secrets.TELEGRAM_GROUP_ID }}
       BUILDER_NAME: "iabi"
       BUILDER_ID: ${{ secrets.TELEGRAM_OWNER_ID }}
     steps:
