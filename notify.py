@@ -187,81 +187,139 @@ def build_message(status, rom_link):
 
     return "\n".join(lines)
 
-def send_notification(status, rom_link, channel_id, bot_token, builder_id="", download_link=""):
-    is_success = status.lower() == 'success'
 
-    run_url = ""
-    if os.environ.get("GITHUB_SERVER_URL") and os.environ.get("GITHUB_REPOSITORY") and os.environ.get("GITHUB_RUN_ID"):
-        run_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+def _get_run_url():
+    """Trả về URL của GitHub Actions run hiện tại (nếu có)."""
+    server = os.environ.get("GITHUB_SERVER_URL")
+    repo   = os.environ.get("GITHUB_REPOSITORY")
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    if server and repo and run_id:
+        return f"{server}/{repo}/actions/runs/{run_id}"
+    return ""
 
-    message = build_message(status, rom_link)
-    if is_success and not is_available(download_link):
-        message += "\n\n⚠️ <i>Upload lên Drive/Gofile thất bại — chưa có link tải.</i>"
 
-    payload = {
-        "text": message,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True
-    }
+def _send_telegram(bot_token, chat_id, payload, label=""):
+    """Gửi một tin nhắn Telegram với retry.
 
-    buttons = []
-    if is_success:
-        if is_available(download_link):
-            buttons.append([{"text": "⬇️ Tải ROM", "url": download_link}])
-    elif is_available(run_url):
-        buttons.append([{"text": "Mở log GitHub Actions", "url": run_url}])
-
-    if buttons:
-        payload["reply_markup"] = json.dumps({"inline_keyboard": buttons})
-
-    target_chat_id = builder_id if is_available(builder_id) else channel_id
-    if not is_available(target_chat_id):
-        print("Lỗi: Không tìm thấy ID chat để gửi báo cáo.")
-        return
-
-    payload["chat_id"] = target_chat_id
-    print(f"[notify] status={status} link={download_link!r} chat={target_chat_id}")
-
-    # Runner GitHub (Azure) KHÔNG phải lúc nào cũng có route tới api.telegram.org:
-    # gặp thật 05/11 - "Failed to establish a new connection: [Errno 101] Network
-    # is unreachable". Lần chạy khác lại được, nên thử lại vài lần là đủ.
-    #
-    # Hàm này KHÔNG bao giờ ném ra ngoài: thông báo hỏng không được phép biến một
-    # bản ROM đã build + upload thành công thành job đỏ.
+    Trả về True nếu gửi thành công, False nếu thất bại.
+    Không bao giờ raise exception ra ngoài.
+    """
+    tag = f"[notify:{label}]" if label else "[notify]"
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload["chat_id"] = chat_id
     attempts = 4
+    last_error = None
+
     for i in range(1, attempts + 1):
         try:
             response = requests.post(url, json=payload, timeout=25)
             if not response.ok:
-                print(f"Telegram trả lỗi: {response.status_code} {response.text}")
+                print(f"{tag} Telegram trả lỗi: {response.status_code} {response.text}")
             response.raise_for_status()
-            print("[notify] đã gửi")
-            return
+            print(f"{tag} đã gửi → {chat_id}")
+            return True
         except Exception as e:
-            print(f"Lỗi khi gửi thông báo (lần {i}/{attempts}): {e}")
+            last_error = e
+            print(f"{tag} lỗi (lần {i}/{attempts}): {e}")
             if i < attempts:
                 delay = 5 * i
-                print(f"[notify] thử lại sau {delay}s…")
+                print(f"{tag} thử lại sau {delay}s…")
                 time.sleep(delay)
 
-    print("[notify] bỏ qua thông báo Telegram - ROM và link tải vẫn hợp lệ.")
+    print(f"{tag} bỏ cuộc sau {attempts} lần → {chat_id} | lỗi cuối: {last_error}")
+    return False
+
+
+def send_notification(status, rom_link, channel_id, bot_token,
+                      builder_id="", download_link="", group_id=""):
+    is_success = status.lower() == 'success'
+    run_url = _get_run_url()
+
+    # ── Tạo nội dung tin nhắn chính ──────────────────────────────
+    message = build_message(status, rom_link)
+    if is_success and not is_available(download_link):
+        message += "\n\n⚠️ <i>Upload lên Drive/Gofile thất bại — chưa có link tải.</i>"
+
+    payload_base = {
+        "text": message,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+
+    # ── Nút bấm riêng cho builder (có log) và group (không log) ──
+    builder_buttons = []
+    group_buttons   = []
+
+    if is_success and is_available(download_link):
+        # Cả hai đều có nút tải ROM
+        btn_download = [{"text": "⬇️ Tải ROM", "url": download_link}]
+        builder_buttons.append(btn_download)
+        group_buttons.append(btn_download)
+    elif not is_success and is_available(run_url):
+        # Chỉ builder mới thấy nút log — nhóm không cần
+        builder_buttons.append([{"text": "Mở log GitHub Actions", "url": run_url}])
+
+    payload_builder = dict(payload_base)
+    payload_group   = dict(payload_base)
+
+    if builder_buttons:
+        payload_builder["reply_markup"] = json.dumps({"inline_keyboard": builder_buttons})
+    if group_buttons:
+        payload_group["reply_markup"] = json.dumps({"inline_keyboard": group_buttons})
+
+    # ── 1. Gửi vào chat chính (builder hoặc channel) ─────────────
+    target_chat_id = builder_id if is_available(builder_id) else channel_id
+    if is_available(target_chat_id):
+        print(f"[notify] status={status} link={download_link!r} chat={target_chat_id}")
+        _send_telegram(bot_token, target_chat_id, payload_builder, label="main")
+    else:
+        print("[notify] không tìm thấy ID chat chính — bỏ qua.")
+
+    # ── 2. Gửi vào nhóm (group) ──────────────────────────────────
+    if is_available(group_id):
+        print(f"[notify:group] gửi vào nhóm {group_id}")
+        group_ok = _send_telegram(bot_token, group_id, payload_group, label="group")
+
+        if not group_ok:
+            # Gửi nhóm thất bại → báo riêng cho builder kèm link log
+            alert_target = builder_id if is_available(builder_id) else channel_id
+            if is_available(alert_target):
+                alert_lines = [
+                    "⚠️ <b>Không gửi được tin nhắn vào nhóm</b>",
+                    f"Group ID: <code>{html_esc(group_id)}</code>",
+                ]
+                if run_url:
+                    alert_lines.append(f"🔗 <a href='{html_esc(run_url)}'>Xem log GitHub Actions</a>")
+                else:
+                    alert_lines.append("<i>Không tìm thấy link log (chạy ngoài GitHub Actions).</i>")
+
+                alert_payload = {
+                    "text": "\n".join(alert_lines),
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True,
+                }
+                _send_telegram(bot_token, alert_target, alert_payload, label="group-fail-alert")
+    else:
+        print("[notify:group] TELEGRAM_GROUP_ID không được đặt — bỏ qua gửi nhóm.")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         sys.exit(1)
 
-    status = sys.argv[1]
-    rom_link = sys.argv[3]
-    builder_id = sys.argv[6] if len(sys.argv) > 6 else ""
-    download_link = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] else os.environ.get("DOWNLOAD_LINK", "")
+    status        = sys.argv[1]
+    rom_link      = sys.argv[3]
+    builder_id    = sys.argv[6] if len(sys.argv) > 6 else ""
+    download_link = (sys.argv[7] if len(sys.argv) > 7 and sys.argv[7]
+                     else os.environ.get("DOWNLOAD_LINK", ""))
 
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    bot_token  = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
+    group_id   = os.environ.get("TELEGRAM_GROUP_ID", "")   # ← MỚI
 
     if not bot_token:
         print("[notify] thiếu TELEGRAM_BOT_TOKEN - bỏ qua, không tính là build lỗi.")
         sys.exit(0)
 
-    send_notification(status, rom_link, channel_id, bot_token, builder_id, download_link)
+    send_notification(status, rom_link, channel_id, bot_token,
+                      builder_id, download_link, group_id)

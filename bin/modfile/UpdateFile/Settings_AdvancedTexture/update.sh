@@ -4,7 +4,7 @@ source $work_dir/functions.sh
 # Unlock Advanced Texture
 if ! is_property_exists persist.sys.background_blur_supported build/baserom/images/product/etc/build.prop; then
     echo "persist.sys.background_blur_supported=true" >> build/baserom/images/product/etc/build.prop
-    echo "persist.sys.background_blur_version=2" >> build/baserom/images/product/etc/build.prop
+    echo "persist.sys.background_blur_version=4" >> build/baserom/images/product/etc/build.prop
 else
     sed -i "s/persist.sys.background_blur_supported=.*/persist.sys.background_blur_supported=true/" build/baserom/images/product/etc/build.prop
 fi
