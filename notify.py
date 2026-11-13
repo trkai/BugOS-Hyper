@@ -232,31 +232,42 @@ def send_notification(status, rom_link, channel_id, bot_token,
         "disable_web_page_preview": True,
     }
 
-    buttons = []
-    if is_success:
-        if is_available(download_link):
-            buttons.append([{"text": "⬇️ Tải ROM", "url": download_link}])
-    elif is_available(run_url):
-        buttons.append([{"text": "Mở log GitHub Actions", "url": run_url}])
+    # ── Nút bấm riêng cho builder (có log) và group (không log) ──
+    builder_buttons = []
+    group_buttons   = []
 
-    if buttons:
-        payload_base["reply_markup"] = json.dumps({"inline_keyboard": buttons})
+    if is_success and is_available(download_link):
+        # Cả hai đều có nút tải ROM
+        btn_download = [{"text": "⬇️ Tải ROM", "url": download_link}]
+        builder_buttons.append(btn_download)
+        group_buttons.append(btn_download)
+    elif not is_success and is_available(run_url):
+        # Chỉ builder mới thấy nút log — nhóm không cần
+        builder_buttons.append([{"text": "Mở log GitHub Actions", "url": run_url}])
+
+    payload_builder = dict(payload_base)
+    payload_group   = dict(payload_base)
+
+    if builder_buttons:
+        payload_builder["reply_markup"] = json.dumps({"inline_keyboard": builder_buttons})
+    if group_buttons:
+        payload_group["reply_markup"] = json.dumps({"inline_keyboard": group_buttons})
 
     # ── 1. Gửi vào chat chính (builder hoặc channel) ─────────────
     target_chat_id = builder_id if is_available(builder_id) else channel_id
     if is_available(target_chat_id):
         print(f"[notify] status={status} link={download_link!r} chat={target_chat_id}")
-        _send_telegram(bot_token, target_chat_id, dict(payload_base), label="main")
+        _send_telegram(bot_token, target_chat_id, payload_builder, label="main")
     else:
         print("[notify] không tìm thấy ID chat chính — bỏ qua.")
 
     # ── 2. Gửi vào nhóm (group) ──────────────────────────────────
     if is_available(group_id):
         print(f"[notify:group] gửi vào nhóm {group_id}")
-        group_ok = _send_telegram(bot_token, group_id, dict(payload_base), label="group")
+        group_ok = _send_telegram(bot_token, group_id, payload_group, label="group")
 
         if not group_ok:
-            # Gửi thất bại → báo riêng cho builder kèm link log
+            # Gửi nhóm thất bại → báo riêng cho builder kèm link log
             alert_target = builder_id if is_available(builder_id) else channel_id
             if is_available(alert_target):
                 alert_lines = [
