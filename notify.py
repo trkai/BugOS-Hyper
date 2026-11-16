@@ -246,61 +246,27 @@ def send_notification(status, rom_link, channel_id, bot_token,
         "disable_web_page_preview": True,
     }
 
-    # ── Nút bấm riêng cho builder (có log) và group (không log) ──
-    builder_buttons = []
-    group_buttons   = []
+    # ── Nút bấm: chỉ gửi cho builder nên luôn kèm link tải và log ─
+    buttons = []
 
     if is_success and is_available(download_link):
-        # Cả hai đều có nút tải ROM
-        btn_download = [{"text": "⬇️ Tải ROM", "url": download_link}]
-        builder_buttons.append(btn_download)
-        group_buttons.append(btn_download)
+        buttons.append([{"text": "⬇️ Tải ROM", "url": download_link}])
     elif not is_success and is_available(run_url):
-        # Chỉ builder mới thấy nút log — nhóm không cần
-        builder_buttons.append([{"text": "Mở log GitHub Actions", "url": run_url}])
+        buttons.append([{"text": "Mở log GitHub Actions", "url": run_url}])
 
     payload_builder = dict(payload_base)
-    payload_group   = dict(payload_base)
+    if buttons:
+        payload_builder["reply_markup"] = json.dumps({"inline_keyboard": buttons})
 
-    if builder_buttons:
-        payload_builder["reply_markup"] = json.dumps({"inline_keyboard": builder_buttons})
-    if group_buttons:
-        payload_group["reply_markup"] = json.dumps({"inline_keyboard": group_buttons})
-
-    # ── 1. Gửi vào chat chính (builder hoặc channel) ─────────────
-    target_chat_id = builder_id if is_available(builder_id) else channel_id
+    # ── Chỉ gửi cho builder (không gửi nhóm, không gửi channel) ──
+    # group_id/channel_id vẫn giữ trong chữ ký hàm để không phá vỡ lời gọi cũ,
+    # nhưng không dùng: ROM và link tải chỉ gửi riêng cho người build.
+    target_chat_id = builder_id
     if is_available(target_chat_id):
         print(f"[notify] status={status} link={download_link!r} chat={target_chat_id}")
         _send_telegram(bot_token, target_chat_id, payload_builder, label="main")
     else:
-        print("[notify] không tìm thấy ID chat chính — bỏ qua.")
-
-    # ── 2. Gửi vào nhóm (group) ──────────────────────────────────
-    if is_available(group_id):
-        print(f"[notify:group] gửi vào nhóm {group_id}")
-        group_ok = _send_telegram(bot_token, group_id, payload_group, label="group")
-
-        if not group_ok:
-            # Gửi nhóm thất bại → báo riêng cho builder kèm link log
-            alert_target = builder_id if is_available(builder_id) else channel_id
-            if is_available(alert_target):
-                alert_lines = [
-                    "⚠️ <b>Không gửi được tin nhắn vào nhóm</b>",
-                    f"Group ID: <code>{html_esc(group_id)}</code>",
-                ]
-                if run_url:
-                    alert_lines.append(f"🔗 <a href='{html_esc(run_url)}'>Xem log GitHub Actions</a>")
-                else:
-                    alert_lines.append("<i>Không tìm thấy link log (chạy ngoài GitHub Actions).</i>")
-
-                alert_payload = {
-                    "text": "\n".join(alert_lines),
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": True,
-                }
-                _send_telegram(bot_token, alert_target, alert_payload, label="group-fail-alert")
-    else:
-        print("[notify:group] TELEGRAM_GROUP_ID không được đặt — bỏ qua gửi nhóm.")
+        print("[notify] thiếu BUILDER_ID (TELEGRAM_OWNER_ID) — không gửi, tránh lộ link ra nơi khác.")
 
 
 if __name__ == "__main__":
@@ -315,11 +281,11 @@ if __name__ == "__main__":
 
     bot_token  = os.environ.get("TELEGRAM_BOT_TOKEN")
     channel_id = os.environ.get("TELEGRAM_CHANNEL_ID")
-    group_id   = os.environ.get("TELEGRAM_GROUP_ID", "")   # ← MỚI
 
     if not bot_token:
         print("[notify] thiếu TELEGRAM_BOT_TOKEN - bỏ qua, không tính là build lỗi.")
         sys.exit(0)
 
+    # Chỉ gửi cho người build. Không còn gửi vào nhóm.
     send_notification(status, rom_link, channel_id, bot_token,
-                      builder_id, download_link, group_id)
+                      builder_id, download_link)

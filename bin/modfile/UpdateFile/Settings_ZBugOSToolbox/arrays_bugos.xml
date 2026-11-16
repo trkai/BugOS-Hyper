@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="bugos_perf_entries">
+        <item>Tiết kiệm pin</item>
+        <item>Cân bằng</item>
+        <item>Hiệu năng</item>
+    </string-array>
+    <string-array name="bugos_perf_values">
+        <item>savings</item>
+        <item>balanced</item>
+        <item>performance</item>
+    </string-array>
+
+    <string-array name="bugos_lang_entries">
+        <item>Tiếng Việt</item>
+        <item>Tiếng Anh</item>
+    </string-array>
+    <string-array name="bugos_lang_values">
+        <item>vi-VN</item>
+        <item>en-US</item>
+    </string-array>
+
+    <string-array name="bugos_theme_entries">
+        <item>Sáng</item>
+        <item>Tối</item>
+    </string-array>
+    <string-array name="bugos_theme_values">
+        <item>light</item>
+        <item>dark</item>
+    </string-array>
+</resources>

@@ -127,7 +127,7 @@ def patch_settings_headers(file_path):
     # Nên dùng id có sẵn của framework: khác namespace (0x0102xxxx) với id của
     # Settings (0x7f0bxxxx) nên không đụng id nào khác trong danh sách.
     mod_header = (
-        '\n  <header android:icon="@drawable/ic_other_advanced_settings"'
+        '\n  <header android:icon="@drawable/ic_bugos_toolbox"'
         '\n          android:id="@android:id/title"'
         '\n          android:title="Toolbox">'
         f'\n    <intent android:targetPackage="{pkg}"'
@@ -195,7 +195,7 @@ def patch_top_level_settings(file_path):
         return False
 
     mod_pref = (
-        '\n    <com.android.settings.widget.HomepagePreference android:icon="@drawable/ic_other_advanced_settings"'
+        '\n    <com.android.settings.widget.HomepagePreference android:icon="@drawable/ic_bugos_toolbox"'
         '\n                          android:title="Toolbox"'
         '\n                          android:order="-9">'
         f'\n        <intent android:targetPackage="{pkg}"'

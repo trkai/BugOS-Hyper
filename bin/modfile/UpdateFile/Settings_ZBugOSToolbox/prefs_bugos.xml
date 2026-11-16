@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceCategory android:title="BugOS Toolbox">
+
+    <!-- Mức hiệu năng: tiết kiệm / cân bằng / hiệu năng -->
+    <ListPreference
+        android:key="bugos_performance_level"
+        android:title="Mức hiệu năng"
+        android:summary="Chọn mức hiệu năng và mức tiêu thụ pin"
+        android:entries="@array/bugos_perf_entries"
+        android:entryValues="@array/bugos_perf_values"
+        android:defaultValue="balanced" />
+
+    <!-- Spoof ứng dụng -->
+    <SwitchPreference
+        android:key="bugos_app_spoof_enabled"
+        android:title="Spoof ứng dụng"
+        android:summary="Giả thông tin thiết bị cho các ứng dụng được chọn"
+        android:defaultValue="false" />
+
+    <!-- Ngôn ngữ -->
+    <ListPreference
+        android:key="bugos_language"
+        android:title="Ngôn ngữ"
+        android:summary="Chọn ngôn ngữ giao diện"
+        android:entries="@array/bugos_lang_entries"
+        android:entryValues="@array/bugos_lang_values"
+        android:defaultValue="vi-VN" />
+
+    <!-- Giao diện -->
+    <ListPreference
+        android:key="bugos_theme"
+        android:title="Giao diện"
+        android:summary="Chọn chế độ giao diện"
+        android:entries="@array/bugos_theme_entries"
+        android:entryValues="@array/bugos_theme_values"
+        android:defaultValue="light" />
+
+</PreferenceCategory>

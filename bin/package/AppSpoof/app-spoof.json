@@ -20,7 +20,7 @@
     "PRODUCT": "RMX5101IN"
   },
   "com.tencent.ig": {
-    "enabled": false,
+    "enabled": true,
     "label": "PUBG Mobile",
     "BRAND": "samsung",
     "DEVICE": "m3q",
@@ -40,7 +40,7 @@
     "PRODUCT": "PLK110"
   },
   "com.dts.freefireth": {
-    "enabled": false,
+    "enabled": true,
     "label": "Free Fire",
     "BRAND": "Infinix",
     "DEVICE": "Infinix-X6891",
@@ -80,7 +80,7 @@
     "PRODUCT": "NX789J-UN"
   },
   "com.mobile.legends": {
-    "enabled": false,
+    "enabled": true,
     "label": "Mobile Legends",
     "BRAND": "Lenovo",
     "DEVICE": "TB321FU",

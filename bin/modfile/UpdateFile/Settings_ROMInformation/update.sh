@@ -609,17 +609,17 @@ patch_settings_apk() {
     # trực tiếp trên Settings.apk: settings_headers + top_level_settings*), nên
     # đổi không ảnh hưởng mục nào khác. Có cả bản drawable-night-v8 nên phải
     # thay hết mọi biến thể tìm được.
-    local tb_icon="$SRC_DIR/ic_toolbox.xml"
+    local tb_icon="$SRC_DIR/ic_bugos_toolbox.xml"
     if [ -f "$tb_icon" ]; then
-        local tb_n=0 tb_f
-        while IFS= read -r tb_f; do
-            [ -n "$tb_f" ] || continue
-            cp -f "$tb_icon" "$tb_f" && tb_n=$((tb_n + 1))
-        done < <(find "$out" -path '*/res/drawable*' -name 'ic_other_advanced_settings.xml' 2>/dev/null)
+        local tb_n=0 d
+        while IFS= read -r d; do
+            [ -n "$d" ] || continue
+            cp -f "$tb_icon" "$d/ic_bugos_toolbox.xml" && tb_n=$((tb_n + 1))
+        done < <(find "$out" -path '*/res/drawable*' -type d 2>/dev/null)
         if [ "$tb_n" -gt 0 ]; then
-            mods "Settings: icon Toolbox -> $tb_n drawable"
+            mods "Settings: them drawable ic_bugos_toolbox -> $tb_n thu muc"
         else
-            warn "Settings: không thấy drawable ic_other_advanced_settings để thay icon"
+            warn "Settings: khong thu muc drawable de them icon"
         fi
     fi
 
@@ -634,6 +634,95 @@ patch_settings_apk() {
     fi
     if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
         python3 "$SRC_DIR/patch_settings_mod.py" "$out" && mod_ok=1 || warn "Settings: tích hợp 'Mod' thất bại"
+    fi
+
+    # ---- Preferences: BugOS Toolbox (ngôn ngữ, theme, spoof, hiệu năng) ----
+    local bugos_prefs_ok=0
+    local bugos_src_dir="$SRC_DIR/../Settings_ZBugOSToolbox"
+    local prefs_xml="$bugos_src_dir/prefs_bugos.xml"
+    local arrays_xml="$bugos_src_dir/arrays_bugos.xml"
+    local receiver_smali="$bugos_src_dir/BugOSBootReceiver.smali"
+
+    if [ -f "$prefs_xml" ] && [ -f "$arrays_xml" ] && [ -f "$receiver_smali" ]; then
+        # 1. Thêm arrays_bugos.xml vào các thư mục values
+        while IFS= read -r values_dir; do
+            [ -n "$values_dir" ] || continue
+            cp -f "$arrays_xml" "$values_dir/arrays_bugos.xml" 2>/dev/null && \
+                mods "Settings: thêm arrays_bugos.xml -> $values_dir"
+        done < <(find "$out" -type d -name "values*" -path "*/res/*" 2>/dev/null)
+
+        # 2. Chèn PreferenceCategory BugOS Toolbox vào top_level_settings*.xml
+        while IFS= read -r tls; do
+            [ -n "$tls" ] || continue
+            if grep -q "BugOS Toolbox" "$tls" 2>/dev/null; then
+                continue
+            fi
+            python3 - "$tls" "$prefs_xml" << 'PYEOF'
+import sys
+tls_path, prefs_path = sys.argv[1], sys.argv[2]
+with open(tls_path, 'r', encoding='utf-8', errors='replace') as f:
+    content = f.read()
+with open(prefs_path, 'r', encoding='utf-8', errors='replace') as f:
+    prefs = f.read().strip()
+if 'BugOS Toolbox' in content:
+    sys.exit(0)
+marker = '</PreferenceScreen>'
+idx = content.rfind(marker)
+if idx < 0:
+    content = content.rstrip() + '\n' + prefs + '\n'
+else:
+    content = content[:idx] + prefs + '\n' + content[idx:]
+with open(tls_path, 'w', encoding='utf-8', newline='\n') as f:
+    f.write(content)
+print(f"  [OK] Đã chèn PreferenceCategory BugOS Toolbox vào {tls_path}")
+PYEOF
+            bugos_prefs_ok=1
+        done < <(find "$out" -type f -name "top_level_settings*.xml" 2>/dev/null)
+
+        # 3. Thêm BugOSBootReceiver.smali vào thư mục smali đầu tiên (tránh trùng lớp đa dex)
+        local smali_added=0
+        while IFS= read -r smali_dir; do
+            [ -n "$smali_dir" ] || continue
+            if [ "$smali_added" -eq 1 ]; then
+                continue
+            fi
+            mkdir -p "$smali_dir/com/bugos/settings"
+            cp -f "$receiver_smali" "$smali_dir/com/bugos/settings/BugOSBootReceiver.smali" && \
+                mods "Settings: thêm BugOSBootReceiver.smali" && smali_added=1
+        done < <(find "$out" -type d \( -name "smali" -o -name "smali_classes*" \) 2>/dev/null | sort | head -n 1)
+
+        # 4. Sửa AndroidManifest.xml: thêm permission + receiver
+        while IFS= read -r manifest; do
+            [ -n "$manifest" ] || continue
+            if grep -q "BugOSBootReceiver" "$manifest" 2>/dev/null; then
+                continue
+            fi
+            python3 - "$manifest" << 'PYEOF'
+import sys
+manifest_path = sys.argv[1]
+with open(manifest_path, 'r', encoding='utf-8', errors='replace') as f:
+    content = f.read()
+if 'BugOSBootReceiver' in content:
+    sys.exit(0)
+perm = '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n'
+receiver = '    <receiver android:name="com.bugos.settings.BugOSBootReceiver" android:enabled="true" android:exported="false">\n        <intent-filter>\n            <action android:name="android.intent.action.BOOT_COMPLETED" />\n        </intent-filter>\n    </receiver>\n'
+marker = '</manifest>'
+idx = content.rfind(marker)
+if idx < 0:
+    content = content.rstrip() + '\n' + perm + receiver + '</manifest>\n'
+else:
+    content = content[:idx] + perm + receiver + content[idx:]
+with open(manifest_path, 'w', encoding='utf-8', newline='\n') as f:
+    f.write(content)
+print(f"  [OK] Đã đăng ký BugOSBootReceiver trong {manifest_path}")
+PYEOF
+            mods "Settings: đăng ký BugOSBootReceiver trong AndroidManifest.xml"
+        done < <(find "$out" -type f -name "AndroidManifest.xml" 2>/dev/null)
+
+        if [ "$bugos_prefs_ok" -eq 1 ]; then
+            mods "Settings: Đã thêm phần mềm BugOS Toolbox (ngôn ngữ, theme, spoof, hiệu năng)"
+            mod_ok=1
+        fi
     fi
 
     if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ] && [ "$mod_ok" -eq 0 ]; then

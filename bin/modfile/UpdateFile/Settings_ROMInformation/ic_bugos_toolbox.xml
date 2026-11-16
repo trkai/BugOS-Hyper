@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icon mục Toolbox trong Cài đặt - resource RIÊNG, không dùng chung với
+  ic_other_advanced_settings của mục "Cài đặt bổ sung".
+
+  Vì sao phải tách: bản trước ghi đè chính file ic_other_advanced_settings.xml,
+  mà drawable đó còn được mục "Cài đặt bổ sung" dùng -> hai mục ra cùng một
+  icon xám, và icon gốc của Cài đặt bổ sung bị mất.
+
+  Hình học: nền vuông bo góc + lưới 2x2, cùng tỉ lệ với icon lưới cũ nhưng
+  đổi sang màu xanh #3482FF để đồng bộ với dải icon màu của HyperOS 4
+  (Wi-Fi, Bluetooth, Ứng dụng... đều là ô màu bo góc + glyph trắng).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28.0dip"
+    android:height="28.0dip"
+    android:viewportWidth="1024.0"
+    android:viewportHeight="1024.0">
+
+    <!-- nền bo góc -->
+    <path
+        android:fillColor="#FF3482FF"
+        android:pathData="M292,72 L732,72 A220,220 0 0 1 952,292 L952,732 A220,220 0 0 1 732,952 L292,952 A220,220 0 0 1 72,732 L72,292 A220,220 0 0 1 292,72 Z" />
+
+    <!-- 4 ô trắng 2x2 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M284,240 L430,240 A44,44 0 0 1 474,284 L474,430 A44,44 0 0 1 430,474 L284,474 A44,44 0 0 1 240,430 L240,284 A44,44 0 0 1 284,240 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M602,240 L748,240 A44,44 0 0 1 792,284 L792,430 A44,44 0 0 1 748,474 L602,474 A44,44 0 0 1 558,430 L558,284 A44,44 0 0 1 602,240 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M284,558 L430,558 A44,44 0 0 1 474,602 L474,748 A44,44 0 0 1 430,792 L284,792 A44,44 0 0 1 240,748 L240,602 A44,44 0 0 1 284,558 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M602,558 L748,558 A44,44 0 0 1 792,602 L792,748 A44,44 0 0 1 748,792 L602,792 A44,44 0 0 1 558,748 L558,602 A44,44 0 0 1 602,558 Z" />
+</vector>
