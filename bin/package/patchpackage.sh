@@ -16,6 +16,12 @@ bash $target_dir/DISABLE_AVB/DISABLEavb.sh
 bash $target_dir/NOTIFICATION_FIX/notificationFIX.sh
 bash $target_dir/RefreshRate/1hz.sh
 
+# FPS Limitations Patcher (Kashi, Unlicense): bỏ giới hạn FPS do PowerKeeper và
+# Joyose áp lên. PHẢI chạy SAU COREPATCH - APK bị sửa sẽ sai chữ ký, mà COREPATCH
+# chính là bước bypass kiểm tra chữ ký trong framework.jar. Chạy trước = APK bị
+# từ chối nạp. Script tự bỏ qua nếu ROM không có PowerKeeper/Joyose.
+bash $target_dir/FPS_LIMITATION_PATCH/fps_limitation_patch.sh
+
 # ---------------------------------------------------------------------------
 # Chốt chặn cuối chuỗi jar: FcmWakeFilter phải còn trong CẢ HAI jar.
 #
