@@ -374,6 +374,33 @@ info "Done"
 bash $work_dir/bin/modfile/OS3/insmod.sh
 bash $work_dir/bin/modfile/OS4/insmod.sh
 bash $work_dir/bin/modfile/Universal/insfile.sh
+
+# ==================== THỨ TỰ BẮT BUỘC - ĐỌC TRƯỚC KHI ĐỔI ====================
+# 1. PRECHINAFIX    -> vá 5 file bằng bảng patch method (69 file / 209 method):
+#                      MiuiSystemUI, PowerKeeper, Settings, miui-services.jar,
+#                      miui-framework.jar. Mỗi dex có bảng riêng
+#                      (patches/<ten>-classesN.json).
+# 2. insupdate.sh   -> FCM_NotificationFix (nếu bật) CHÈN FcmWakeFilter vào 2 jar;
+#                      Settings_ROMInformation decode lại Settings.apk ĐÃ VÁ rồi
+#                      mới gắn branding.
+# 3. patchpackage.sh -> COREPATCH decompile rồi VÁ + GHI ĐÈ services.jar,
+#                      miui-services.jar, miui-framework.jar; NOTIFICATION_FIX vá
+#                      tiếp; cuối cùng fcm_final_check kiểm FcmWakeFilter.
+#
+# RÀNG BUỘC CHÍNH: COREPATCH GHI ĐÈ 2 jar bằng bản nó tự build, nên nó phải chạy
+# TRÊN bản mà PRECHINAFIX vừa vá (giữ 209 method + thêm bypass chữ ký).
+# Đảo thứ tự (patchpackage trước, PRECHINAFIX sau) -> mất toàn bộ patch de-China
+# và mất luôn bypass chữ ký -> ROM không boot.
+#
+# Patch dùng "thay thân method" chứ không chèn byte thô, nên vẫn sống sau khi
+# COREPATCH decompile + build lại jar.
+#
+# LƯU Ý FCM: vector V4 của FCM_NotificationFix cũng vá
+# BroadcastQueueModernStubImpl.checkApplicationAutoStart - trùng method với bộ
+# này. FCM anchor theo tên class/method nên vẫn khớp, nhưng đó là chỗ hai bộ
+# giành nhau cùng một method, nên mặc định đã TẮT bằng fcm_notification_fix.
+# =============================================================================
+bash $work_dir/bin/package/PRECHINAFIX/apply.sh
 bash $work_dir/bin/modfile/UpdateFile/insupdate.sh
 bash $work_dir/bin/package/patchpackage.sh
 

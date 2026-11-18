@@ -38,6 +38,15 @@ fcm_final_check() {
     region=$(cat "$work_dir/bin/ddevice/device_type.txt" 2>/dev/null | tr -d '\r\n ')
     [ "$region" = "China" ] || return 0
 
+    # fcm_notification_fix=false: FCM_NotificationFix không chèn FcmWakeFilter,
+    # nên chốt chặn này sẽ fail oan. Bỏ qua kiểm tra thay vì bắt build dừng.
+    local fcm_on
+    fcm_on=$(grep -m1 '^fcm_notification_fix=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    if [ "$fcm_on" = "false" ]; then
+        mods "FCM final check: BỎ QUA (fcm_notification_fix=false)"
+        return 0
+    fi
+
     # grep thẳng lên jar chỉ đúng khi dex được lưu uncompressed (các bước đóng gói
     # của repo đều dùng 7za -mx=0 nên thường đúng). Nếu jar bị nén lại thì grep
     # trượt oan, nên fallback: giải nén từng dex rồi tìm.
