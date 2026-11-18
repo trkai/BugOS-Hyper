@@ -365,30 +365,32 @@ bash $work_dir/bin/modfile/OS4/insmod.sh
 bash $work_dir/bin/modfile/Universal/insfile.sh
 
 # ==================== THỨ TỰ BẮT BUỘC - ĐỌC TRƯỚC KHI ĐỔI ====================
-# 1. PRECHINAFIX    -> vá 5 file bằng bảng patch method (69 file / 209 method):
+# 1. PRECHINAFIX    -> vá bộ máy hệ thống (69 file / 209 method):
 #                      MiuiSystemUI, PowerKeeper, Settings, miui-services.jar,
 #                      miui-framework.jar. Mỗi dex có bảng riêng
 #                      (patches/<ten>-classesN.json).
-# 2. insupdate.sh   -> Settings_ROMInformation decode lại Settings.apk ĐÃ VÁ rồi
+# 2. FEATURE_UNLOCK -> vá tính năng người dùng (22 file / 38 method):
+#                      mở chụp màn hình, bỏ giới hạn FPS, cửa sổ nổi,
+#                      Android/data, mua theme/vault, SetupWizard, bỏ chặn 10s.
+#                      Cũng vá services.jar (PRECHINAFIX KHÔNG đụng services.jar).
+# 3. insupdate.sh   -> Settings_ROMInformation decode lại Settings.apk ĐÃ VÁ rồi
 #                      mới gắn branding.
-# 3. patchpackage.sh -> COREPATCH decompile rồi VÁ + GHI ĐÈ services.jar,
-#                      miui-services.jar, miui-framework.jar; NOTIFICATION_FIX vá
-#                      tiếp.
+# 4. patchpackage.sh -> COREPATCH decompile rồi VÁ + GHI ĐÈ cả 4 jar
+#                      (framework, services, miui-services, miui-framework);
+#                      NOTIFICATION_FIX vá tiếp.
 #
-# RÀNG BUỘC CHÍNH: COREPATCH GHI ĐÈ 2 jar bằng bản nó tự build, nên nó phải chạy
-# TRÊN bản mà PRECHINAFIX vừa vá (giữ 209 method + thêm bypass chữ ký).
-# Đảo thứ tự (patchpackage trước, PRECHINAFIX sau) -> mất toàn bộ patch de-China
-# và mất luôn bypass chữ ký -> ROM không boot.
+# RÀNG BUỘC CHÍNH: COREPATCH GHI ĐÈ 4 jar bằng bản nó tự build, nên nó phải chạy
+# TRÊN bản mà PRECHINAFIX + FEATURE_UNLOCK vừa vá. Đảo thứ tự -> mất toàn bộ
+# patch và mất luôn bypass chữ ký -> ROM không boot.
 #
-# Patch dùng "thay thân method" chứ không chèn byte thô, nên vẫn sống sau khi
-# COREPATCH decompile + build lại jar.
+# Hai bộ patch độc lập nhau (không file nào trùng), nên thứ tự giữa chúng không
+# quan trọng; nhưng cả hai PHẢI đứng trước patchpackage.sh.
 #
-# LƯU Ý FCM: vector V4 của FCM_NotificationFix cũng vá
-# BroadcastQueueModernStubImpl.checkApplicationAutoStart - trùng method với bộ
-# này. FCM anchor theo tên class/method nên vẫn khớp, nhưng đó là chỗ hai bộ
-# giành nhau cùng một method, nên mặc định đã TẮT bằng fcm_notification_fix.
+# Patch dùng "thay thân method" nên vẫn sống sau khi COREPATCH decompile + build
+# lại jar.
 # =============================================================================
 bash $work_dir/bin/package/PRECHINAFIX/apply.sh
+bash $work_dir/bin/package/FEATURE_UNLOCK/apply.sh
 bash $work_dir/bin/modfile/UpdateFile/insupdate.sh
 bash $work_dir/bin/package/patchpackage.sh
 

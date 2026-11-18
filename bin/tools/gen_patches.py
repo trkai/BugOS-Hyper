@@ -16,7 +16,7 @@ import os
 import re
 import sys
 
-META_RE = re.compile(r'\s*\.(line|local|param|prologue|end local|source)\b')
+META_RE = re.compile(r'\s*\.(line|local|param|prologue|end local|source|restart)\b')
 
 
 def read_methods(path):
@@ -89,8 +89,8 @@ def main():
                 obody = om.get(sig)
                 if obody is None:
                     added[sig] = nbody          # method mới thêm
-                elif strip_meta(obody) != strip_meta(nbody):
-                    methods[sig] = nbody        # thân đổi
+                elif norm_labels(strip_meta(obody)) != norm_labels(strip_meta(nbody)):
+                    methods[sig] = nbody        # thân đổi THẬT (không chỉ label)
             entry = {}
             if methods:
                 entry['methods'] = methods

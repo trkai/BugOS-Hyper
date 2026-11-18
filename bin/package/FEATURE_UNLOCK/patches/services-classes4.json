@@ -1,0 +1,51 @@
+{
+ "com/android/server/wm/ActivityTaskManagerService$LocalService.smali": {
+  "methods": {
+   "public showSystemReadyErrorDialogsIfNeeded()V": [
+    ".method public showSystemReadyErrorDialogsIfNeeded()V",
+    "    .registers 2",
+    "",
+    "    return-void",
+    ".end method"
+   ]
+  }
+ },
+ "com/android/server/wm/ActivityTaskManagerService.smali": {
+  "methods": {
+   "public registerScreenCaptureObserver(Landroid/os/IBinder;Landroid/app/IScreenCaptureObserver;)V": [
+    ".method public registerScreenCaptureObserver(Landroid/os/IBinder;Landroid/app/IScreenCaptureObserver;)V",
+    "    .registers 4",
+    "",
+    "    return-void",
+    ".end method"
+   ],
+   "public unregisterScreenCaptureObserver(Landroid/os/IBinder;Landroid/app/IScreenCaptureObserver;)V": [
+    ".method public unregisterScreenCaptureObserver(Landroid/os/IBinder;Landroid/app/IScreenCaptureObserver;)V",
+    "    .registers 4",
+    "",
+    "    return-void",
+    ".end method"
+   ]
+  }
+ },
+ "com/android/server/wm/WindowState.smali": {
+  "methods": {
+   "isSecureLocked()Z": [
+    ".method isSecureLocked()Z",
+    "    .registers 2",
+    "",
+    "    const/4 v0, 0x0",
+    "",
+    "    return v0",
+    ".end method"
+   ],
+   "setSecureLocked(Z)V": [
+    ".method setSecureLocked(Z)V",
+    "    .registers 3",
+    "",
+    "    return-void",
+    ".end method"
+   ]
+  }
+ }
+}

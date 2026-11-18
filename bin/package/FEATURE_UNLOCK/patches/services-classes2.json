@@ -1,0 +1,35 @@
+{
+ "com/android/server/devicepolicy/DevicePolicyCacheImpl.smali": {
+  "methods": {
+   "public isScreenCaptureAllowed(I)Z": [
+    ".method public isScreenCaptureAllowed(I)Z",
+    "    .registers 3",
+    "",
+    "    const/4 v0, 0x1",
+    "",
+    "    return v0",
+    ".end method"
+   ]
+  }
+ },
+ "com/android/server/devicepolicy/DevicePolicyManagerService.smali": {
+  "methods": {
+   "public getScreenCaptureDisabled(Landroid/content/ComponentName;IZ)Z": [
+    ".method public getScreenCaptureDisabled(Landroid/content/ComponentName;IZ)Z",
+    "    .registers 5",
+    "",
+    "    const/4 v0, 0x0",
+    "",
+    "    return v0",
+    ".end method"
+   ],
+   "public setScreenCaptureDisabled(Landroid/content/ComponentName;Ljava/lang/String;ZZ)V": [
+    ".method public setScreenCaptureDisabled(Landroid/content/ComponentName;Ljava/lang/String;ZZ)V",
+    "    .registers 6",
+    "",
+    "    return-void",
+    ".end method"
+   ]
+  }
+ }
+}

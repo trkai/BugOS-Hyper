@@ -1,0 +1,47 @@
+{
+ "com/miui/powerkeeper/feedbackcontrol/ThermalManager.smali": {
+  "methods": {
+   "public displayControl(I)V": [
+    ".method public displayControl(I)V",
+    "    .registers 3",
+    "",
+    "    return-void",
+    ".end method"
+   ],
+   "public getDisplayCtrlCode()I": [
+    ".method public getDisplayCtrlCode()I",
+    "    .registers 2",
+    "",
+    "    const/4 v0, 0x0",
+    "",
+    "    return v0",
+    ".end method"
+   ]
+  }
+ },
+ "com/miui/powerkeeper/statemachine/DisplayFrameSetting.smali": {
+  "methods": {
+   "private setScreenEffect(Ljava/lang/String;II)V": [
+    ".method private setScreenEffect(Ljava/lang/String;II)V",
+    "    .registers 5",
+    "",
+    "    return-void",
+    ".end method"
+   ],
+   "private setScreenEffectInternal(IILjava/lang/String;)V": [
+    ".method private setScreenEffectInternal(IILjava/lang/String;)V",
+    "    .registers 5",
+    "",
+    "    return-void",
+    ".end method"
+   ],
+   "public setScreenEffect(II)V": [
+    ".method public setScreenEffect(II)V",
+    "    .registers 4",
+    "",
+    "    return-void",
+    ".end method"
+   ]
+  }
+ }
+}
