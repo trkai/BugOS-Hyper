@@ -7,11 +7,10 @@ on:
         description: 'URL'
         required: true
       toolbox_mode:
-        description: 'Toolbox trong Settings: root = có root + BugOS Toolbox; kaorios = không root + Kaorios Toolbox'
+        description: 'Toolbox trong Settings: chỉ còn root (có root + BugOS Toolbox). Mode kaorios đã xoá.'
         type: choice
         options:
           - root
-          - kaorios
         default: root
 
 jobs:
@@ -71,51 +70,12 @@ jobs:
         run: |
           sudo chmod 777 -R *
 
-      - name: Build prop-fix helper
-        run: |
-          set -e
-          SRC="bin/package/BugOSPropFix/bugos_propfix.c"
-          OUT="bin/package/BugOSPropFix/bugos_propfix"
-          if [ ! -f "$SRC" ]; then
-            echo "Không có $SRC - bỏ qua"
-            exit 0
-          fi
-
-          # Không dùng NDK: zip r27c giải nén ~5GB, runner hết đĩa giữa lúc unzip
-          # (ENOSPC trong liblldb.so) và chết cả job. Binary chỉ cần libc chuẩn,
-          # nên cross-gcc của Ubuntu (~120MB) là đủ và không phụ thuộc bionic.
-          #
-          # Phải kèm libc6-dev-arm64-cross: nếu thiếu, gcc không thấy sysroot
-          # arm64 và lấy nhầm /usr/include của host -> "bits/libc-header-start.h:
-          # No such file". `--no-install-recommends` KHÔNG cài kèm gói này.
-          CC=aarch64-linux-gnu-gcc
-          if ! command -v "$CC" >/dev/null 2>&1; then
-            echo "Cài cross-compiler aarch64 ..."
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq \
-              gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-          fi
-          "$CC" --version | head -1
-          echo "sysroot: $(aarch64-linux-gnu-gcc -print-sysroot)"
-
-          # Tự kiểm tra phần ghi serial bằng gcc của máy build TRƯỚC khi đóng
-          # binary vào ROM. Đây là chỗ từng sai mà không báo lỗi: serial giữ
-          # byte độ dài cũ -> bionic đọc lại value sai độ dài.
-          gcc -O1 -Wall -DBUGOS_SELFTEST -o /tmp/propfix_selftest "$SRC"
-          /tmp/propfix_selftest --selftest
-
-          # -static + -no-pie: ELF tĩnh không cần loader động, chạy được trên
-          # Android (kernel Linux, không đụng bionic).
-          "$CC" -Os -Wall -fno-stack-protector -static -no-pie -s -o "$OUT" "$SRC"
-          file "$OUT"
-          ls -la "$OUT"
-
       - name: Apply toolbox mode
         run: |
           MODE="${{ inputs.toolbox_mode }}"
           if [ -z "$MODE" ]; then MODE=root; fi
           case "$MODE" in
-            root|kaorios) ;;
+            root) ;;
             *) echo "toolbox_mode không hợp lệ: $MODE"; exit 1 ;;
           esac
           if grep -q '^toolbox_mode=' config.env; then

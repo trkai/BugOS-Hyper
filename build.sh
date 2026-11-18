@@ -210,19 +210,9 @@ done
 # trên các image hiện có. Vá boot.img sau đó là vbmeta lệch.
 bash "$work_dir/bin/package/SukiSU/patch.sh"
 
-# ==================== ROOT TOOLBOX (app của user) ====================
-# App tự chứa SukiSU manager + module; ROM chỉ đặt vào product/app.
-bash "$work_dir/bin/package/RootToolbox/patch.sh"
-
-# ==================== KAORIOS TOOLBOX (mode không root) ====================
-# Chỉ chạy khi toolbox_mode=kaorios. APK giữ nguyên chữ ký của Kaorios.
-bash "$work_dir/bin/package/KaoriosToolbox/patch.sh"
-
-# ==================== APP SPOOF (game / Photos / ứng dụng) ====================
-# Đóng profile mặc định vào /system/etc/bugos/app-spoof.json.
-# Phần patch framework.jar nằm trong apply_app_spoof() - a17 có bản inline,
-# a15/a16 source từ bin/package/AppSpoof/apply.sh.
-bash "$work_dir/bin/package/AppSpoof/patch.sh"
+# RootToolbox / KaoriosToolbox / AppSpoof / FPS_LIMITATION_PATCH đã bị xoá.
+# ROM giờ: root sẵn bằng SukiSU, không spoof, không giới hạn FPS patcher.
+# Bộ vá de-China nằm ở bin/package/PRECHINAFIX (xem dưới).
 
 # ==================== FIX TÊN CODENAME THIẾT BỊ ====================
 detected_codename=""
@@ -371,7 +361,6 @@ bash $work_dir/bin/ddevice/DEBLOAT/debloat.sh
 info "Done"
 
 # OS1/OS2 da bi xoa: chung chi co dispatcher, khong co mod nao ben trong.
-bash $work_dir/bin/modfile/OS3/insmod.sh
 bash $work_dir/bin/modfile/OS4/insmod.sh
 bash $work_dir/bin/modfile/Universal/insfile.sh
 
@@ -380,12 +369,11 @@ bash $work_dir/bin/modfile/Universal/insfile.sh
 #                      MiuiSystemUI, PowerKeeper, Settings, miui-services.jar,
 #                      miui-framework.jar. Mỗi dex có bảng riêng
 #                      (patches/<ten>-classesN.json).
-# 2. insupdate.sh   -> FCM_NotificationFix (nếu bật) CHÈN FcmWakeFilter vào 2 jar;
-#                      Settings_ROMInformation decode lại Settings.apk ĐÃ VÁ rồi
+# 2. insupdate.sh   -> Settings_ROMInformation decode lại Settings.apk ĐÃ VÁ rồi
 #                      mới gắn branding.
 # 3. patchpackage.sh -> COREPATCH decompile rồi VÁ + GHI ĐÈ services.jar,
 #                      miui-services.jar, miui-framework.jar; NOTIFICATION_FIX vá
-#                      tiếp; cuối cùng fcm_final_check kiểm FcmWakeFilter.
+#                      tiếp.
 #
 # RÀNG BUỘC CHÍNH: COREPATCH GHI ĐÈ 2 jar bằng bản nó tự build, nên nó phải chạy
 # TRÊN bản mà PRECHINAFIX vừa vá (giữ 209 method + thêm bypass chữ ký).
