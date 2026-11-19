@@ -603,7 +603,99 @@ patch_settings_apk() {
 
     mods "Settings: drawable=$total  string=$strings_done"
 
-    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ]; then
+    # ---- Bản vá "About phone kiểu ColorOS" (kashi) -----------------------
+    # 7 resource mới: 2 layout, 2 vector drawable, 2 PNG nền card phiên bản,
+    # và id storage_progress_kchi (layout tham chiếu @id/...).
+    # Màu my_device_info_item_background_color KHÔNG thêm: APK gốc đã có.
+    # 10 class mới + 5 method sửa đã được vá ở PRECHINAFIX
+    # (Settings-classes12.json / Settings-classes3.json), chạy TRƯỚC bước này.
+    #
+    # Smali của bản vá tra resource THEO TÊN lúc chạy
+    # (Resources.getIdentifier) chứ không nhúng id, nên chỉ cần đúng tên -
+    # không phải trùng id với APK gốc. Vì vậy cấp id mới cho từng entry là đủ.
+    local kashi_dir="$SRC_DIR/kashi"
+    local kashi_n=0
+    if [ -d "$kashi_dir" ]; then
+        local rel src dst
+        for resroot in "${resroots[@]}"; do
+            while IFS= read -r rel; do
+                [ -n "$rel" ] || continue
+                src="$kashi_dir/$rel"
+                dst="$resroot/${rel#res/}"
+                [ -f "$src" ] || continue
+                mkdir -p "$(dirname "$dst")"
+                cp -f "$src" "$dst" && kashi_n=$((kashi_n + 1))
+            done < <(cd "$kashi_dir" && find res -type f \( -name "*.xml" -o -name "*.png" \) | sort)
+        done
+
+        if [ "$kashi_n" -gt 0 ]; then
+            python3 - "$out" <<'PYEOF'
+import os
+import re
+import sys
+
+out = sys.argv[1]
+# 7 resource mới. my_device_info_item_background_color KHÔNG nằm ở đây vì
+# APK gốc đã có sẵn màu đó.
+want = [("layout", "device_info_item_kashi"),
+        ("layout", "storage_info_item_kashi"),
+        ("drawable", "ic_device_name_info"),
+        ("drawable", "storage_progress_drawable"),
+        ("drawable", "version_card_img_dark"),
+        ("drawable", "version_card_img_light"),
+        ("id", "storage_progress_kchi")]
+
+# id phải khai trong values/ids.xml trước, public.xml chỉ gán số.
+for root, _dirs, files in os.walk(out):
+    if "ids.xml" in files and os.path.basename(root) == "values":
+        p = os.path.join(root, "ids.xml")
+        s = open(p, encoding="utf-8", errors="replace").read()
+        if 'name="storage_progress_kchi"' not in s:
+            s = s.replace("</resources>",
+                          '  <id name="storage_progress_kchi" />\n</resources>')
+            open(p, "w", encoding="utf-8", newline="\n").write(s)
+
+pubs = []
+for root, _dirs, files in os.walk(out):
+    if "public.xml" in files and os.path.basename(root) == "values":
+        pubs.append(os.path.join(root, "public.xml"))
+if not pubs:
+    print("  [WARN] khong thay public.xml - resource moi se thieu id")
+    raise SystemExit(0)
+
+for p in pubs:
+    s = open(p, encoding="utf-8", errors="replace").read()
+    added = 0
+    for typ, name in want:
+        if 'type="%s" name="%s"' % (typ, name) in s:
+            continue
+        m = re.search(r'<public id="(0x7f[0-9a-f]{2})[0-9a-f]{4}" type="%s"' % typ, s)
+        if not m:
+            print("  [WARN] public.xml khong co entry type=%s" % typ)
+            continue
+        tid = m.group(1)
+        ids = [int(x, 16) for x in
+               re.findall(r'<public id="(%s[0-9a-f]{4})" type="%s"' % (tid, typ), s)]
+        if not ids:
+            continue
+        nxt = max(ids) + 1
+        if nxt > int(tid + "ffff", 16):
+            print("  [WARN] het id trong type %s" % typ)
+            continue
+        s = s.replace("</resources>",
+                      '  <public id="0x%08x" type="%s" name="%s" />\n</resources>'
+                      % (nxt, typ, name))
+        added += 1
+    if added:
+        open(p, "w", encoding="utf-8", newline="\n").write(s)
+PYEOF
+            mods "Settings: bản vá ColorOS - $kashi_n file resource + id storage_progress_kchi"
+        else
+            warn "Settings: không chép được resource bản vá ColorOS"
+        fi
+    fi
+
+    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ] && [ "$kashi_n" -eq 0 ]; then
         warn "Settings: không thay đổi được asset lẫn string - giữ APK gốc"
         return 1
     fi

@@ -31,13 +31,18 @@
 #     isUserExperienceAndPrivacyAllowed         -> ép false (tắt upload log cloud)
 #     CustomerPowerCheck.outputResultPassAndNone
 #
-#   Settings.apk                         7 method / 5 class
+#   Settings.apk                         12 method / 10 class mới + 5 class sửa
 #     SettingsFeatures.isLocationNeeded / isPrivacyNeeded   -> luôn true
 #     MiuiSettings.updateHeaderList                          -> hiện Google Settings
 #     IconDisplayCustomizationSettings.setupShowNotificationIconCount
 #                                                            -> thêm 3/4/5 icon
 #     DeviceBasicInfoPresenter.initData / updateCameraInfo
 #     ParseMiShopDataUtils.getItemTitle(Context,...)         -> THÊM MỚI
+#     (ColorOS About phone, classes3 + classes12)
+#     DeviceBasicInfoPresenter.getLineNum                    -> luôn 1 dòng
+#     MiuiDeviceNameCard/MiuiMemoryCard.initView             -> dùng layout kashi
+#     MiuiVersionCard.initView / setLogoBlur                 -> nền card mới
+#     10 class mới: com.kashi.settings.view.* + com.android.settings.kashi.Utils
 #
 #   miui-services.jar                    166 method / 37 file
 #     Ép IS_INTERNATIONAL_BUILD = true xuyên suốt ->
@@ -234,9 +239,13 @@ fi
 # Settings: vá TRƯỚC Settings_ROMInformation (chạy trong insupdate.sh). Bước đó
 # decode lại chính file này rồi rebuild với branding BugOS, nên 7 method vẫn
 # còn. Nếu bước branding fail và giữ APK gốc, patch vẫn không mất.
+#
+# classes12: nơi chứa 10 class mới của bản vá "About phone kiểu ColorOS"
+# (com.kashi.settings.view.*, com.android.settings.kashi.Utils). Bản gốc không
+# có classes12 patch nào nên phải thêm vào danh sách này.
 SETAPK=$(find "$MAIN_FOLDER" -type f -name "Settings.apk" 2>/dev/null | head -n1)
 if [ -n "$SETAPK" ]; then
-    apply_dex_patch "$SETAPK" Settings classes2.dex classes3.dex classes4.dex
+    apply_dex_patch "$SETAPK" Settings classes2.dex classes3.dex classes4.dex classes12.dex
 else
     warn_msg "ROM không có Settings.apk - bỏ qua"
 fi
