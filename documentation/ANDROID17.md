@@ -20,9 +20,50 @@ Repo **chỉ build OS4 trên Android 17**. Mọi nhánh khác đã bị xoá:
 | `MultiLang/updatesource/` | trùng 62/62 file với `updatesource_os4/` |
 | `Fonts/HyperOS/A14/` | trùng 6/6 file với `Fonts/HyperOS/` |
 
-`getROM.sh` **exit 1** với mọi ROM không phải OS4 (`OS1/OS2/OS3`, `V13/V14`,
-hoặc `OS<n>` lạ), `bin/package/COREPATCH/update.sh` exit 1 nếu Android không
-phải 17, và `target_check.sh` chặn build khi thiếu `targets/android<VER>.env`.
+`getROM.sh` **exit 1** với mọi ROM không phải OS4 hoặc không phải CHINA,
+`bin/package/COREPATCH/update.sh` exit 1 nếu Android không phải 17, và
+`target_check.sh` chặn build khi thiếu `targets/android<VER>.env`.
+
+---
+
+## 0. Chỉ nhận ROM China
+
+Build **chỉ chạy với ROM China (mã `CNXM`)**. Kiểm tra hai lớp, cả hai đều `exit 1`:
+
+**Lớp 1 — `getROM.sh`, theo tên file (chặn trước khi tải)**
+
+| Mã đuôi | Vùng | Kết quả |
+|---|---|---|
+| `XPKCNXM` | China | nhận |
+| `XMGEUXM` | EEA | chặn |
+| `XMGMI` | Global | chặn |
+| `XMGRU` / `XMGIN` / `XMGID` / `XMGTW` / `XMGJP` / `XMGTR` | các vùng khác | chặn |
+| tên không đọc được | — | chặn |
+
+Thêm nữa, nếu `device_code` chứa chữ `global` (`annibale_global-...`) cũng chặn.
+
+**Lớp 2 — `target_check.sh`, theo `build.prop` (sau khi bung)**
+
+```bash
+ro.miui.build.region=CN   -> nhận
+ro.miui.build.region=GL   -> DỪNG
+```
+
+Đọc `ro.miui.build.region`, fallback `ro.miui.region`. Không có prop nào thì chỉ
+cảnh báo (một số ROM hiếm thiếu prop này).
+
+**Vì sao cần lớp 2:** lớp 1 đoán từ tên file. `DEVICE_TYPE` cũ chỉ là "China nếu
+`device_code` không chứa chữ Global" — mà mã `XMGEUXM` (EEA) **không có** chữ
+"global", nên trước đây ROM EEA bị nhận là China và toàn bộ mod de-China chạy
+trên base Global.
+
+**Cũng đã siết:**
+
+- `TARGET_HYPEROS` trong `targets/android17.env` giờ **được kiểm tra thật**
+  (trước đây khai báo `"OS4 OS5 OS6"` nhưng không chỗ nào đọc, nên OS5/OS6 lọt qua).
+  Hiện đặt `"OS4"`.
+- SDK lệch `TARGET_SDK` → **`exit 1`** thay vì chỉ `warn`. Bộ patch smali được
+  viết cho SDK 37; chạy SDK khác sẽ trượt anchor.
 
 ---
 

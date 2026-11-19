@@ -116,6 +116,48 @@ else
     DEVICE_TYPE="China"
 fi
 
+# ---------------------------------------------------------------------------
+# CHỈ NHẬN ROM CHINA.
+#
+# Mã vùng Xiaomi nằm ở ĐUÔI base_rom_code, dạng "<số hiệu>.<vùng>":
+#     OS4.0.6.0.XPKCNXM   -> đuôi CNXM    = China
+#     OS4.0.6.0.XMGEUXM   -> đuôi EUXM    = EEA (Global)
+#     OS4.0.6.0.XMGRU     -> đuôi RU      = Russia
+#
+# Trước đây bước này tin DEVICE_TYPE, mà DEVICE_TYPE chỉ là "China nếu
+# device_code không chứa chữ Global". Mã Global không phải lúc nào cũng có chữ
+# "global" trong tên file (XMGEUXM!), nên ROM EEA bị nhận là China và toàn bộ
+# mod de-China chạy sai base.
+#
+# Kiểm tra 2 lớp:
+#   (1) Ở đây - theo tên file, chặn TRƯỚC khi tải cả GB.
+#   (2) target_check.sh - đọc ro.miui.build.region từ build.prop sau khi bung,
+#       vì tên file có thể bị đổi.
+#
+# Đuôi nhận là China: CNXM (và biến thể chứa CN như CNXM/CHN).
+# ---------------------------------------------------------------------------
+ROM_REGION_TAIL=$(echo "$base_rom_code" | sed -E 's/^.*\.//; s/[0-9]+$//' | tr -d '\r\n ')
+
+case "$ROM_REGION_TAIL" in
+    CNXM|CNXM*|*CNXM)
+        : # China - nhận
+        ;;
+    "")
+        warn "ROM: không đọc được mã vùng từ tên file ('$base_rom_code') - sẽ kiểm lại bằng build.prop"
+        ;;
+    *)
+        echo "ROM vùng '$ROM_REGION_TAIL' (mã '$base_rom_code') KHÔNG phải China (CNXM)."
+        echo "Repo này chỉ build ROM CHINA. Dừng."
+        exit 1
+        ;;
+esac
+
+# Tên file có chữ "global" -> chắc chắn quốc tế, dừng luôn.
+if echo "$device_code" | grep -qi 'global'; then
+    echo "ROM quốc tế ('$device_code') - chỉ nhận ROM CHINA. Dừng."
+    exit 1
+fi
+
 # Chỉ hỗ trợ HyperOS 4. Các nhánh OS1/OS2/OS3 và MIUI (V13/V14) đã bị xoá cùng
 # toàn bộ mod/modfile của chúng — nhận nhầm một ROM cũ sẽ dựng ROM thiếu patch mà
 # không báo lỗi, nên ở đây phải DỪNG và nói rõ.
