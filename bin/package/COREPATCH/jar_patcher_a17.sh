@@ -1282,6 +1282,131 @@ SMALI
 }
 
 # Main services patching function (Android 17)
+# ---------------------------------------------------------------------------
+# FCM wake filter - nguyên lí lấy từ module HyperOS_FCM_OnTheFly_Fix v1.4.
+#
+# Nhúng class com.android.server.am.FcmWakeFilter vào services.jar rồi chèn vào
+# đầu BroadcastController.broadcastIntentLockedTraced:
+#
+#     move-object/from16 v0, p4
+#     if-eqz v0, :fcm_hook_done
+#     invoke-static {v0}, Lcom/android/server/am/FcmWakeFilter;->applyFlags(...)V
+#     :fcm_hook_done
+#
+# applyFlags đọc /data/system/fcm_wake.conf rồi thêm/bớt
+# FLAG_INCLUDE_STOPPED_PACKAGES (0x20) trên Intent của broadcast FCM. Đó là
+# toàn bộ cơ chế "lọc đánh thức": quyết định broadcast nào được phép đánh thức
+# app đang bị đóng băng.
+#
+# KHÔNG chép y nguyên bản gốc: nó dùng label :cond_7, mà method này ĐÃ CÓ sẵn
+# :cond_7 (đã kiểm tra trên services.jar thật) -> chèn nữa là trùng label và
+# smali không build được. Ở đây dùng label riêng. Thanh ghi v0 an toàn vì code
+# gốc ghi đè v0 trước khi đọc (lệnh đầu của method là move-object/from16 v1,p0).
+#
+# Class FcmWakeFilter lấy từ services.jar đã vá trên máy thật (A17/OS4.0.6),
+# không phải viết lại từ đầu.
+# ---------------------------------------------------------------------------
+apply_fcm_wake_filter() {
+  local decompile_dir="$1"
+  local flag
+  flag=$(grep -m1 '^fcm_fix_bytecode=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+  if [ "$flag" = "false" ]; then
+    log "FcmWakeFilter: fcm_fix_bytecode=false - bỏ qua"
+    return 0
+  fi
+
+  local target
+  target=$(find "$decompile_dir" -type f -name "BroadcastController.smali" \
+           -path "*/com/android/server/am/*" 2>/dev/null | head -n1)
+  if [ -z "$target" ]; then
+    warn "FcmWakeFilter: không thấy BroadcastController.smali - bỏ qua"
+    return 0
+  fi
+
+  local dir
+  dir=$(dirname "$target")
+  if ! cp -f "$work_dir/bin/package/COREPATCH/assets/FcmWakeFilter.smali" \
+             "$dir/FcmWakeFilter.smali"; then
+    warn "FcmWakeFilter: không chép được class - bỏ qua"
+    return 0
+  fi
+
+  local _out
+  _out=$(python3 - "$target" <<'PYEOF'
+import re
+import sys
+
+path = sys.argv[1]
+lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
+
+start = None
+for i, l in enumerate(lines):
+    if l.startswith(".method") and "broadcastIntentLockedTraced(" in l:
+        start = i
+        break
+if start is None:
+    print("KHONG_THAY_METHOD")
+    raise SystemExit(0)
+
+end = None
+for i in range(start, len(lines)):
+    if lines[i].strip() == ".end method":
+        end = i
+        break
+if end is None:
+    print("KHONG_THAY_END")
+    raise SystemExit(0)
+
+body = lines[start:end]
+if any("FcmWakeFilter" in l for l in body):
+    print("DA_CO")
+    raise SystemExit(0)
+if any(l.strip() == ":fcm_hook_done" for l in body):
+    print("TRUNG_LABEL")
+    raise SystemExit(0)
+
+# chèn trước lệnh đầu tiên: bỏ qua .param/.line/.local và khối .annotation
+ins = None
+depth = 0
+for i in range(start + 1, end):
+    s = lines[i].strip()
+    if s.startswith(".annotation"):
+        depth += 1
+        continue
+    if s.startswith(".end annotation"):
+        depth -= 1
+        continue
+    if depth > 0 or not s or s.startswith(".") or s.startswith("#") or s.startswith(":"):
+        continue
+    if re.match(r"^[a-z]", s):
+        ins = i
+        break
+if ins is None:
+    print("KHONG_THAY_LENH")
+    raise SystemExit(0)
+
+lines[ins:ins] = [
+    "",
+    "    move-object/from16 v0, p4",
+    "",
+    "    if-eqz v0, :fcm_hook_done",
+    "",
+    "    invoke-static {v0}, Lcom/android/server/am/FcmWakeFilter;->applyFlags(Landroid/content/Intent;)V",
+    "",
+    "    :fcm_hook_done",
+]
+open(path, "w", encoding="utf-8", newline="\n").write("\n".join(lines))
+print("DA_CHEN")
+PYEOF
+  )
+  case "$_out" in
+    DA_CHEN)     log "FcmWakeFilter: đã chèn hook vào broadcastIntentLockedTraced" ;;
+    DA_CO)       log "FcmWakeFilter: hook đã có sẵn - bỏ qua" ;;
+    TRUNG_LABEL) warn "FcmWakeFilter: method đã có label :fcm_hook_done - bỏ qua" ;;
+    *)           warn "FcmWakeFilter: không chèn được ($_out)" ;;
+  esac
+}
+
 patch_services() {
   local services_path="$work_dir/build/baserom/images/system/system/framework/services.jar"
 
@@ -1318,6 +1443,9 @@ patch_services() {
   # Cho phép chụp màn hình ở app có FLAG_SECURE (ngân hàng, DRM...)
   apply_no_secure_windows "$decompile_dir"
   #apply_services_disable_secure_flag "$decompile_dir"
+
+  # Lọc đánh thức FCM (module HyperOS_FCM_OnTheFly_Fix) - xem hàm.
+  apply_fcm_wake_filter "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
   # modify_invoke_custom_methods "$decompile_dir"
