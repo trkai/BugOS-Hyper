@@ -278,6 +278,13 @@ if [ "$PREINSTALL" != "true" ]; then
     # boot.img vẫn có root sẵn, chỉ là chưa có manager nào để nói chuyện.
     mods "SukiSU: không cài sẵn manager (sukisu_preinstall_manager=false) - Root Toolbox lo"
 elif [ -d "$IMG/product" ]; then
+    # Tải manager có thể đã thất bại ở trên (script in "bỏ qua root, build tiếp")
+    # nhưng preinstall vẫn chạy tới đây. Thiếu guard thì cp im lặng, unzip im
+    # lặng, rồi báo nhầm là "APK không có lib".
+    if [ ! -f "$APK" ]; then
+        error "SukiSU: không có file manager APK ($APK) - không cài sẵn được"
+        exit 1
+    fi
     mkdir -p "$APP_DIR"
     cp -f "$APK" "$APP_DIR/SukiSUUltra.apk"
     chmod 0644 "$APP_DIR/SukiSUUltra.apk"
@@ -424,5 +431,9 @@ else
     warn "SukiSU: không thấy system_ext/ - manager chỉ nằm ở /product/app và sẽ báo 'chưa cài đặt'"
 fi
 
-mods "SukiSU: xong - kernel có root sẵn; manager do Root Toolbox cài khi người dùng bấm"
+if [ "$PREINSTALL" = "true" ]; then
+    mods "SukiSU: xong - root sẵn; manager cài sẵn, tự sang /data/app ở boot đầu"
+else
+    mods "SukiSU: xong - kernel có root sẵn; manager do Root Toolbox cài khi người dùng bấm"
+fi
 exit 0
