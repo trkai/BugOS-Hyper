@@ -1407,6 +1407,79 @@ apply_miui_services_floating() {
 }
 
 # Main miui-services patching function (Android 17)
+# ---------------------------------------------------------------------------
+# Bỏ chặn broadcast trên ROM China (fix "notification delay").
+#
+# ĐO ĐƯỢC, không phải suy đoán: so miui-services.jar gốc với bản vá bằng tool
+# online (19/11) ở mức method, toàn bộ khác biệt THẬT chỉ là 6 chỗ đổi
+#     sget-boolean vX, Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z
+# thành
+#     sget-boolean vX, Lmiui/os/Build;->IS_MIUI:Z
+# Phần "khác" còn lại của dex chỉ là nhiễu do build lại: const-string ->
+# const-string/jumbo, số hiệu label đổi, thêm nop.
+#
+# Vì sao có tác dụng: các nhánh "international" trong BroadcastQueue bỏ qua
+# chặn auto-start và cho com.google.android.c2dm.intent.RECEIVE (FCM) đi qua.
+# ROM China có IS_INTERNATIONAL_BUILD=false nên các nhánh đó bị bỏ -> thông báo
+# bị giữ lại. Đổi sang IS_MIUI (luôn true trên MIUI) làm ROM China chạy đúng
+# như bản quốc tế.
+#
+# Cố ý KHÔNG thay cả thân method như bảng JSON của PRECHINAFIX: chỉ đổi đúng
+# tên field bên trong method, nên không phụ thuộc bản ROM và không ghi đè
+# nhầm code khác khi Xiaomi sửa method.
+# ---------------------------------------------------------------------------
+patch_is_international_in_method() {
+  local decompile_dir="$1" rel="$2" method="$3"
+  local d f start end total i hits=0
+  for d in "$decompile_dir"/smali "$decompile_dir"/smali_classes*; do
+    f="$d/$rel"
+    [ -f "$f" ] || continue
+    start=$(grep -n "^[[:space:]]*\.method.* $method" "$f" | cut -d: -f1 | head -n1)
+    [ -z "$start" ] && continue
+    total=$(wc -l < "$f")
+    end=0
+    i=$start
+    while [ "$i" -le "$total" ]; do
+      [ "$(sed -n "${i}p" "$f" | tr -d ' \r')" = ".endmethod" ] && { end=$i; break; }
+      i=$((i + 1))
+    done
+    [ "$end" -eq 0 ] && continue
+    if sed -n "${start},${end}p" "$f" | grep -q "Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z"; then
+      sed -i "${start},${end}s|Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z|Lmiui/os/Build;->IS_MIUI:Z|g" "$f"
+      hits=$((hits + 1))
+    fi
+  done
+  [ "$hits" -gt 0 ] || warn "ChinaBroadcast: không thấy IS_INTERNATIONAL_BUILD trong $rel::$method"
+}
+
+apply_china_broadcast_unblock() {
+  local decompile_dir="$1"
+  local flag
+  flag=$(grep -m1 '^china_broadcast_unblock=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+  if [ "$flag" = "false" ]; then
+    log "ChinaBroadcast: china_broadcast_unblock=false - bỏ qua"
+    return 0
+  fi
+
+  local rel_am="com/android/server/am/BroadcastQueueModernStubImpl.smali"
+  patch_is_international_in_method "$decompile_dir" "$rel_am" \
+    "isInternationalSpecialAction(Ljava/lang/String;Landroid/content/pm/ResolveInfo;)Z"
+  patch_is_international_in_method "$decompile_dir" "$rel_am" "updateBlockBroadcast()V"
+  patch_is_international_in_method "$decompile_dir" "$rel_am" \
+    "checkApplicationAutoStart(Lcom/android/server/am/BroadcastQueue;Lcom/android/server/am/BroadcastRecord;Landroid/content/pm/ResolveInfo;)Z"
+  patch_is_international_in_method "$decompile_dir" \
+    "com/android/server/am/ProcessManagerService.smali" \
+    "isForceStopEnable(Lcom/android/server/am/ProcessRecord;I)Z"
+  patch_is_international_in_method "$decompile_dir" \
+    "com/android/server/am/ProcessSceneCleaner.smali" \
+    "handleSwipeKill(Lmiui/process/ProcessConfig;)Z"
+  patch_is_international_in_method "$decompile_dir" \
+    "com/android/server/am/ProcessSceneCleaner.smali" \
+    "killAppForHasOtherTask(ILmiui/process/ProcessConfig;)Z"
+
+  log "ChinaBroadcast: 6 method chuyển IS_INTERNATIONAL_BUILD -> IS_MIUI"
+}
+
 patch_miui_services() {
   local miui_services_path="$work_dir/build/baserom/images/system_ext/framework/miui-services.jar"
 
@@ -1440,6 +1513,7 @@ patch_miui_services() {
   apply_miui_services_floating "$decompile_dir"
   apply_miui_services_gboard "$decompile_dir"
   apply_miui_services_contentextension "$decompile_dir"
+  apply_china_broadcast_unblock "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
   # modify_invoke_custom_methods "$decompile_dir"
