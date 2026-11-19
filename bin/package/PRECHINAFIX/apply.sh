@@ -46,7 +46,8 @@
 #       - nới auto-start / broadcast / clipboard / jobs cho app nền
 #       - GreezeManagerService (21 method), ProcessPolicy, ProcessSceneCleaner
 #       - shortcut/phím cứng (MiuiShortcutTriggerHelper, MiuiSingleKeyRule...)
-#     KHÔNG đụng PackageManagerServiceImpl (repo vá riêng ở NOTIFICATION_FIX).
+#     PackageManagerServiceImpl: verifyIsolationViolation + canBeUpdate -> return-void
+#       (chuyển từ NOTIFICATION_FIX sang khi bỏ module đó).
 #
 #   miui-framework.jar                   14 method + 9 class mới
 #     ActivityThreadImpl (7 method), AppOpsManagerInjector, NearbyUtils,

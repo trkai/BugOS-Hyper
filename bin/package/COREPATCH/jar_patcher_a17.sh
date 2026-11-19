@@ -1304,7 +1304,7 @@ apply_services_disable_secure_flag() {
 #     at WindowManagerService.captureDisplay(...)
 #
 # NGUỒN GỐC THẬT (đính chính so với kết luận đầu tiên): lời gọi đó do CHÍNH
-# patch của mình chèn vào - NOTIFICATION_FIX/A17/patch_miui_services_a17.py,
+# patch của mình chèn vào - script NOTIFICATION_FIX/A17 (đã xoá cùng module),
 # hàm patch_window_manager_secure_flag. Method này KHÔNG hề tồn tại trong
 # services.jar (đã quét cả 4 dex), nên patch đó tạo ra một lời gọi chết.
 # Patch ấy đã bị bỏ hẳn; xem commit ngay sau aab1ed2.

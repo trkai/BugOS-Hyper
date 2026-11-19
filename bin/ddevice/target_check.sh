@@ -82,7 +82,7 @@ if [ ! -f "$TARGET_ENV" ]; then
     done
     echo ""
     echo "  Muốn thêm Android $ANDROID_VER: tạo targets/android${ANDROID_MAJOR}.env,"
-    echo "  bổ sung jar_patcher_a${ANDROID_MAJOR}.sh + NOTIFICATION_FIX/A${ANDROID_MAJOR}/"
+    echo "  bổ sung jar_patcher_a${ANDROID_MAJOR}.sh"
     echo "  rồi build lại. Xem documentation/ANDROID17.md."
     exit 1
 fi

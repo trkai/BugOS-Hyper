@@ -376,8 +376,7 @@ bash $work_dir/bin/modfile/Universal/insfile.sh
 # 3. insupdate.sh   -> Settings_ROMInformation decode lại Settings.apk ĐÃ VÁ rồi
 #                      mới gắn branding.
 # 4. patchpackage.sh -> COREPATCH decompile rồi VÁ + GHI ĐÈ cả 4 jar
-#                      (framework, services, miui-services, miui-framework);
-#                      NOTIFICATION_FIX vá tiếp.
+#                      (framework, services, miui-services, miui-framework).
 #
 # RÀNG BUỘC CHÍNH: COREPATCH GHI ĐÈ 4 jar bằng bản nó tự build, nên nó phải chạy
 # TRÊN bản mà PRECHINAFIX + FEATURE_UNLOCK vừa vá. Đảo thứ tự -> mất toàn bộ

@@ -21171,5 +21171,23 @@
     ".end method"
    ]
   }
+ },
+ "com/android/server/pm/PackageManagerServiceImpl.smali": {
+  "methods": {
+   "private verifyIsolationViolation(Lcom/android/internal/pm/parsing/pkg/ParsedPackage;Lcom/android/server/pm/InstallSource;)V": [
+    ".method private verifyIsolationViolation(Lcom/android/internal/pm/parsing/pkg/ParsedPackage;Lcom/android/server/pm/InstallSource;)V",
+    "    .registers 3",
+    "",
+    "    return-void",
+    ".end method"
+   ],
+   "public canBeUpdate(Ljava/lang/String;)V": [
+    ".method public canBeUpdate(Ljava/lang/String;)V",
+    "    .registers 2",
+    "",
+    "    return-void",
+    ".end method"
+   ]
+  }
  }
 }

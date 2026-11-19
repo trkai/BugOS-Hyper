@@ -14,7 +14,6 @@ Repo **chỉ build OS4 trên Android 17**. Mọi nhánh khác đã bị xoá:
 | `bin/modfile/OS3` | cùng LauncherMod v7.5F và các mod OS3 |
 | `targets/android15.env`, `android16.env` | không còn target tương ứng |
 | `COREPATCH/jar_patcher_a13..a16.sh` | chỉ giữ `a17` |
-| `NOTIFICATION_FIX/A13..A16/` | chỉ giữ `A17` |
 | `gmsservices/maps/A13..A15/` | chỉ giữ `A17` |
 | `UpdateFile/China_GoogleCTS4A13` | chỉ chạy khi `androidVER == 13` |
 | `MultiLang/updatesource/` | trùng 62/62 file với `updatesource_os4/` |
@@ -90,9 +89,9 @@ cp bin/package/COREPATCH/jar_patcher_a17.sh bin/package/COREPATCH/jar_patcher_a1
 # 3. Mở khoá router: bin/package/COREPATCH/update.sh
 #    hiện chỉ nhận "17"; thêm nhánh cho 18.
 
-# 4. Bộ notification fix
-cp -r bin/package/NOTIFICATION_FIX/A17 bin/package/NOTIFICATION_FIX/A18
-#    sửa --api 38 và đường dẫn A17 -> A18 bên trong
+# 4. Bộ vá de-China: bin/package/PRECHINAFIX/patches/
+#    Các bảng patch là theo base ROM, phải sinh lại trên ROM A18
+#    (xem bin/tools/gen_patches.py). Riêng thiết kế module không đổi.
 
 # 5. Build thử, đọc log, chỉ đặt TARGET_STATUS=stable khi đã test trên máy thật
 ```
@@ -107,7 +106,6 @@ dispatch theo thư mục.
 | Dùng chung được | Phải riêng theo phiên bản |
 |---|---|
 | `Fonts`, `MultiLang` (regex `^OS[4-9]`) | `COREPATCH/jar_patcher_a*.sh` |
-| `Settings_AdvancedTexture` (prop) | `NOTIFICATION_FIX/A*/` |
 | `Xiaomi_NoLowEnd` (prop) | `SukiSU/patch.sh` (KMI theo kernel) |
 | `DISABLE_AVB` (vbmeta) | `gmsservices/maps/A*` |
 | `Settings_ROMInformation` (APKEditor) | `PRECHINAFIX/patches/*.json` (theo base ROM) |

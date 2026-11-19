@@ -14,7 +14,6 @@ if ! bash $target_dir/COREPATCH/update.sh; then
 fi
 
 bash $target_dir/DISABLE_AVB/DISABLEavb.sh
-bash $target_dir/NOTIFICATION_FIX/notificationFIX.sh
 bash $target_dir/RefreshRate/1hz.sh
 
 # FPS_LIMITATION_PATCH đã bị xoá cùng FCM_NotificationFix. Nếu khôi phục FPS:
