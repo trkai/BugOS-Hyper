@@ -2246,5 +2246,50 @@
     ".end method"
    ]
   }
+ },
+ "com/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl$startFlipAnimation$1.smali": {
+  "methods": {
+   "public final onFlip()V": [
+    ".method public final onFlip()V",
+    "    .registers 3",
+    "",
+    "    iget-object v0, p0, Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl$startFlipAnimation$1;->this$0:Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl;",
+    "",
+    "    new-instance v1, Lcom/android/systemui/kashi/mediaui/MediaNotificationHelper;",
+    "",
+    "    invoke-direct {v1, v0}, Lcom/android/systemui/kashi/mediaui/MediaNotificationHelper;-><init>(Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl;)V",
+    "",
+    "    iget-object p0, p0, Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl$startFlipAnimation$1;->this$0:Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl;",
+    "",
+    "    iget-object v0, p0, Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl;->holder:Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewHolder;",
+    "",
+    "    if-eqz v0, :cond_16",
+    "",
+    "    iget-object v0, v0, Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewHolder;->appIcon:Landroid/widget/ImageView;",
+    "",
+    "    if-eqz v0, :cond_16",
+    "",
+    "    iget-object v1, p0, Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl;->appIconDrawable:Landroid/graphics/drawable/Drawable;",
+    "",
+    "    invoke-virtual {v0, v1}, Landroid/widget/ImageView;->setImageDrawable(Landroid/graphics/drawable/Drawable;)V",
+    "",
+    "    :cond_16",
+    "    iget-object v0, p0, Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl;->holder:Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewHolder;",
+    "",
+    "    if-eqz v0, :cond_23",
+    "",
+    "    iget-object v0, v0, Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewHolder;->albumImageView:Landroid/widget/ImageView;",
+    "",
+    "    if-eqz v0, :cond_23",
+    "",
+    "    iget-object p0, p0, Lcom/android/systemui/statusbar/notification/mediacontrol/MiuiMediaViewControllerImpl;->artWorkDrawable:Landroid/graphics/drawable/Drawable;",
+    "",
+    "    invoke-virtual {v0, p0}, Landroid/widget/ImageView;->setImageDrawable(Landroid/graphics/drawable/Drawable;)V",
+    "",
+    "    :cond_23",
+    "    return-void",
+    ".end method"
+   ]
+  }
  }
 }

@@ -109,11 +109,6 @@ def main():
 
     # quét 1 lần: map "phần đuôi đường dẫn" -> đường dẫn thật, tránh listdir lặp
     index = {}
-    subs = []
-    for name in sorted(os.listdir(tree)):
-        full = os.path.join(tree, name)
-        if os.path.isdir(full):
-            subs.append(full)
     for dirpath, _, files in os.walk(tree):
         for fn in files:
             if not fn.endswith('.smali'):
@@ -125,7 +120,13 @@ def main():
             parts = rel.split('/')
             if len(parts) > 1:
                 index.setdefault('/'.join(parts[1:]), full)
-    base_for_new = subs[0] if subs else tree
+    # File mới ghi thẳng vào GỐC cây smali.
+    #
+    # Trước đây lấy thư mục con đầu tiên (subs[0]) làm gốc, nên entry "_newfile"
+    # có rel "com/android/.../Foo.smali" rơi vào "android/com/android/.../Foo.smali".
+    # Vẫn chạy được - smali biên dịch theo dòng .class chứ không theo đường dẫn -
+    # nhưng sai chỗ và rất dễ đọc nhầm khi soi lại cây sau khi vá.
+    base_for_new = tree
 
     for rel, entry in patch.items():
         target = index.get(rel)
