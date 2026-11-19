@@ -22,7 +22,10 @@ jar_util()
     fi
 
     if [[ $1 == "d" ]]; then
-        patch "Patching $2 : "
+        # Chi tiet nay khong can o muc INFO: caller da noi dang lam gi, va
+        # "[PATCH] Patching miui-services.jar : " (co dau hai cham cuoi dong)
+        # la nua cau, doc log rat roi.
+        debug "jar_util: tach $2"
         if [[ -f $work_dir/build/baserom/images/system_ext/framework/miui-services.jar ]]; then
             sudo cp $work_dir/build/baserom/images/system_ext/framework/miui-services.jar $work_dir/jar_temp
             sudo chown $(whoami) $work_dir/jar_temp/$2
@@ -62,10 +65,10 @@ jar_util()
                 if [[ -f $work_dir/jar_temp/$2 ]]; then
                     sudo cp -rf $work_dir/jar_temp/$2 $work_dir/build/baserom/images/system_ext/framework/miui-services.jar
                     final_dir="$work_dir/module/*"
-                    patch "Success"
+                    debug "jar_util: dong goi $2 xong"
                     rm -rf $work_dir/jar_temp/$2.out $work_dir/jar_temp/$2_notal 
                 else
-                    patch "Fail"
+                    error "jar_util: KHONG dong goi duoc $2 - giu nguyen jar goc"
                 fi
             fi
         fi
@@ -88,5 +91,6 @@ if [[ ! -d $work_dir/jar_temp ]]; then
     mkdir $work_dir/jar_temp
 fi
 
-patch "Bypass Devices Policy Check..."
+patch "Framework: bỏ kiểm tra device policy"
 miui-services
+patch "Framework: bỏ kiểm tra device policy - xong"

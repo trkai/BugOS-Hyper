@@ -335,8 +335,8 @@ step "Kiểm tra target Android"
 bash $work_dir/bin/ddevice/target_check.sh || { error "Dừng: Android target chưa được hỗ trợ đầy đủ"; exit 1; }
 
 step "Debloat"
+# debloat.sh tự in dòng tổng kết ("xoá N thư mục ..."), không cần "Done" ở đây.
 bash $work_dir/bin/ddevice/DEBLOAT/debloat.sh
-info "Done"
 
 # OS1/OS2 da bi xoa: chung chi co dispatcher, khong co mod nao ben trong.
 step "Mod theo máy (OS4 / Universal)"

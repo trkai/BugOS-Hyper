@@ -14,7 +14,10 @@ jar_util()
     fi
 
     if [[ $1 == "d" ]]; then
-        patch "Patching $2 : "
+        # Chi tiet nay khong can o muc INFO: caller da noi dang lam gi, va
+        # "[PATCH] Patching miui-services.jar : " (co dau hai cham cuoi dong)
+        # la nua cau, doc log rat roi.
+        debug "jar_util: tach $2"
         if [[ -f $work_dir/build/baserom/images/system_ext/framework/miui-services.jar ]]; then
             sudo cp $work_dir/build/baserom/images/system_ext/framework/miui-services.jar $work_dir/jar_temp
             sudo chown $(whoami) $work_dir/jar_temp/$2
@@ -56,10 +59,10 @@ jar_util()
                     sudo cp -rf $work_dir/jar_temp/$2 $work_dir/build/baserom/images/system_ext/framework/miui-services.jar
                     final_dir="$work_dir/module/*"
                     #7za a -tzip "$work_dir/miui-services_patched_$(date "+%d%m%y").zip" $final_dir
-                    patch "Success"
+                    debug "jar_util: dong goi $2 xong"
                     rm -rf $work_dir/jar_temp/$2.out $work_dir/jar_temp/$2_notal 
                 else
-                    patch "Fail"
+                    error "jar_util: KHONG dong goi duoc $2 - giu nguyen jar goc"
                 fi
             fi
         fi
@@ -98,6 +101,7 @@ if [[ ! -d $work_dir/jar_temp ]]; then
 fi
 
 if [[ $deviceTYPE == "China" ]]; then
-patch "Fixing Delay Power Button..."
+patch "Framework: bỏ độ trễ menu nguồn"
 miui-services
+patch "Framework: bỏ độ trễ menu nguồn - xong"
 fi

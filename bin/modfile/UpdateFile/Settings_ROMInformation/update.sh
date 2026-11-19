@@ -664,7 +664,7 @@ for p in pubs:
     entry = '  <public id="0x%08x" type="drawable" name="%s" />\n' % (nxt, name)
     s = s.replace('</resources>', entry + '</resources>')
     io.open(p, 'w', encoding='utf-8', newline='\n').write(s)
-    print('  [OK] khai bao drawable %s = 0x%08x trong public.xml' % (name, nxt))
+    # Khong in: dong 'Settings: them drawable ...' cua shell ngay tren da du.
 PYEOF
         else
             warn "Settings: khong thu muc drawable de them icon"
@@ -681,7 +681,14 @@ PYEOF
         export TOOLBOX_TARGET_CLASS="$(grep -m1 '^toolbox_target_class=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
     fi
     if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
-        python3 "$SRC_DIR/patch_settings_mod.py" "$out" && mod_ok=1 || warn "Settings: tích hợp 'Mod' thất bại"
+        # python không tự in nữa (chỉ in khi DEBUG=1) - shell in một dòng duy nhất
+        # để log vẫn biết việc gắn menu Toolbox đã chạy và kết quả.
+        if python3 "$SRC_DIR/patch_settings_mod.py" "$out"; then
+            mod_ok=1
+            mods "Settings: gắn mục Toolbox vào menu Cài đặt (chỉ XML, không sửa DEX)"
+        else
+            warn "Settings: tích hợp 'Mod' thất bại"
+        fi
     fi
 
     # ---- Preferences: BugOS Toolbox (ngôn ngữ, theme, spoof, hiệu năng) ----

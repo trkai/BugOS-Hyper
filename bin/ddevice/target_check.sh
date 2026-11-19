@@ -78,8 +78,13 @@ if [ -n "$ROM_REGION_REAL" ]; then
         exit 1
     fi
 else
-    warn "ROM: không có ro.miui.region trong 5 build.prop đã kiểm - KHÔNG xác minh được vùng"
-    warn "     Đã kiểm: system, system_ext, vendor, product, odm. Nếu đây là base Global thì dừng lại."
+    # Base XPKCNXM KHÔNG khai báo ro.miui.region / ro.miui.build.region ở bất kỳ
+    # build.prop nào (MultiLang/update.sh cũng ghi chú đúng như vậy). Đây là bình
+    # thường, không phải lỗi - vùng thật được xác định từ tên ROM ngay dưới
+    # (REGION=China -> MODS "Android 17 (SDK 37) / OS4 / China") và cổng chặn
+    # Global nằm ở đó. Vì vậy chỉ log debug, không WARN, để không tạo cảnh báo
+    # giả mỗi lần build.
+    debug "ROM: không khai báo ro.miui.region trong build.prop - dùng vùng từ tên ROM (${REGION:-?})"
 fi
 
 # DEVICE_TYPE đoán từ tên file: nếu nó nói Global thì cũng dừng, vì hai lớp

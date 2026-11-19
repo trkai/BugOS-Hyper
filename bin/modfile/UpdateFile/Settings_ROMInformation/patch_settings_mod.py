@@ -229,7 +229,8 @@ def main():
         print(f"Thư mục không tồn tại: {out_dir}", file=sys.stderr)
         return 1
 
-    print("Settings: Gắn mục Toolbox vào menu Settings...")
+    if VERBOSE:
+        print("Settings: Gắn mục Toolbox vào menu Settings...")
 
     # Duyệt và gắn vào settings_headers*.xml và top_level_settings*.xml
     for root, _, files in os.walk(out_dir):
@@ -241,7 +242,8 @@ def main():
                 full_p = os.path.join(root, fn)
                 patch_top_level_settings(full_p)
 
-    print("Settings: Gắn mục Toolbox hoàn tất (an toàn, không can thiệp DEX).")
+    if VERBOSE:
+        print("Settings: Gắn mục Toolbox hoàn tất (an toàn, không can thiệp DEX).")
     return 0
 
 
