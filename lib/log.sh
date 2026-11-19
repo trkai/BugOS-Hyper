@@ -45,10 +45,40 @@ patch()  { _bugos_log "$_C_MAG" "PATCH"  "$@"; }
 unpack() { _bugos_log "$_C_GRN" "UNPACK" "$@"; }
 repack() { _bugos_log "$_C_GRN" "REPACK" "$@"; }
 upload() { _bugos_log "$_C_GRN" "UPLOAD" "$@"; }
+# Hai hàm cũ còn dùng trong functions.sh (tách partition theo định dạng).
+unpack_erofs() { _bugos_log "$_C_GRN" "EROFS"  "$@"; }
+unpack_ext()   { _bugos_log "$_C_GRN" "EXT4"   "$@"; }
 
 # Tiêu đề một bước lớn, để log dài còn đọc được.
 section() {
     printf '\n%s==> %s%s\n' "$_C_BOLD" "$*" "$_C_RST" >&2
+}
+
+# Đánh số bước tự động: step "Tên bước" -> "==> [3] Tên bước"
+# Giúp khi build chết thì biết ngay dừng ở bước nào, không phải đọc cả log.
+_BUGOS_STEP=0
+step() {
+    _BUGOS_STEP=$((_BUGOS_STEP + 1))
+    printf '\n%s==> [%d] %s%s\n' "$_C_BOLD" "$_BUGOS_STEP" "$*" "$_C_RST" >&2
+}
+
+# Chạy một bước build; nếu thất bại thì báo rõ số bước rồi thoát.
+# Dùng: run_step "Vá de-China" bash bin/package/PRECHINAFIX/apply.sh
+run_step() {
+    local title=$1
+    shift
+    step "$title"
+    local t0 rc
+    t0=$(date +%s)
+    "$@"
+    rc=$?
+    local dur=$(( $(date +%s) - t0 ))
+    if [ "$rc" -ne 0 ]; then
+        error "Bước $_BUGOS_STEP ('$title') thất bại sau ${dur}s (mã $rc)"
+        return "$rc"
+    fi
+    debug "Bước $_BUGOS_STEP xong sau ${dur}s"
+    return 0
 }
 
 # Log ở mức thấp, chỉ hiện khi DEBUG=1.

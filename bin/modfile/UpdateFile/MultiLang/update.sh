@@ -1,6 +1,6 @@
 work_dir=${work_dir:-$(pwd)}
 MAIN_FOLDER="$work_dir/build/baserom/images"
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 deviceTYPE=$(cat $work_dir/bin/ddevice/device_type.txt 2>/dev/null)
 rom_os=$(cat $work_dir/bin/ddevice/rom_os.txt 2>/dev/null | tr -d '\r\n ')
 
@@ -153,5 +153,5 @@ if [[ $deviceTYPE == "China" ]]; then
     }
     region_summary
 
-    mods "Done!"
+    debug "Done!"
 fi

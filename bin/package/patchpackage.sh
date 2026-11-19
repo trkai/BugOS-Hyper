@@ -1,7 +1,6 @@
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 
-mods "Add Package..."
 target_dir="$work_dir/bin/package/"
 
 # COREPATCH là bước sống-còn: nó bypass verify chữ ký APK trong framework.jar.
@@ -16,8 +15,8 @@ fi
 bash $target_dir/DISABLE_AVB/DISABLEavb.sh
 bash $target_dir/RefreshRate/1hz.sh
 
-# FPS_LIMITATION_PATCH đã bị xoá cùng FCM_NotificationFix. Nếu khôi phục FPS:
-# phải chạy SAU COREPATCH, vì script đó sửa APK nên chữ ký sai, mà COREPATCH
-# chính là bước bypass.
+# Thứ tự trong file này BẮT BUỘC: COREPATCH trước, vì nó là bước bypass chữ ký.
+# Mọi script sửa APK (DISABLE_AVB không sửa APK, nhưng mod nào thêm sau thì có)
+# phải đứng SAU COREPATCH, nếu không APK sẽ mang chữ ký sai và bị từ chối nạp.
 
-mods "Add Package Done"
+mods "Package: xong"

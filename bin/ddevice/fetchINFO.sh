@@ -1,6 +1,13 @@
-baserom="$1"
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
+
+# os_type do build.sh ghi vào bin/ddevice/os_type.txt ("BugOS"). Script này chạy
+# như TIẾN TRÌNH RIÊNG nên không thấy biến của build.sh - trước đây nó dùng
+# $os_type (rỗng) rồi ghi đè chính file đó thành chuỗi rỗng, khiến packROM đặt
+# tên file thành "out/_annibale_OS4...". Đọc lại từ file để giữ giá trị.
+os_type=$(cat "$work_dir/bin/ddevice/os_type.txt" 2>/dev/null | tr -d '\r\n')
+[ -z "$os_type" ] && os_type=$(cat "$work_dir/bin/ddevice/brand.txt" 2>/dev/null | tr -d '\r\n')
+[ -z "$os_type" ] && os_type="BugOS"
 
 regionTYPE=$(cat $work_dir/bin/ddevice/device_type.txt)
 AndroidVer=$(< $work_dir/build/baserom/images/system/system/build.prop grep "ro.system.build.version.release" |awk 'NR==1' |cut -d '=' -f 2)
@@ -48,7 +55,6 @@ case "$board_lc" in
     *mtk*|*mediatek*) echo "Mediatek"   > $work_dir/bin/script2flash/META-INF/Data/Chip ;;
     *)                echo "Snapdragon" > $work_dir/bin/script2flash/META-INF/Data/Chip ;;
 esac
-echo "Chip platform: ${board:-$board_lc} -> $(cat $work_dir/bin/script2flash/META-INF/Data/Chip)"
 
 echo "$os_type" > $work_dir/bin/ddevice/os_type.txt
 echo "$AndroidVer" > $work_dir/bin/ddevice/androidver.txt
@@ -62,13 +68,21 @@ echo "$name" > $work_dir/bin/script2flash/META-INF/Data/DeviceName
 echo "$systemtype" > $work_dir/bin/script2flash/META-INF/Data/Types
 
 
-echo "------------------ BugOS BuildInfo ---------------------"
-echo "- Device Name: $name"
-echo "- Codename: $device_code"
-echo "- Xiaomi Version: $rom_os"  
-echo "- BuildRegion: $regionTYPE"
-echo "- Android: $AndroidVer"                                      
-echo "- Base ROM Code: $base_rom_code"                                                                        
-echo "- BuildTool Version: $starxVER"
-echo "- OS Type: $systemtype"
-echo "--------------------------------------------------------"
+# Gọn thành 2 dòng thay vì khung 10 dòng: thông tin này còn xuất hiện trong
+# notify.py và tên file ROM, nên không cần chiếm chỗ trong log build.
+info "ROM: $name ($device_code) | $rom_os $base_rom_code | Android $AndroidVer | $regionTYPE | $systemtype"
+info "Tool: v$starxVER | OS type: $os_type | Chip: $(cat $work_dir/bin/script2flash/META-INF/Data/Chip)"
+
+# Chi tiết đầy đủ chỉ khi cần gỡ lỗi.
+if [ "${DEBUG:-0}" = "1" ]; then
+    echo "------------------ BugOS BuildInfo ---------------------"
+    echo "- Device Name: $name"
+    echo "- Codename: $device_code"
+    echo "- Xiaomi Version: $rom_os"
+    echo "- BuildRegion: $regionTYPE"
+    echo "- Android: $AndroidVer"
+    echo "- Base ROM Code: $base_rom_code"
+    echo "- BuildTool Version: $starxVER"
+    echo "- OS Type: $systemtype"
+    echo "--------------------------------------------------------"
+fi

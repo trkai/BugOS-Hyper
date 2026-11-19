@@ -1,10 +1,9 @@
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 
 # Define ROM infomation
-androidVer=$(cat $work_dir/bin/ddevice/androidver.txt 2>/dev/null | tr -d '\r\n ')
-rom_os=$(cat $work_dir/bin/ddevice/rom_os.txt 2>/dev/null | tr -d '\r\n ')
-deviceTYPE=$(cat $work_dir/bin/ddevice/device_type.txt 2>/dev/null | tr -d '\r\n ')
+rom_os=$(cat "$work_dir/bin/ddevice/rom_os.txt" 2>/dev/null | tr -d '\r\n ')
+deviceTYPE=$(cat "$work_dir/bin/ddevice/device_type.txt" 2>/dev/null | tr -d '\r\n ')
 MAIN_FOLDER="$work_dir/build/baserom/images"
 
 # ---------------------------------------------------------------------------
@@ -19,21 +18,17 @@ MAIN_FOLDER="$work_dir/build/baserom/images"
 # đè MiSans lên sẽ làm sai metric của tiếng bản địa.
 # ---------------------------------------------------------------------------
 
-mods "Fix Fonts"
-
 if [[ $deviceTYPE != "China" ]]; then
-    mods "Global ROM!No Adding..."
-    mods "Done"
+    debug "Fonts: ROM Global - không chép MiSans (đã có Noto/Roboto)"
     exit 0
 fi
 
 if [[ $rom_os != "OS4" ]]; then
-    mods "Fonts: chỉ hỗ trợ OS4 (ROM này là '${rom_os:-?}') - bỏ qua"
-    mods "Done"
+    debug "Fonts: chỉ hỗ trợ OS4 (ROM này là '${rom_os:-?}') - bỏ qua"
     exit 0
 fi
 
-mods "Detect HyperOS 4!Adding..."
+mods "Fonts: HyperOS 4 - thay bộ MiSans"
 
 FONT_SRC="$work_dir/bin/modfile/UpdateFile/Fonts/HyperOS"
 DEST_SYSTEM="$MAIN_FOLDER/system/system/fonts"
@@ -45,5 +40,3 @@ rm -f "$DEST_SYSTEM/MiSansLatinVF.ttf" \
       "$DEST_SYSTEM/MiSansVF_Overlay.ttf"
 
 cp -rf "$FONT_SRC"/*.ttf "$DEST_SYSTEM/"
-
-mods "Done"

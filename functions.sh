@@ -1,91 +1,21 @@
 #!/bin/bash
-yellow() { echo -e "\e[1;33m$*\e[0m"; }
+# ---------------------------------------------------------------------------
+# functions.sh - hàm dùng chung cho mọi script build.
+#
+# LOG: KHÔNG tự định nghĩa nữa. Toàn bộ mods/info/warn/error/patch/unpack/
+# repack/upload/exists nằm ở lib/log.sh - một chỗ duy nhất, có timestamp, màu
+# và mức DEBUG. Trước đây file này định nghĩa lại 10 hàm giống hệt, nên log
+# build và log của bin/rom/ có hai định dạng khác nhau.
+#
+# Tên hàm giữ nguyên nên 33 script đang gọi `source functions.sh` không phải sửa.
+# ---------------------------------------------------------------------------
 WORK_DIR=$(pwd)
 
-mods() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [MODS] - $1
-    else
-        echo "Usage: mods <string>"
-    fi
-}
+# shellcheck source=lib/log.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/log.sh"
 
-info() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [INFO] - $1
-    else
-        echo "Usage: info <string>"
-    fi
-}
-
-warn() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [WARN] - $1
-    else
-        echo "Usage: warn <string>"
-    fi
-}
-
-error() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [ERROR] - $1
-    else
-        echo "Usage: error <string>"
-    fi
-}
-
-unpack() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [UNPACK] - $1
-    else
-        echo "Usage: unpack <string>"
-    fi
-}
-
-unpack_erofs() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [UNPACK - EROFS] - $1
-    else
-        echo "Usage: unpack_erofs <string>"
-    fi
-}
-
-unpack_ext() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [UNPACK - EXT4] - $1
-    else
-        echo "Usage: unpack_ext <string>"
-    fi
-}
-
-repack() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [REPACK] - $1
-    else
-        echo "Usage: repack <string>"
-    fi
-}
-
-upload() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [UPLOADING] - $1
-    else
-        echo "Usage: upload <string>"
-    fi
-}
-
-patch() {
-    if [ "$#" -eq 1 ] ; then
-        echo -e [PATCH] - $1
-    else
-        echo "Usage: patch <string>"
-    fi
-}
-
-# Check for required dependencies
-exists() {
-    command -v "$1" > /dev/null 2>&1
-}
+# Giữ tên cũ cho script nào còn gọi yellow (2 chỗ trong file này + bên ngoài).
+yellow() { printf '%s%s%s\n' "$_C_YEL" "$*" "$_C_RST"; }
 
 abort() {
     yellow "--> Missing $1 ! installing..."
@@ -224,12 +154,12 @@ change_prop() {
     local base_dir="$work_dir/build/baserom/images"
 
     if [[ -z "$key" || -z "$new_value" ]]; then
-        echo "[INFO] - Usage: change_prop <property_key> <new_value>" >&2
+        info "change_prop: cần <property_key> <new_value>"
         return 1
     fi
 
     if [[ ! -d "$base_dir" ]]; then
-        echo "[ERROR] -  Directory '$base_dir' not found!" >&2
+        error "change_prop: không thấy thư mục '$base_dir'"
         return 1
     fi
 
@@ -241,7 +171,7 @@ change_prop() {
     while IFS= read -r -d '' file; do
         if grep -q -E "^$key=" "$file"; then
             sed -i -E "s#^($key)=.*#\1=$escaped_value#" "$file"
-            echo "[SYSTEM] - Updated '$key'"
+            debug "change_prop: đặt $key=$new_value"
             return 0
         fi
     done < <(find "$base_dir" -type f -name "build.prop" -print0)
@@ -252,10 +182,10 @@ change_prop() {
 
     if [[ -n "$first_file" ]]; then
         echo "$key=$new_value" >> "$first_file"
-        echo "[INFO] - Appended '$key=$new_value' to $first_file"
+        info "change_prop: thêm mới $key=$new_value vào $(basename "$(dirname "$first_file")")/build.prop"
         return 0
     else
-        echo "[INFO] - No build.prop files found to update or append." >&2
+        warn "change_prop: không có build.prop nào để ghi"
         return 1
     fi
 }
@@ -269,7 +199,7 @@ mvsml() {
     file_path=$(find "$framework_dir" -type f -name "$file_name")
 
     if [ -z "$file_path" ]; then
-        echo "File $file_name not found in any dex folder within $framework_dir."
+        warn "mvsml: không thấy $file_name trong $framework_dir"
         return 1
     fi
 
@@ -282,7 +212,7 @@ mvsml() {
 
     mv "$file_path" "$target_path"
 
-    echo "Moved $file_name to $target_path"
+    debug "mvsml: $file_name -> $target_path"
 }
 
 mvdir() {
@@ -293,7 +223,7 @@ mvdir() {
     folder_path=$(find "$framework_dir" -type d -name "$folder_name")
 
     if [ -z "$folder_path" ]; then
-        echo "Folder $folder_name not found in any dex folder within $framework_dir."
+        warn "mvdir: không thấy thư mục $folder_name trong $framework_dir"
         return 1
     fi
 
@@ -308,5 +238,54 @@ mvdir() {
         mv "$file_path" "$target_path"
     done
 
-    echo "Moved all .smali files from $folder_name to $target_folder"
+    debug "mvdir: $folder_name -> $target_folder"
+}
+
+# ---------------------------------------------------------------------------
+# dispatch_mods <dir> <tên-dispatcher> <nhãn-log>
+#
+# Chạy mọi mod (*.sh) trong <dir> theo thứ tự TẤT ĐỊNH, bỏ qua chính dispatcher.
+#
+# Trước đây ba dispatcher (OS4/insmod.sh, Universal/insfile.sh,
+# UpdateFile/insupdate.sh) chép nguyên một vòng find|sort|skip giống hệt nhau -
+# sửa logic phải sửa ba chỗ và dễ lệch. Giờ chỉ còn một chỗ.
+#
+# Thứ tự: sort theo đường dẫn đầy đủ. `find` một mình trả thứ tự do filesystem
+# quyết định, nên cùng một cây file có thể chạy khác thứ tự giữa các lần build -
+# mod nào phụ thuộc thứ tự sẽ hỏng ngẫu nhiên, rất khó lần.
+#
+# Mod lỗi KHÔNG dừng build (giữ hành vi cũ), nhưng có cảnh báo tổng ở cuối để
+# không "chết im lặng".
+# ---------------------------------------------------------------------------
+dispatch_mods() {
+    local dir=$1 me=$2 label=$3
+    local script base failed=0 ran=0 total
+
+    [ -d "$dir" ] || { warn "không có thư mục $dir - bỏ qua"; return 0; }
+
+    # Đếm trước để in nhãn MỘT lần, trước khi chạy (nhãn in sau khi chạy thì log
+    # đọc rất khó hiểu), và để thư mục rỗng không in gì.
+    total=$(find "$dir" -type f -name "*.sh" | grep -v "/${me}\.sh$" | wc -l | tr -d ' ')
+    if [ "$total" -eq 0 ]; then
+        debug "không có mod nào trong $dir"
+        return 0
+    fi
+
+    mods "$label ($total mod)"
+
+    while IFS= read -r script; do
+        [ -n "$script" ] || continue
+        base=$(basename "$script" .sh)
+        [ "$base" = "$me" ] && continue
+        ran=$((ran + 1))
+        # Báo đường dẫn TƯƠNG ĐỐI, không phải basename: nhiều mod cùng tên
+        # "update.sh" nằm ở các thư mục khác nhau, basename sẽ báo nhập nhằng.
+        if ! bash "$script"; then
+            warn "mod '${script#"$dir"/}' kết thúc với lỗi (vẫn chạy tiếp)"
+            failed=$((failed + 1))
+        fi
+    done < <(find "$dir" -type f -name "*.sh" | sort)
+
+    [ "$failed" -gt 0 ] && warn "$failed/$ran mod thất bại trong $dir"
+    return 0
 }

@@ -11,14 +11,14 @@
 # chữ ký -> ROM không boot được. Thà dừng sớm và nói rõ.
 # ---------------------------------------------------------------------------
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 AndroidVER=$(cat $work_dir/bin/ddevice/androidver.txt 2>/dev/null | tr -d '\r\n ')
 
 if [[ "${AndroidVER%%.*}" == "17" ]]; then
     # A17 dùng patcher riêng: API 37, fail-fast (xem jar_patcher_a17.sh)
     bash $work_dir/bin/package/COREPATCH/jar_patcher_a17.sh
 else
-    echo "[ERROR] COREPATCH: repo chỉ hỗ trợ Android 17, ROM này là '$AndroidVER' - DỪNG"
-    echo "[ERROR] Patcher A13-A16 đã bị xoá. Cần build OS4/A17."
+    error "COREPATCH: repo chỉ hỗ trợ Android 17, ROM này là '$AndroidVER' - DỪNG"
+    error "Patcher A13-A16 đã bị xoá. Cần build OS4/A17."
     exit 1
 fi

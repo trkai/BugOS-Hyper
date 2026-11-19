@@ -28,7 +28,7 @@ if [[ $deviceTYPE == "China" ]];then
     fi
 
     rm -rf $WORK_DIR/apk_temp
-	mods "Done"
+	debug "Done"
 else
     mods "Region not support to patch"
 fi

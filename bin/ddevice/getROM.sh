@@ -2,7 +2,7 @@
 
 baserom="$1"
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 # Check whether it is a local package or a link
 if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     info "Download link detected, starting a download..."
@@ -91,8 +91,6 @@ else
     device_code="YourDevice"
     base_rom_code="Unknown"
 fi
-
-device_f=$(echo $device_code | sed 's/\(Global\|EEAGlobal\|INGlobal\|IDGlobal\|RUGlobal\|TWGlobal\|TRGlobal\|JPGlobal\)$//' | tr '[:upper:]' '[:lower:]')
 
 # Determine Device Type
 info "Get Device Type"

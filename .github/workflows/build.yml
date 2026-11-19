@@ -91,7 +91,7 @@ jobs:
         env:
           INPUT_URL: ${{ inputs.input_url }}
         run: |
-          sudo -E bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
+          sudo -E bash build.sh "$INPUT_URL"
 
       - name: Pack ROM...
         timeout-minutes: 40

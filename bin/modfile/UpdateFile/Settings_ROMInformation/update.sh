@@ -311,7 +311,7 @@ if [ -n "$FP_BRAND" ] && [ -n "$FP_PROD" ] && [ -n "$FP_DEV" ] && [ -n "$FP_REL"
     if [ "$FP_DONE" -eq 0 ]; then
         warn "OS version: không tìm được build.prop nào để ghi fingerprint"
     else
-        mods "OS version: fingerprint = ${CLEAN_FP}"
+        debug "OS version: fingerprint = ${CLEAN_FP}"
     fi
 else
     if [ "$FP_GENERIC" -eq 1 ]; then
@@ -374,7 +374,7 @@ patch_settings_apk() {
     rm -rf "$work"
     mkdir -p "$work"
 
-    mods "Settings: Decode: ${apk#$MAIN_FOLDER/}"
+    debug "Settings: Decode: ${apk#$MAIN_FOLDER/}"
     if ! $APKEDITOR d -f -i "$apk" -o "$out" > "$work/decode.log" 2>&1; then
         warn "Settings: Decode FAILED - giữ APK gốc. Log:"
         tail -n 5 "$work/decode.log" 2>/dev/null
@@ -387,7 +387,7 @@ patch_settings_apk() {
         warn "Settings: Decode ra không có resources/ -> bỏ qua"
         return 1
     fi
-    mods "Settings: res roots: ${#resroots[@]}"
+    debug "Settings: res roots: ${#resroots[@]}"
 
     # Chẩn đoán: nếu header là TextView (không phải ảnh) thì chuỗi sẽ nằm ở values
     local hit
@@ -399,7 +399,7 @@ patch_settings_apk() {
 
     local aspect
     aspect=$(aspect_of "$SRC_DIR/ic_hyper_os.xml")
-    mods "Settings: Wordmark aspect: $aspect"
+    debug "Settings: Wordmark aspect: $aspect"
 
     local total=0
     local strings_done=0
