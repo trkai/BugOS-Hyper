@@ -916,11 +916,11 @@ PY
             warn "Settings: PNG có trong APK nhưng resource 'xiaomi_os_logo' biến mất - giữ APK gốc"
             return 1
         fi
-        mods "Settings: resource name còn trong ARSC (verify $ok_name)"
     fi
 
     cp -f "$work/new.apk" "$apk"
-    mods "Settings: DONE - drawable=$total (verify $ok vector, $ok_png png), string=$strings_done (verify $ok_str) trong ${apk#$MAIN_FOLDER/}"
+    mods "Settings: DONE - $total drawable + $strings_done string trong ${apk#$MAIN_FOLDER/}"
+    debug "Settings: verify vector=$ok png=$ok_png arsc=$ok_name string=$ok_str"
     rm -rf "$work"
     return 0
 }
