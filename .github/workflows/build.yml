@@ -102,6 +102,16 @@ jobs:
         run: |
           sudo -E bash uploadROM.sh
 
+      - name: Free build disk before upload
+        if: success()
+        run: |
+          # uploadROM.sh da chiem xong out/ va ghi output_zip.txt; build/ khong
+          # con ai dung. De nguyen no lam root fs day 100% (log that: 718M/145G)
+          # -> rclone/Gofile de hong o nam cuoi cung.
+          echo "Truoc don: $(df -h / | tail -1)"
+          sudo rm -rf build
+          echo "Sau don:  $(df -h / | tail -1)"
+
       - name: Upload ROM to Google Drive
         id: drive
         if: success()
@@ -112,6 +122,7 @@ jobs:
         run: |
           if [ -z "$RCLONE_CONF" ]; then
             echo "Chưa cấu hình RCLONE_CONF -> bỏ qua Google Drive"
+            # exit 1 co chu: keep outcome=failure de step Gofile (outcome != success) chay.
             exit 1
           fi
 
@@ -122,6 +133,19 @@ jobs:
           fi
 
           DEST="${GDRIVE_DIR:-gdrive:BugOS}"
+
+          # setup.sh co `sudo apt install rclone` NHUNG khong co set -e: neu apt
+          # hong giua chung (PPA / het dia) step van xanh va day moi phat hien o day.
+          if ! command -v rclone >/dev/null 2>&1; then
+            echo "rclone khong co trong PATH -> tu cai lai"
+            sudo apt-get update -qq || true
+            sudo apt-get install -y -qq rclone || {
+              echo "Khong cai duoc rclone -> nhuong cho Gofile"
+              exit 1
+            }
+          fi
+          rclone version | head -n 1
+
           mkdir -p "$HOME/.config/rclone"
           printf '%s\n' "$RCLONE_CONF" > "$HOME/.config/rclone/rclone.conf"
 
@@ -161,20 +185,31 @@ jobs:
           fi
           echo "Gofile server: $SERVER"
 
-          AUTH=()
-          if [ -n "$GOFILE_TOKEN" ]; then
-            AUTH=(-F "token=${GOFILE_TOKEN}")
-          fi
+          # Co token thi thu token truoc. Neu Gofile tra `error-token` (secret sai
+          # hoac het han) thi BO TOKEN va upload an danh - cung cach cac build cu
+          # (trước khi co GOFILE_TOKEN) van upload thanh cong.
+          MODE=token
+          [ -z "$GOFILE_TOKEN" ] && MODE=anon
 
           LINK=""
-          for i in 1 2 3; do
+          for i in 1 2 3 4; do
+            AUTH=()
+            [ "$MODE" = "token" ] && AUTH=(-F "token=${GOFILE_TOKEN}")
+
             RES=$(curl -sS --max-time 3600 "${AUTH[@]}" \
                   -F "file=@${ROM_ZIP_PATH}" "https://${SERVER}.gofile.io/contents/uploadfile") || RES=""
-            echo "Lần $i: status=$(echo "$RES" | jq -r '.status' 2>/dev/null)"
-            LINK=$(echo "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
-            if [ -n "$LINK" ]; then
-              break
+            STATUS=$(printf '%s' "$RES" | jq -r '.status // empty' 2>/dev/null)
+            LINK=$(printf '%s' "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
+            echo "Lần $i (mode=$MODE): status=${STATUS:-curl-error}"
+
+            [ -n "$LINK" ] && break
+
+            if [ "$STATUS" = "error-token" ] && [ "$MODE" = "token" ]; then
+              echo "GOFILE_TOKEN bị Gofile từ chối -> đổi sang upload ẩn danh"
+              MODE=anon
+              continue
             fi
+            [ -n "$STATUS" ] && echo "  response: $(printf '%s' "$RES" | head -c 300)"
             sleep 10
           done
 
