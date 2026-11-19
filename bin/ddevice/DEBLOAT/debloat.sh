@@ -107,6 +107,11 @@ rm -rf "$MAIN_FOLDER/product/app/Updater"
 rm -rf "$MAIN_FOLDER/product/etc/permissions/cn.google.services.xml"
 
 # --- 1. Debloat theo package (chính xác) -----------------------------------
+# Hai bộ đếm để log cuối chỉ in MỘT dòng tổng kết. Trước đây mỗi thư mục bị xoá
+# in một dòng INFO, log build thật có ~60 dòng chỉ để liệt kê file đã xoá -
+# không ai đọc, và che mất cảnh báo thật.
+debloat_pkg_n=0
+debloat_dir_n=0
 if [ "${#debloat_pkgs[@]}" -gt 0 ]; then
     if [ -f "$FINDER" ] && [ -d "$MAIN_FOLDER" ]; then
         pkg_csv=$(IFS=,; echo "${debloat_pkgs[*]}")
@@ -134,13 +139,15 @@ if [ "${#debloat_pkgs[@]}" -gt 0 ]; then
                 # APK nằm trực tiếp trong thư mục chứa app -> chỉ xoá APK,
                 # KHÔNG xoá thư mục mẹ (sẽ xoá cả app/ hay priv-app/).
                 app|priv-app|data-app|overlay|framework)
-                    info "Debloat: xoá APK $pkg -> $apk"
+                    debug "Debloat: xoá APK $pkg -> $apk"
                     rm -f "$apk"
                     rm -rf "$dir/oat"
+                    debloat_pkg_n=$((debloat_pkg_n + 1))
                     ;;
                 *)
-                    info "Debloat: xoá thư mục $pkg -> $dir"
+                    debug "Debloat: xoá thư mục $pkg -> $dir"
                     rm -rf "$dir"
+                    debloat_pkg_n=$((debloat_pkg_n + 1))
                     ;;
             esac
         done < <(python3 "$FINDER" "$MAIN_FOLDER" --list "$pkg_csv" 2>/dev/null)
@@ -184,8 +191,9 @@ for debloat_app in "${debloat_apps[@]}"; do
         fi
         case "$(basename "$(dirname "$app_dir")")" in
             app|priv-app|data-app|overlay)
-                info "Removing directory: $app_dir"
+                debug "Debloat: xoá thư mục $app_dir"
                 rm -rf "$app_dir"
+                debloat_dir_n=$((debloat_dir_n + 1))
                 ;;
             *)
                 warn "Debloat: bỏ qua '$app_dir' - thư mục mẹ không phải app/priv-app/data-app/overlay"
@@ -194,7 +202,7 @@ for debloat_app in "${debloat_apps[@]}"; do
     done <<< "$all_app_dirs"
 done
 
-info "Debloat Done"
+mods "Debloat: xoá $debloat_pkg_n thư mục theo package + $debloat_dir_n thư mục theo tên"
 
 # Xác nhận kho ứng dụng còn thật sự trong images. Nếu base ROM không có sẵn
 # GetApps thì cờ keep_getapps không tạo ra được gì - báo ngay trong log build

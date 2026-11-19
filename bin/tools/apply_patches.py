@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Áp bảng patch method vào một cây smali đã decompile.
 
-    python3 apply_patches.py <smali_tree> <patch.json>
+    python3 apply_patches.py <smali_tree> <patch.json> [-v|--verbose]
+
+Không có -v (mặc định khi build): chỉ in cảnh báo THIẾU ra stderr, im lặng khi
+áp đủ. Caller đã in "Tên.apk: vá N dex" nên không cần thêm.
 
 Với mỗi entry trong JSON:
   - "_newfile": ghi nguyên nội dung thành file mới (đường dẫn tương đối rel).
@@ -90,7 +93,13 @@ def apply_file(path, entry):
 
 
 def main():
+    if len(sys.argv) < 3:
+        sys.stderr.write('dùng: apply_patches.py <smali_tree> <patch.json> [-v]\n')
+        return 1
     tree, json_path = sys.argv[1], sys.argv[2]
+    # --verbose (hoặc DEBUG=1) mới in dòng tổng kết từng file. Xem ghi chú ở cuối.
+    verbose = ('-v' in sys.argv[3:] or '--verbose' in sys.argv[3:]
+               or os.environ.get('DEBUG') == '1')
     with open(json_path, encoding='utf-8') as f:
         patch = json.load(f)
 
@@ -131,13 +140,19 @@ def main():
             if miss:
                 missing.append((rel, miss))
 
-    print('[apply_patches] method áp được: {} | file mới: {}'.format(total_ok, total_new))
+    # Dòng tổng kết chỉ in khi cần: script này được gọi 1 lần cho MỖI file trong
+    # mỗi APK (PRECHINAFIX 69 file + FEATURE_UNLOCK 22 file), nên log build thật
+    # có ~20 dòng "[apply_patches] method áp được: N" xen giữa log có tiền tố.
+    # Caller đã in "MiuiSystemUI.apk: vá 2 dex" - đủ thông tin ở mức bình thường.
+    if verbose:
+        print('[apply_patches] method áp được: {} | file mới: {}'.format(total_ok, total_new))
     if missing:
-        print('[apply_patches] THIẾU {} file:'.format(len(missing)))
+        # THIẾU thì luôn phải thấy: đó là patch không áp được, không phải chi tiết.
+        print('[apply_patches] THIẾU {} file:'.format(len(missing)), file=sys.stderr)
         for rel, ms in missing:
-            print('  {} ({} method)'.format(rel, len(ms)))
+            print('  {} ({} method)'.format(rel, len(ms)), file=sys.stderr)
             for m in ms[:3]:
-                print('      - ' + m[:90])
+                print('      - ' + m[:90], file=sys.stderr)
         return 2
     return 0
 

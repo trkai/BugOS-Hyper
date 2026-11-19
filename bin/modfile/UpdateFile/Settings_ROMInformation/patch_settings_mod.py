@@ -23,6 +23,11 @@ import sys
 import xml.etree.ElementTree as ET
 
 DEFAULT_PKG = "com.khai.roottoolbox"
+
+# Chi tiết từng file xml chỉ in khi DEBUG=1. Log build thật in 4 dòng
+# "  [OK] Đã gắn Intent mở Toolbox vào <file>" - trong khi dòng tổng kết ngay
+# sau đã nói việc gắn đã xong, nên 4 dòng đó chỉ làm log dài.
+VERBOSE = os.environ.get("DEBUG") == "1"
 DEFAULT_CLS = "com.khai.roottoolbox.MainActivity"
 
 # Mọi package từng dùng cho mục Toolbox — để gỡ bản cũ trước khi chèn bản mới.
@@ -139,7 +144,8 @@ def patch_settings_headers(file_path):
     new_content = content[:insert_pos] + mod_header + content[insert_pos:]
 
     if write_file_validated(file_path, new_content):
-        print(f"  [OK] Đã gắn Intent mở Toolbox vào {os.path.basename(file_path)}")
+        if VERBOSE:
+            print(f"  [OK] Đã gắn Intent mở Toolbox vào {os.path.basename(file_path)}")
         return True
     return False
 
@@ -207,7 +213,8 @@ def patch_top_level_settings(file_path):
     new_content = content[:insert_pos] + mod_pref + content[insert_pos:]
 
     if write_file_validated(file_path, new_content):
-        print(f"  [OK] Đã gắn Intent mở Toolbox vào {os.path.basename(file_path)}")
+        if VERBOSE:
+            print(f"  [OK] Đã gắn Intent mở Toolbox vào {os.path.basename(file_path)}")
         return True
     return False
 

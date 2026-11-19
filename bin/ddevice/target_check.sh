@@ -44,24 +44,42 @@ mods "Android $ANDROID_VER (SDK ${SDK_LEVEL:-?}) / $ROM_OS / ${REGION:-?}"
 #
 # Giá trị thường gặp: CN (China), GL (Global), EE (EEA), RU, IN, ID, TR, TW, JP.
 # ---------------------------------------------------------------------------
-BUILD_PROP="$work_dir/build/baserom/images/system/system/build.prop"
-if [ -f "$BUILD_PROP" ]; then
-    ROM_REGION_REAL=$(grep -m1 '^ro\.miui\.build\.region=' "$BUILD_PROP" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
-    [ -z "$ROM_REGION_REAL" ] && ROM_REGION_REAL=$(grep -m1 '^ro\.miui\.region=' "$BUILD_PROP" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+# Region có thể nằm ở nhiều partition tuỳ ROM. Bản cũ CHỈ đọc
+# system/system/build.prop, nên trên OS4 (prop nằm chỗ khác) nó luôn rơi vào
+# nhánh "không có prop -> bỏ qua kiểm tra vùng": cổng chặn ROM Global thành vô
+# dụng mà log chỉ WARN nhẹ. Log build thật 19/11 xác nhận đúng như vậy.
+# Dùng mảng, không dùng chuỗi: đường dẫn build có thể chứa dấu cách.
+REGION_PROPS=(
+    "$work_dir/build/baserom/images/system/system/build.prop"
+    "$work_dir/build/baserom/images/system_ext/etc/build.prop"
+    "$work_dir/build/baserom/images/vendor/build.prop"
+    "$work_dir/build/baserom/images/product/etc/build.prop"
+    "$work_dir/build/baserom/images/odm/etc/build.prop"
+)
+ROM_REGION_REAL=""
+REGION_SRC=""
+for p in "${REGION_PROPS[@]}"; do
+    [ -f "$p" ] || continue
+    v=$(grep -m1 '^ro\.miui\.build\.region=' "$p" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+    [ -z "$v" ] && v=$(grep -m1 '^ro\.miui\.region=' "$p" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
+    if [ -n "$v" ]; then
+        ROM_REGION_REAL="$v"
+        REGION_SRC="${p#$work_dir/build/baserom/images/}"
+        break
+    fi
+done
 
-    if [ -n "$ROM_REGION_REAL" ]; then
-        mods "Vùng ROM thực tế (build.prop): $ROM_REGION_REAL"
-        if [ "$ROM_REGION_REAL" != "CN" ]; then
-            error "ROM này là vùng '$ROM_REGION_REAL', KHÔNG phải China (CN)."
-            error "Repo chỉ build ROM CHINA. Bộ mod de-China sẽ chạy sai trên base Global."
-            error "Dừng build - không tạo ra ROM hỏng."
-            exit 1
-        fi
-    else
-        warn "ROM: build.prop không có ro.miui.build.region / ro.miui.region - bỏ qua kiểm tra vùng"
+if [ -n "$ROM_REGION_REAL" ]; then
+    mods "Vùng ROM thực tế: $ROM_REGION_REAL ($REGION_SRC)"
+    if [ "$ROM_REGION_REAL" != "CN" ]; then
+        error "ROM này là vùng '$ROM_REGION_REAL', KHÔNG phải China (CN)."
+        error "Repo chỉ build ROM CHINA. Bộ mod de-China sẽ chạy sai trên base Global."
+        error "Dừng build - không tạo ra ROM hỏng."
+        exit 1
     fi
 else
-    warn "ROM: không thấy $BUILD_PROP - bỏ qua kiểm tra vùng bằng build.prop"
+    warn "ROM: không có ro.miui.region trong 5 build.prop đã kiểm - KHÔNG xác minh được vùng"
+    warn "     Đã kiểm: system, system_ext, vendor, product, odm. Nếu đây là base Global thì dừng lại."
 fi
 
 # DEVICE_TYPE đoán từ tên file: nếu nó nói Global thì cũng dừng, vì hai lớp
@@ -130,11 +148,9 @@ case "$TARGET_STATUS" in
         mods "Target Android $ANDROID_VER: STABLE"
         ;;
     experimental)
-        warn "=============================================================="
-        warn " Target Android $ANDROID_VER đang ở mức EXPERIMENTAL."
-        warn " Nhánh này CHƯA được kiểm chứng trên ROM thật."
-        warn " Hãy test kỹ: boot, Settings, thông báo, Fake Lock."
-        warn "=============================================================="
+        # Một dòng thay vì 5 dòng khung: cùng nội dung, log gọn hơn, và không
+        # còn 4 dòng WARN trông như 4 lỗi khác nhau.
+        warn "Target Android $ANDROID_VER: EXPERIMENTAL - nhánh CHƯA kiểm chứng trên ROM thật; test kỹ boot / Settings / thông báo / Fake Lock"
         ;;
     *)
         warn "Target Android $ANDROID_VER: trạng thái '$TARGET_STATUS' (không rõ) - vẫn tiếp tục"

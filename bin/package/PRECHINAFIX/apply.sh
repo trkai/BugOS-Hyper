@@ -124,7 +124,14 @@ apply_dex_patch() {
     for d in "$@"; do
         dexname="${d%.dex}"
         pj="$PDIR/${base}-${dexname}.json"
-        [ -f "$pj" ] || { warn_msg "$apkname: thiếu bảng patch $pj - bỏ qua $d"; continue; }
+        if [ ! -f "$pj" ]; then
+            # Tên bảng phải đúng "<base>-<dex>.json". Từng có bảng đặt tên
+            # "PowerKeeper.json" (thiếu "-classes") nên 7 method không bao giờ
+            # được áp mà build vẫn xanh - log chỉ WARN rồi đi tiếp.
+            warn_msg "$apkname: thiếu bảng patch $pj - bỏ qua $d"
+            debug "  bảng có sẵn cho ${base}: $(ls "$PDIR" 2>/dev/null | grep -i "^${base}" | tr '\n' ' ')"
+            continue
+        fi
         [ -f "$tmp/dex/$d" ] || { warn_msg "$apkname: không có $d - bỏ qua"; continue; }
 
         java -jar "$BSMALI_JAR" d --api 37 "$tmp/dex/$d" -o "$tmp/sm/$dexname" >/dev/null 2>&1 || {

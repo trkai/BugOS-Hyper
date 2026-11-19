@@ -183,11 +183,16 @@ fi
 
 for part in ${super_list}; do
     if [ -f "$work_dir/build/baserom/images/${part}.img" ]; then
-        echo ">>> extract ${part}"
-        extract_partition $work_dir/build/baserom/images/${part}.img $work_dir/build/baserom/images || echo "!!! extract ${part} THẤT BẠI"
-        PACK_TYPE=$(cat $work_dir/bin/ddevice/fstype.txt 2>/dev/null || echo "erofs")
+        # extract_partition tự log "[UNPACK] File X.img extracted." nên không in
+        # thêm dòng ">>> extract X" nữa (log build thật bị lặp 2 dòng/partition).
+        debug "extract ${part}"
+        extract_partition "$work_dir/build/baserom/images/${part}.img" "$work_dir/build/baserom/images" \
+            || error "extract ${part} thất bại"
     else
-        echo "!!! không thấy ${part}.img"
+        # odm_dlkm / product_dlkm ... không có trong payload của một số máy - bình
+        # thường. Partition BẮT BUỘC được kiểm riêng ngay dưới (vendor/system/
+        # product), nên ở đây chỉ cần mức debug.
+        debug "không có ${part}.img - bỏ qua"
     fi
 done
 
@@ -318,7 +323,8 @@ echo "$MY_BRAND_NAME" > $work_dir/bin/ddevice/os_type.txt
 echo "$MY_BRAND_NAME" > $work_dir/bin/ddevice/brand.txt
 
 step "Đọc thông tin thiết bị"
-mods "Gathering Devices Infomations"
+# Không in thêm dòng "Gathering Devices Infomations" nữa: step() ngay trên đã
+# nói đúng việc đang làm, và dòng cũ còn sai chính tả.
 bash $work_dir/bin/ddevice/getname.sh "$getvar"
 bash $work_dir/bin/ddevice/fetchINFO.sh
 

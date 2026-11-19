@@ -21,7 +21,7 @@ name=$(cat $work_dir/bin/ddevice/device_name.txt 2>/dev/null | tr -d '\r\n')
 [ -z "$name" ] && name="Xiaomi Device"
 base_rom_code=$(cat $work_dir/bin/ddevice/base_rom_code.txt)
 rom_os=$(cat $work_dir/bin/ddevice/rom_os.txt)
-starxVER=$(cat $work_dir/Version)
+build_tool=$(cat "$work_dir/Version" 2>/dev/null | tr -d '\r\n')
 systemtype=$(cat $work_dir/bin/ddevice/fstype.txt)
 
 if grep -q "ro.build.ab_update=true" build/baserom/images/vendor/build.prop; then
@@ -62,7 +62,7 @@ echo "$sdkLevel" > $work_dir/bin/ddevice/sdkLevel.txt
 #Parse Data
 echo "$AndroidVer" > $work_dir/bin/script2flash/META-INF/Data/AndroidVer
 echo "$base_rom_code" > $work_dir/bin/script2flash/META-INF/Data/RomBased
-echo "$starxVER" > $work_dir/bin/script2flash/META-INF/Data/Version
+echo "$build_tool" > $work_dir/bin/script2flash/META-INF/Data/Version
 echo "$regionTYPE" > $work_dir/bin/script2flash/META-INF/Data/Region
 echo "$name" > $work_dir/bin/script2flash/META-INF/Data/DeviceName
 echo "$systemtype" > $work_dir/bin/script2flash/META-INF/Data/Types
@@ -71,7 +71,7 @@ echo "$systemtype" > $work_dir/bin/script2flash/META-INF/Data/Types
 # Gọn thành 2 dòng thay vì khung 10 dòng: thông tin này còn xuất hiện trong
 # notify.py và tên file ROM, nên không cần chiếm chỗ trong log build.
 info "ROM: $name ($device_code) | $rom_os $base_rom_code | Android $AndroidVer | $regionTYPE | $systemtype"
-info "Tool: v$starxVER | OS type: $os_type | Chip: $(cat $work_dir/bin/script2flash/META-INF/Data/Chip)"
+info "Tool: ${build_tool:-BugOS} | OS type: $os_type | Chip: $(cat $work_dir/bin/script2flash/META-INF/Data/Chip)"
 
 # Chi tiết đầy đủ chỉ khi cần gỡ lỗi.
 if [ "${DEBUG:-0}" = "1" ]; then
@@ -82,7 +82,7 @@ if [ "${DEBUG:-0}" = "1" ]; then
     echo "- BuildRegion: $regionTYPE"
     echo "- Android: $AndroidVer"
     echo "- Base ROM Code: $base_rom_code"
-    echo "- BuildTool Version: $starxVER"
+    echo "- BuildTool: $build_tool"
     echo "- OS Type: $systemtype"
     echo "--------------------------------------------------------"
 fi
