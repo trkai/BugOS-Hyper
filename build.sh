@@ -15,12 +15,6 @@ source "$work_dir/functions.sh"
 # nhầm là lỗi. Trap phải đặt SAU khi source functions.sh mới có hàm error.
 trap 'rc=$?; if [ "$rc" -ne 0 ]; then error "build.sh dừng với mã $rc"; fi' EXIT
 
-# ==================== TOOLBOX MODE (root / kaorios) ====================
-# Ghi lại config.env TRƯỚC mọi bước patch, vì các script sau đọc file này
-# bằng grep chứ không đọc biến môi trường. Xem bin/ddevice/apply_mode.sh.
-step "Chuẩn hoá toolbox mode"
-bash "$work_dir/bin/ddevice/apply_mode.sh"
-
 # Fix lỗi cấu hình gói apt/dpkg và cài đặt các phụ thuộc cần thiết
 sudo dpkg --configure -a 2>/dev/null || true
 sudo apt-get update -y

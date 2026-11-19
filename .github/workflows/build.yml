@@ -6,12 +6,6 @@ on:
       input_url:
         description: 'URL'
         required: true
-      toolbox_mode:
-        description: 'Toolbox trong Settings: chỉ còn root (có root + BugOS Toolbox). Mode kaorios đã xoá.'
-        type: choice
-        options:
-          - root
-        default: root
 
 jobs:
   Initialize:
@@ -69,22 +63,6 @@ jobs:
       - name: Giving permission
         run: |
           sudo chmod 777 -R *
-
-      - name: Apply toolbox mode
-        run: |
-          MODE="${{ inputs.toolbox_mode }}"
-          if [ -z "$MODE" ]; then MODE=root; fi
-          case "$MODE" in
-            root) ;;
-            *) echo "toolbox_mode không hợp lệ: $MODE"; exit 1 ;;
-          esac
-          if grep -q '^toolbox_mode=' config.env; then
-            sed -i "s/^toolbox_mode=.*/toolbox_mode=$MODE/" config.env
-          else
-            echo "toolbox_mode=$MODE" >> config.env
-          fi
-          echo "--- toolbox_mode trong config.env ---"
-          grep -n '^toolbox_mode=' config.env
 
       - name: Build ROM...
         timeout-minutes: 90

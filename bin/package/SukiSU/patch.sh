@@ -274,9 +274,10 @@ mods "SukiSU: boot.img đã vá - $out_sz byte (gốc $stock_sz)"
 APP_DIR="$IMG/product/app/SukiSUUltra"
 PREINSTALL=$(grep -m1 '^sukisu_preinstall_manager=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
 if [ "$PREINSTALL" != "true" ]; then
-    # Không cài sẵn app: người dùng mở Root Toolbox bấm "Cài". Kernel trong
-    # boot.img vẫn có root sẵn, chỉ là chưa có manager nào để nói chuyện.
-    mods "SukiSU: không cài sẵn manager (sukisu_preinstall_manager=false) - Root Toolbox lo"
+    # Không cài sẵn app: kernel trong boot.img vẫn có root sẵn, nhưng KHÔNG có
+    # app nào để nói chuyện với nó (Root Toolbox đã bị xoá khỏi repo). Người
+    # dùng phải tự cài APK manager thì mới có root dùng được.
+    mods "SukiSU: không cài sẵn manager (sukisu_preinstall_manager=false) - người dùng phải tự cài APK"
 elif [ -d "$IMG/product" ]; then
     # Tải manager có thể đã thất bại ở trên (script in "bỏ qua root, build tiếp")
     # nhưng preinstall vẫn chạy tới đây. Thiếu guard thì cp im lặng, unzip im
@@ -434,6 +435,6 @@ fi
 if [ "$PREINSTALL" = "true" ]; then
     mods "SukiSU: xong - root sẵn; manager cài sẵn, tự sang /data/app ở boot đầu"
 else
-    mods "SukiSU: xong - kernel có root sẵn; manager do Root Toolbox cài khi người dùng bấm"
+    mods "SukiSU: xong - kernel có root sẵn; KHÔNG có manager, người dùng phải tự cài APK"
 fi
 exit 0
