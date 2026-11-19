@@ -1,0 +1,17 @@
+# BugOS FCM fix - chay sau khi boot xong.
+#
+# Cung khuon voi bugos-fakelock.rc: late_start + disabled, kich hoat bang
+# sys.boot_completed, vi script can framework (pm/cmd/content deu di qua
+# binder) chu khong chi can /system.
+#
+# Neu service khong chay, kiem tra:
+#   dmesg | grep -E "avc.*bugos|bugos-fcm"
+service bugos-fcm /system/bin/sh /system/bin/bugos-fcm.sh
+    class late_start
+    user root
+    group root system
+    oneshot
+    disabled
+
+on property:sys.boot_completed=1
+    start bugos-fcm

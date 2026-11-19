@@ -16,6 +16,9 @@ fi
 # Chay truoc DISABLE_AVB chi de gom nhom; no khong dung vbmeta.
 bash $target_dir/FAKELOCK/apply.sh
 
+# FCM: mien tru GMS + pha tuong lua PowerKeeper moi lan boot.
+bash $target_dir/FCMFIX/apply.sh
+
 bash $target_dir/DISABLE_AVB/DISABLEavb.sh
 bash $target_dir/RefreshRate/1hz.sh
 
