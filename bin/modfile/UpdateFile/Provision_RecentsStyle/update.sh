@@ -21,7 +21,7 @@ source "$work_dir/functions.sh"
 #       if (bundle == null) return v3;                    // launcher chưa trả lời
 #
 # Bản vá trước chỉ đổi hằng số mặc định 2 -> 3. Nó không ăn, vì:
-#   * hằng số đó nằm trong một thanh ghi cụ thể (bản OS3 là v3, bản OS4 có thể
+#   * hằng số đó nằm trong một thanh ghi cụ thể (bản OS4 có thể
 #     là v0/v1/v2) nên điều kiện 'const/4 v3, 0x2' không khớp -> script lặng lẽ
 #     bỏ qua, giữ nguyên APK gốc;
 #   * và kể cả khi khớp, nếu launcher kịp trả lời provider thì giá trị mặc định

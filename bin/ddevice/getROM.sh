@@ -51,13 +51,7 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     done
 
     baserom="$rom_file"
-    if [ -f $work_dir/topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip ]; then
-        baserom="topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip"
-        info "BASEROM: ${baserom}"
-    elif [ -f $work_dir/munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip ]; then
-        baserom="munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip"
-        info "BASEROM: ${baserom}"
-    elif ! rom_zip_ok "${baserom}"; then
+    if ! rom_zip_ok "${baserom}"; then
         error "Download error! (thiếu hoặc hỏng: ${baserom})"
         exit 1
     fi
@@ -122,21 +116,19 @@ else
     DEVICE_TYPE="China"
 fi
 
-#Check MIUI or Hyper
-if echo "$base_rom_code" | grep -q "OS1"; then
-    ROM_OS="OS1"
-elif echo "$base_rom_code" | grep -q "OS2"; then
-    ROM_OS="OS2"
-elif echo "$base_rom_code" | grep -q "OS3"; then
-    ROM_OS="OS3"
-elif echo "$base_rom_code" | grep -q "OS4"; then
+# Chỉ hỗ trợ HyperOS 4. Các nhánh OS1/OS2/OS3 và MIUI (V13/V14) đã bị xoá cùng
+# toàn bộ mod/modfile của chúng — nhận nhầm một ROM cũ sẽ dựng ROM thiếu patch mà
+# không báo lỗi, nên ở đây phải DỪNG và nói rõ.
+if echo "$base_rom_code" | grep -q "OS4"; then
     ROM_OS="OS4"
+elif echo "$base_rom_code" | grep -qE "(OS1|OS2|OS3|V13|V14)"; then
+    echo "ROM này là '$(echo "$base_rom_code" | grep -oE '(OS[0-9]+|V1[34])' | head -n1)' - repo chỉ hỗ trợ OS4."
+    echo "Unsupport ROM Exiting..."
+    exit 1
 elif echo "$base_rom_code" | grep -qE "OS[0-9]+"; then
-    ROM_OS=$(echo "$base_rom_code" | grep -oE "OS[0-9]+" | head -n 1)
-elif echo "$base_rom_code" | grep -q "V14"; then
-    ROM_OS="MIUI"
-elif echo "$base_rom_code" | grep -q "V13"; then
-    ROM_OS="MIUI"
+    echo "ROM '$(echo "$base_rom_code" | grep -oE 'OS[0-9]+' | head -n1)' chưa có target - chỉ hỗ trợ OS4."
+    echo "Unsupport ROM Exiting..."
+    exit 1
 else
     echo "Unsupport ROM Exiting..."
     exit 1

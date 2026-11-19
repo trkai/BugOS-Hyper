@@ -16,9 +16,13 @@ Repo **chỉ build OS4 trên Android 17**. Mọi nhánh khác đã bị xoá:
 | `COREPATCH/jar_patcher_a13..a16.sh` | chỉ giữ `a17` |
 | `NOTIFICATION_FIX/A13..A16/` | chỉ giữ `A17` |
 | `gmsservices/maps/A13..A15/` | chỉ giữ `A17` |
+| `UpdateFile/China_GoogleCTS4A13` | chỉ chạy khi `androidVER == 13` |
+| `MultiLang/updatesource/` | trùng 62/62 file với `updatesource_os4/` |
+| `Fonts/HyperOS/A14/` | trùng 6/6 file với `Fonts/HyperOS/` |
 
-`bin/package/COREPATCH/update.sh` **exit 1** nếu Android không phải 17, và
-`target_check.sh` chặn build khi thiếu `targets/android<VER>.env`.
+`getROM.sh` **exit 1** với mọi ROM không phải OS4 (`OS1/OS2/OS3`, `V13/V14`,
+hoặc `OS<n>` lạ), `bin/package/COREPATCH/update.sh` exit 1 nếu Android không
+phải 17, và `target_check.sh` chặn build khi thiếu `targets/android<VER>.env`.
 
 ---
 

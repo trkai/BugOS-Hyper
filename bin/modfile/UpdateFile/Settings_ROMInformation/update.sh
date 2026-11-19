@@ -52,11 +52,11 @@ my_props=(
 # Lấy version ROM.
 #
 # NGUỒN CHÍNH là base_rom_code - chuỗi lấy từ TÊN FILE ROM, ví dụ
-#   annibale-ota_full-OS3.0.307.0.WPKCNXM-user-16.0-....zip  ->  OS3.0.307.0.WPKCNXM
+#   annibale-ota_full-OS4.0.6.0.XPKCNXM-user-17.0-...zip  ->  OS4.0.6.0.XPKCNXM
 # Đây đúng là chuỗi mà trang Giới thiệu điện thoại hiển thị ở dòng "Phiên bản OS".
 #
 # Trước đây lấy từ build.prop trước, và trên ROM thật nó ra
-#   "16OS3.1.260716.235326947.QCPECN"   (sai hoàn toàn)
+#   "17OS4.1.260716.235326947.QCPECN"   (sai hoàn toàn)
 # vì ro.mi.os.version.incremental của bản build này không cùng định dạng.
 # Prop chỉ còn là fallback, và phải qua bước kiểm tra định dạng.
 rom_version_name=""
@@ -157,7 +157,7 @@ for p in "${my_props[@]}"; do
     [ -n "$(tail -c1 "$p")" ] && echo "" >> "$p"
 
     # Dòng "Phiên bản OS" (trang Giới thiệu) đọc ro.mi.os.version.name.
-    # Giữ nguyên tiền tố gốc (vd "OS3.0.307.0.WPKCNXM") rồi nối thêm brand, để
+    # Giữ nguyên tiền tố gốc (vd "OS4.0.6.0.XPKCNXM") rồi nối thêm brand, để
     # các đoạn code so sánh startsWith("OS") vẫn đúng.
     if grep -q '^ro\.mi\.os\.version\.name=' "$p" 2>/dev/null; then
         cur_name=$(grep -m1 '^ro\.mi\.os\.version\.name=' "$p" | cut -d= -f2- | tr -d '\r\n')
@@ -585,7 +585,7 @@ patch_settings_apk() {
                 found=$((found + 1))
             done < <(find "$resroot" -type f -name "dimens.xml" -path "*/values*/*" 2>/dev/null)
             if [ "$found" -eq 0 ]; then
-                # Tên dimen đọc được trên Settings OS4 (a17); OS3 (a16) chưa kiểm
+                # Tên dimen đọc được trên Settings OS4 (a17)
                 # trực tiếp. Nếu bản ROM đang build đặt tên khác thì logo không
                 # to lên - in ra các dimen nghi vấn để lần sau sửa đúng chỗ,
                 # thay vì chỉ nói "không thấy".

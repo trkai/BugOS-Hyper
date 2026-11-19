@@ -2,7 +2,7 @@
 # ---------------------------------------------------------------------------
 # Thay app hệ thống bằng bản APK có sẵn trong apks/
 #
-# Áp cho mọi phiên bản HyperOS (OS3 / OS4 ...), vì chỉ thay file APK.
+# Chỉ áp cho OS4 (repo chỉ còn target này), vì chỉ thay file APK.
 #
 # Cách tìm app đích: đọc AndroidManifest.xml của từng APK trong images và so
 # khớp TÊN PACKAGE, không dựa vào tên thư mục (MIUIGallery / Weather / ... đổi

@@ -68,24 +68,6 @@ jar_util()
         fi
     fi
 }
-find_and_replace_miui() {
-    local search=$1
-    local replace=$2
-    local base_dir=$work_dir/jar_temp/miui-services.jar.out
-    local files=(
-        "MiuiKeyShortcutManager$MiuiOtherSettingsObserver.smali"
-    )
-
-    for file in "${files[@]}"; do
-        file_path=$(find "$base_dir" -name "$file")
-        if [[ -n $file_path ]]; then
-            if grep -q "$search" "$file_path"; then
-                sed -i "s|$search|$replace|g" "$file_path"
-            fi
-        fi
-    done
-}
-
 find_and_replace_hyperos() {
     local search=$1
     local replace=$2
@@ -107,16 +89,10 @@ find_and_replace_hyperos() {
 miui-services() {
     jar_util d "miui-services.jar" fw
 
-    if [[ $rom_os == "MIUI" ]];then
-
-    find_and_replace_miui "sget-boolean v0, Lmiui/os/Build;->IS_GLOBAL_BUILD:Z" "const/4 v0, 0x1"
-
-    else
-
+    # Chỉ còn HyperOS 4: nhánh MIUI (dùng find_and_replace_miui + anchor khác)
+    # đã bị xoá. find_and_replace_hyperos là hàm duy nhất còn định nghĩa.
     find_and_replace_hyperos "sget-boolean v0, Lmiui/os/Build;->IS_GLOBAL_BUILD:Z" "const/4 v0, 0x1"
 
-    fi
-    
     jar_util a "miui-services.jar" 
 }
 
