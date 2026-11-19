@@ -172,75 +172,6 @@ PY
   return 0
 }
 
-replace_move_result_after_invoke() {
-  local file="$1"
-  local invoke_pattern="$2"
-  local replacement="$3"
-
-  python3 - "$file" "$invoke_pattern" "$replacement" << 'PY'
-from pathlib import Path
-import re
-import sys
-
-path = Path(sys.argv[1])
-invoke_pattern = sys.argv[2]
-replacement = sys.argv[3]
-
-if not path.exists():
-    sys.exit(4)
-
-lines = path.read_text().splitlines()
-matched = False
-changed = False
-
-i = 0
-while i < len(lines):
-    line = lines[i]
-    if invoke_pattern in line:
-        matched = True
-        for j in range(i + 1, min(i + 6, len(lines))):
-            target = lines[j].strip()
-            if target.startswith('move-result'):
-                indent = re.match(r"\s*", lines[j]).group(0)
-                desired = f"{indent}{replacement}"
-                if target == replacement:
-                    break
-                if lines[j].strip() == replacement:
-                    break
-                lines[j] = desired
-                changed = True
-                break
-        i = i + 1
-    else:
-        i += 1
-
-if not matched:
-    sys.exit(3)
-
-if changed:
-    path.write_text("\n".join(lines) + "\n")
-PY
-
-  local status=$?
-  case "$status" in
-    0)
-      log "Replaced move-result after invoke '${invoke_pattern##*/}' in $(basename "$file")"
-      ;;
-    3)
-      warn "Invoke pattern '${invoke_pattern}' not found in $(basename "$file")"
-      ;;
-    4)
-      warn "File not found: $file"
-      ;;
-    *)
-      err "Failed to replace move-result in $file (status $status)"
-      return 1
-      ;;
-  esac
-
-  return 0
-}
-
 force_methods_return_const() {
   local file="$1"
   local method_substring="$2"
@@ -578,14 +509,14 @@ PY
 }
 
 # ----------------------------------------------
-# Framework patches (Android 16)
+# Framework patches (Android 17)
 # ----------------------------------------------
 
-# Apply signature verification bypass patches to framework.jar (Android 16)
+# Apply signature verification bypass patches to framework.jar (Android 17)
 apply_framework_signature_patches() {
   local decompile_dir="$1"
 
-  log "Applying signature verification patches to framework.jar (Android 16)..."
+  log "Applying signature verification patches to framework.jar (Android 17)..."
 
   local pkg_parser_file
   pkg_parser_file=$(find "$decompile_dir" -type f -path "*/android/content/pm/PackageParser.smali" | head -n1)
@@ -622,21 +553,19 @@ apply_framework_signature_patches() {
     warn "SigningDetails.smali not found"
   fi
 
-  local apk_sig_scheme_v2_file
-  apk_sig_scheme_v2_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSignatureSchemeV2Verifier.smali" | head -n1)
-  if [ -n "$apk_sig_scheme_v2_file" ]; then
-    replace_move_result_after_invoke "$apk_sig_scheme_v2_file" "invoke-static {v8, v4}, Ljava/security/MessageDigest;->isEqual([B[B)Z" "const/4 v0, 0x1"
-  else
-    warn "ApkSignatureSchemeV2Verifier.smali not found"
-  fi
-
-  local apk_sig_scheme_v3_file
-  apk_sig_scheme_v3_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSignatureSchemeV3Verifier.smali" | head -n1)
-  if [ -n "$apk_sig_scheme_v3_file" ]; then
-    replace_move_result_after_invoke "$apk_sig_scheme_v3_file" "invoke-static {v9, v3}, Ljava/security/MessageDigest;->isEqual([B[B)Z" "const/4 v0, 0x1"
-  else
-    warn "ApkSignatureSchemeV3Verifier.smali not found"
-  fi
+  # isEqual trong ApkSignatureSchemeV2Verifier / V3Verifier / ApkSigningBlockUtils
+  # KHÔNG vá ở đây. Ba file đó do patch_isequal_true() xử lý ngay sau bước này,
+  # và nó giữ nguyên số thanh ghi đích.
+  #
+  # Lý do bỏ: bản cũ gọi replace_move_result_after_invoke() với anchor cứng
+  # "invoke-static {v9, v3}" và đích cứng "const/4 v0, 0x1". Trên OS4 (A17):
+  #   V3Verifier  : invoke {v5, v4} -> move-result v11  -> anchor KHÔNG khớp
+  #                 => log build in WARN "Invoke pattern ... not found" mỗi lần,
+  #                    trong khi patch_isequal_true vá đúng 1 site ngay sau đó.
+  #   V2Verifier  : anchor khớp, nhưng nếu move-result đích không phải v0 thì
+  #                 helper ghi const/4 v0 -> giá trị rơi vào thanh ghi khác,
+  #                 chỗ kiểm tra chữ ký không nhận được 0x1.
+  # Bỏ hẳn 3 lời gọi: patch_isequal_true phủ cả 3 file và an toàn hơn.
 
   local apk_signature_verifier_file
   apk_signature_verifier_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSignatureVerifier.smali" | head -n1)
@@ -645,14 +574,6 @@ apply_framework_signature_patches() {
     insert_line_before_all "$apk_signature_verifier_file" "ApkSignatureVerifier;->verifyV1Signature" "const p3, 0x0"
   else
     warn "ApkSignatureVerifier.smali not found"
-  fi
-
-  local apk_signing_block_utils_file
-  apk_signing_block_utils_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSigningBlockUtils.smali" | head -n1)
-  if [ -n "$apk_signing_block_utils_file" ]; then
-    replace_move_result_after_invoke "$apk_signing_block_utils_file" "invoke-static {v5, v6}, Ljava/security/MessageDigest;->isEqual([B[B)Z" "const/4 v7, 0x1"
-  else
-    warn "ApkSigningBlockUtils.smali not found"
   fi
 
   local strict_jar_verifier_file
@@ -679,20 +600,20 @@ apply_framework_signature_patches() {
     warn "ParsingPackageUtils.smali not found"
   fi
 
-  log "Signature verification patches applied to framework.jar (Android 16)"
+  log "Signature verification patches applied to framework.jar (Android 17)"
 }
 
-# Apply disable secure flag patches to framework.jar (Android 16)
+# Apply disable secure flag patches to framework.jar (Android 17)
 apply_framework_disable_secure_flag() {
   local decompile_dir="$1"
 
-  log "Applying disable secure flag patches to framework.jar (Android 16)..."
+  log "Applying disable secure flag patches to framework.jar (Android 17)..."
 
-  # Note: For Android 16, disable secure flag does not require framework.jar patches
+  # Note: For Android 17, disable secure flag does not require framework.jar patches
   # Only services.jar and miui-services.jar are affected
-  log "Disable secure flag: No framework.jar patches required for Android 16"
+  log "Disable secure flag: No framework.jar patches required for Android 17"
 
-  log "Disable secure flag patches applied to framework.jar (Android 16)"
+  log "Disable secure flag patches applied to framework.jar (Android 17)"
 }
 
 # ---------------------------------------------------------------------------
@@ -715,12 +636,15 @@ apply_framework_disable_secure_flag() {
 # Vá mọi chỗ gọi MessageDigest.isEqual trong file: đổi "move-result vN" ngay sau
 # đó thành "const/4 vN, 0x1" - GIỮ NGUYÊN số thanh ghi.
 #
-# Vì sao không dùng replace_move_result_after_invoke: helper đó khớp theo chuỗi
-# invoke CỐ ĐỊNH (kèm số thanh ghi) và thay bằng const/4 CỐ ĐỊNH. Trên Android 17:
-#   ApkSignatureSchemeV2Verifier : invoke {v8, v4} -> move-result v0    (khớp)
-#   ApkSignatureSchemeV3Verifier : invoke {v5, v4} -> move-result v11   (KHÔNG khớp
-#       vì anchor cũ là {v9, v3}; và nếu khớp thì const/4 v0 cũng sai, phải là v11)
-#   ApkSigningBlockUtils         : invoke {v5, v6} -> move-result v7    (khớp)
+# Đây là CÁCH DUY NHẤT repo vá isEqual sau khi bỏ helper khớp-anchor-cứng. Helper
+# cũ (replace_move_result_after_invoke) khớp theo chuỗi invoke kèm SỐ THANH GHI cố
+# định rồi ghi const/4 cũng cố định, nên trên Android 17:
+#   ApkSignatureSchemeV3Verifier : invoke {v5, v4} -> move-result v11
+#       anchor cũ {v9, v3} không khớp -> WARN mỗi lần build, patch không ăn
+#   ApkSignatureSchemeV2Verifier : invoke {v8, v4} -> move-result v0
+#       khớp, nhưng nếu đích khác v0 thì ghi const/4 v0 là SAI thanh ghi
+# Hàm dưới đây đọc đúng số thanh ghi từ chính dòng move-result nên đúng cho mọi
+# biến thể build.
 patch_isequal_true() {
   local file="$1"
   [ -f "$file" ] || { warn "A17 extra: không thấy $file"; return 0; }
@@ -783,7 +707,8 @@ patch_provider_authority_null() {
     return 0
   fi
 
-  python3 - "$f" <<'PYEOF'
+  local _out
+  _out=$(python3 - "$f" <<'PYEOF'
 import re, sys
 from pathlib import Path
 
@@ -829,8 +754,10 @@ if s2.count(':gms_authority_null_fix') != 2:
 p.write_text(s2)
 print('GMS authority: da them null-check trong installProviderAuthoritiesLocked')
 PYEOF
-
+  )
+  # Lay rc NGAY sau khi python ket thuc: dong debug ben duoi lam thay doi $?.
   local rc=$?
+  [ -n "$_out" ] && debug "GMS authority: $_out"
   if [ "$rc" -eq 0 ]; then
     log "A17 extra: ActivityThread.installProviderAuthoritiesLocked chong NPE khi authority=null"
   else
@@ -843,14 +770,23 @@ apply_a17_extra_framework() {
   local decompile_dir="$1"
   local f v
 
-  # 1) MessageDigest.isEqual -> luôn true, giữ nguyên thanh ghi
+  # 1) MessageDigest.isEqual -> luôn true, giữ nguyên thanh ghi.
+  #
+  #    ĐÂY LÀ PASS DUY NHẤT vá isEqual (pass anchor-cứng đã bị bỏ), nên:
+  #      - đếm được site  -> log INFO, nêu rõ số site
+  #      - 0 site         -> WARN thật, vì nghĩa là pattern isEqual đã đổi ở bản
+  #                          ROM này và bypass chữ ký có thể không ăn
   for v in ApkSignatureSchemeV2Verifier ApkSignatureSchemeV3Verifier ApkSigningBlockUtils; do
     f=$(find "$decompile_dir" -type f -name "$v.smali" 2>/dev/null | head -n 1)
-    if [ -n "$f" ]; then
-      log "A17 extra: $v -> isEqual true (register-preserving)"
-      patch_isequal_true "$f"
-    else
+    if [ -z "$f" ]; then
       warn "A17 extra: không thấy $v.smali"
+      continue
+    fi
+    _n=$(patch_isequal_true "$f" | awk -F': ' '/patched/ {print $2}')
+    if [ "${_n:-0}" -gt 0 ]; then
+      log "A17 extra: $v -> isEqual true ($_n site)"
+    else
+      warn "A17 extra: $v không có site isEqual nào - pattern đã đổi, cần xem lại"
     fi
   done
 
@@ -897,7 +833,8 @@ patch_notification_wake() {
     warn "A17 extra: không thấy NotificationManagerService.smali - bỏ qua vá wake"
     return 0
   fi
-  python3 - "$f" << 'PYEOF'
+  local _out
+  _out=$(python3 - "$f" << 'PYEOF'
 import re, sys
 from pathlib import Path
 p = Path(sys.argv[1])
@@ -917,6 +854,8 @@ s = s[:m.start(1)] + body2 + s[m.end(1):]
 p.write_text(s)
 print("da doi checkCallerIsSystem -> isCallerSystemOrSystemUi")
 PYEOF
+  )
+  [ -n "$_out" ] && debug "checkCallerIsSystem: $_out"
   if grep -A6 '\.method [^\n]*checkCallerIsSystem()V' "$f" 2>/dev/null | grep -q 'isCallerSystemOrSystemUi'; then
     log "A17 extra: NotificationManagerService.checkCallerIsSystem -> chấp nhận SystemUI (bật màn hình khi có thông báo)"
   else
@@ -1067,7 +1006,8 @@ apply_boot_state_spoof() {
 .end method
 SMALIEOF
 
-  python3 - "$sp" << 'PYEOF'
+  local _out
+  _out=$(python3 - "$sp" << 'PYEOF'
 import re, sys
 from pathlib import Path
 
@@ -1132,6 +1072,8 @@ if patched == 0:
 path.write_text(s)
 print(f"da va {patched} method")
 PYEOF
+  )
+  [ -n "$_out" ] && debug "BootStateSpoof: $_out"
 
   if grep -q "$MARK" "$sp" 2>/dev/null; then
     log "BootStateSpoof: SystemProperties.get -> green/locked cho 6 prop boot (chỉ tầng Java)"
@@ -1141,7 +1083,7 @@ PYEOF
 }
 
 
-# Main framework patching function (Android 16)
+# Main framework patching function (Android 17)
 patch_framework() {
   local framework_path="$work_dir/build/baserom/images/system/system/framework/framework.jar"
 
@@ -1175,14 +1117,14 @@ patch_framework() {
 }
 
 # ----------------------------------------------
-# Services patches (Android 16)
+# Services patches (Android 17)
 # ----------------------------------------------
 
-# Apply signature verification bypass patches to services.jar (Android 16)
+# Apply signature verification bypass patches to services.jar (Android 17)
 apply_services_signature_patches() {
   local decompile_dir="$1"
 
-  log "Applying signature verification patches to services.jar (Android 16)..."
+  log "Applying signature verification patches to services.jar (Android 17)..."
 
   # Resolve smali files across classes*/ to handle layout differences in CI
   resolve_smali_file() {
@@ -1254,43 +1196,42 @@ apply_services_signature_patches() {
 
   # modify_invoke_custom_methods "$decompile_dir"
 
-  # Emit robust verification logs for CI (avoid brittle hardcoded file paths)
-  log "[VERIFY] services: locating isLeavingSharedUser invoke (context)"
-  grep -s -R -n --include='*.smali' \
+  # Kiểm chứng: các dòng grep ở đây in nguyên đường dẫn + số dòng smali ra log
+  # (log build thật đổ ~10 dòng /home/runner/.../classes3/... rất khó đọc). Chuyển
+  # sang debug - chỉ hiện khi DEBUG=1, vẫn tra được khi patch không ăn.
+  debug "[VERIFY] services: isLeavingSharedUser invoke (context)"
+  debug "$(grep -s -R -n --include='*.smali' \
     'invoke-interface {p5}, Lcom/android/server/pm/pkg/AndroidPackage;->isLeavingSharedUser()Z' \
-    "$decompile_dir" | head -n 1 || true
+    "$decompile_dir" | head -n 1)"
 
-  log "[VERIFY] services: verifySignatures/compareSignatures/matchSignaturesCompat presence"
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* verifySignatures' "$decompile_dir" | head -n 1 || true
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* compareSignatures' "$decompile_dir" | head -n 1 || true
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* matchSignaturesCompat' "$decompile_dir" | head -n 1 || true
+  debug "[VERIFY] services: verifySignatures/compareSignatures/matchSignaturesCompat presence"
+  debug "$(grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* verifySignatures' "$decompile_dir" | head -n 1)"
+  debug "$(grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* compareSignatures' "$decompile_dir" | head -n 1)"
+  debug "$(grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* matchSignaturesCompat' "$decompile_dir" | head -n 1)"
 
-  log "[VERIFY] services: checkDowngrade methods now return-void"
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\.method.*checkDowngrade' "$decompile_dir" | head -n 5 || true
+  debug "[VERIFY] services: checkDowngrade -> return-void ($(grep -s -R -c --include='*.smali' '^[[:space:]]*\.method.*checkDowngrade' "$decompile_dir" | awk -F: '{s+=$2} END{print s+0}') method)"
 
-  log "[VERIFY] services: ReconcilePackageUtils <clinit> toggle lines"
   local rpu_file
   rpu_file=$(find "$decompile_dir" -type f -path "*/com/android/server/pm/ReconcilePackageUtils.smali" | head -n1)
   if [ -n "$rpu_file" ]; then
-    grep -n '^[[:space:]]*\\.method static constructor <clinit>()V' "$rpu_file" || true
-    grep -n 'const/4 v0, 0x[01]' "$rpu_file" | head -n 5 || true
+    debug "[VERIFY] ReconcilePackageUtils clinit toggle: $(grep -c 'const/4 v0, 0x[01]' "$rpu_file") dong"
   fi
 
-  log "Signature verification patches applied to services.jar (Android 16)"
+  log "Signature verification patches applied to services.jar (Android 17)"
 }
 
-# Apply disable secure flag patches to services.jar (Android 16)
+# Apply disable secure flag patches to services.jar (Android 17)
 apply_services_disable_secure_flag() {
   local decompile_dir="$1"
 
-  log "Applying disable secure flag patches to services.jar (Android 16)..."
+  log "Applying disable secure flag patches to services.jar (Android 17)..."
 
-  # Android 16: Patch WindowState.isSecureLocked()
+  # Android 17: Patch WindowState.isSecureLocked()
   log "Patching WindowState.isSecureLocked()..."
   local method_body="    .registers 6\n\n    const/4 v0, 0x0\n\n    return v0"
   replace_entire_method "isSecureLocked()Z" "$decompile_dir" "$method_body" "com/android/server/wm/WindowState"
 
-  log "Disable secure flag patches applied to services.jar (Android 16)"
+  log "Disable secure flag patches applied to services.jar (Android 17)"
 }
 
 # ---------------------------------------------------------------------------
@@ -1340,7 +1281,7 @@ SMALI
   log "Đã chèn WindowState.isBypassSecureFlag() -> false (phòng hờ, không còn caller)"
 }
 
-# Main services patching function (Android 16)
+# Main services patching function (Android 17)
 patch_services() {
   local services_path="$work_dir/build/baserom/images/system/system/framework/services.jar"
 
@@ -1392,39 +1333,38 @@ patch_services() {
 }
 
 # ----------------------------------------------
-# MIUI services patches (Android 16)
+# MIUI services patches (Android 17)
 # ----------------------------------------------
 
-# Apply signature verification bypass patches to miui-services.jar (Android 16)
+# Apply signature verification bypass patches to miui-services.jar (Android 17)
 apply_miui_services_signature_patches() {
   local decompile_dir="$1"
 
-  log "Applying signature verification patches to miui-services.jar (Android 16)..."
+  log "Applying signature verification patches to miui-services.jar (Android 17)..."
 
   # According to the miui-services guide: force specific methods to return-void
   patch_return_void_methods_all "verifyIsolationViolation" "$decompile_dir"
   patch_return_void_methods_all "canBeUpdate" "$decompile_dir"
 
-  # Targeted verification that won't hang
-  log "[VERIFY] miui-services: verifyIsolationViolation/canBeUpdate return-void"
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\.method.*verifyIsolationViolation' "$decompile_dir" | head -n 5 || true
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\.method.*canBeUpdate' "$decompile_dir" | head -n 5 || true
+  # Kiểm chứng: chỉ đếm, không đổ đường dẫn smali ra log (xem ghi chú ở
+  # apply_services_signature_patches).
+  debug "[VERIFY] miui-services: verifyIsolationViolation $(grep -s -R -c --include='*.smali' '^[[:space:]]*\.method.*verifyIsolationViolation' "$decompile_dir" | awk -F: '{s+=$2} END{print s+0}') method, canBeUpdate $(grep -s -R -c --include='*.smali' '^[[:space:]]*\.method.*canBeUpdate' "$decompile_dir" | awk -F: '{s+=$2} END{print s+0}') method"
 
-  log "Signature verification patches applied to miui-services.jar (Android 16)"
+  log "Signature verification patches applied to miui-services.jar (Android 17)"
 }
 
-# Apply disable secure flag patches to miui-services.jar (Android 16)
+# Apply disable secure flag patches to miui-services.jar (Android 17)
 apply_miui_services_disable_secure_flag() {
   local decompile_dir="$1"
 
-  log "Applying disable secure flag patches to miui-services.jar (Android 16)..."
+  log "Applying disable secure flag patches to miui-services.jar (Android 17)..."
 
-  # Android 16: Patch WindowManagerServiceImpl.notAllowCaptureDisplay()
+  # Android 17: Patch WindowManagerServiceImpl.notAllowCaptureDisplay()
   log "Patching WindowManagerServiceImpl.notAllowCaptureDisplay()..."
   local method_body="    .registers 9\n\n    const/4 v0, 0x0\n\n    return v0"
   replace_entire_method "notAllowCaptureDisplay(Lcom/android/server/wm/RootWindowContainer;I)Z" "$decompile_dir" "$method_body" "com/android/server/wm/WindowManagerServiceImpl"
 
-  log "Disable secure flag patches applied to miui-services.jar (Android 16)"
+  log "Disable secure flag patches applied to miui-services.jar (Android 17)"
 }
 
 # Apply Gboard patches
@@ -1442,25 +1382,31 @@ apply_miui_services_gboard() {
   sed_all_smali "$decompile_dir" "$expr" "com/android/server/wm/MiuiSplitInputMethodImpl.smali"
   sed_all_smali "$decompile_dir" "$expr" "com/miui/server/security/AppBehaviorService.smali"
 
-  echo "Gboard patches applied to miui-services.jar"
+  log "Gboard patches applied to miui-services.jar"
 }
 
 # Apply ContentExtension patches
 apply_miui_services_contentextension() {
   local decompile_dir="$1"
   replace_line_contains_in_smali_method "IS_INTERNATIONAL_BUILD" "updateContentCatcherWhitelist()V" "    const/4 v0, 0x0" "$decompile_dir/smali/com/android/server/am/ProcessPolicy.smali"
-  echo "ContentExtension patches applied to miui-services.jar"
+  log "ContentExtension patches applied to miui-services.jar"
 }
 
 # Apply floating
 apply_miui_services_floating() {
   local decompile_dir="$1"
-  for i in "$decompile_dir/"*"/com/android/server/wm/MiuiFreeFormStackDisplayStrategy.smali"; do
-    patch_method_in_file "getMaxMiuiFreeFormStackCount(Ljava/lang/String;Lcom/android/server/wm/MiuiFreeFormActivityStack;)I" 6 "$i"
+  # Chỉ lặp các thư mục smali THẬT. Bản cũ dùng "$decompile_dir/"*"/..." nên khớp
+  # cả symlink tương thích classes -> smali, và vá/log hai lần cùng một file
+  # (log build thật in hai dòng "✓ Patched getMaxMiuiFreeFormStackCount ...").
+  local d
+  for d in "$decompile_dir"/smali "$decompile_dir"/smali_classes*; do
+    [ -f "$d/com/android/server/wm/MiuiFreeFormStackDisplayStrategy.smali" ] || continue
+    patch_method_in_file "getMaxMiuiFreeFormStackCount(Ljava/lang/String;Lcom/android/server/wm/MiuiFreeFormActivityStack;)I" 6 \
+      "$d/com/android/server/wm/MiuiFreeFormStackDisplayStrategy.smali"
   done
 }
 
-# Main miui-services patching function (Android 16)
+# Main miui-services patching function (Android 17)
 patch_miui_services() {
   local miui_services_path="$work_dir/build/baserom/images/system_ext/framework/miui-services.jar"
 
@@ -1523,7 +1469,7 @@ apply_miui_framework_gboard() {
   sed_all_smali "$decompile_dir" "$expr" "com/android/internal/os/AnrEnhanceImpl.smali"
   sed_all_smali "$decompile_dir" "$expr" "miui/util/HapticFeedbackUtil.smali"
 
-  echo "Gboard patches applied to miui-framework.jar"
+  log "Gboard patches applied to miui-framework.jar"
 }
 
 # Main miui-framework patching function

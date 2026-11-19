@@ -12,6 +12,14 @@
 # của lệnh con sẽ không bị lẫn log vào).
 # ---------------------------------------------------------------------------
 
+# Chống nạp hai lần: getROM.sh (được build.sh `source`) cũng source
+# functions.sh -> lib/log.sh lần nữa. Không có guard thì _BUGOS_STEP bị reset
+# về 0 giữa build, và số bước in ra sai (log thật: bước 12 hiện thành [10]).
+if [ -n "${_BUGOS_LOG_LOADED:-}" ]; then
+    return 0 2>/dev/null || true
+fi
+_BUGOS_LOG_LOADED=1
+
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
     _C_RST=$'\e[0m'
     _C_BOLD=$'\e[1m'

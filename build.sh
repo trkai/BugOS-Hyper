@@ -1,5 +1,3 @@
-trap 'rc=$?; echo "[TRAP] build.sh kết thúc, mã thoát $rc"' EXIT
-
 # Chỉ nhận 1 tham số: đường dẫn/URL ROM. Các tham số repo_name/prefix_id/
 # builder_name/builder_id trước đây khai báo nhưng KHÔNG dùng ở đâu trong file -
 # notify.py được workflow gọi trực tiếp, không qua build.sh.
@@ -11,6 +9,11 @@ export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$PATH
 chmod 777 ${work_dir}/bin/*
 chmod 777 ${work_dir}/bin/Linux/x86_64/*
 source "$work_dir/functions.sh"
+
+# Chỉ báo khi build THẤT BẠI. Bản cũ in "[TRAP] build.sh kết thúc, mã thoát 0" ở
+# MỌI lần build thành công, nên dòng cuối log trông như có sự cố và dễ bị đọc
+# nhầm là lỗi. Trap phải đặt SAU khi source functions.sh mới có hàm error.
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then error "build.sh dừng với mã $rc"; fi' EXIT
 
 # ==================== TOOLBOX MODE (root / kaorios) ====================
 # Ghi lại config.env TRƯỚC mọi bước patch, vì các script sau đọc file này

@@ -27,6 +27,9 @@ if ! declare -F info >/dev/null 2>&1; then
     info()  { printf '[INFO] %s\n'  "$*" >&2; }
     warn()  { printf '[WARN] %s\n'  "$*" >&2; }
     error() { printf '[ERROR] %s\n' "$*" >&2; }
+    # debug cũng phải có: patching.sh đã chuyển 7 dòng "✓ Patched ..." sang
+    # debug. Thiếu hàm này thì mỗi lần vá xong sẽ in "debug: command not found".
+    debug() { :; }
 fi
 
 # Progress indicator (giữ hành vi cũ: ghi đè một dòng bằng \r).
