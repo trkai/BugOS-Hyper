@@ -53,7 +53,7 @@
    ]
   }
  },
- "com/android/thememanager/detail/theme/presenter/OnlineResourceDetailPresenter.smali": {
+ "com/android/thememanager/module/detail/presenter/OnlineResourceDetailPresenter.smali": {
   "methods": {
    "public ld6()Z": [
     ".method public ld6()Z",
