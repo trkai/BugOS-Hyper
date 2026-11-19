@@ -12,9 +12,9 @@ if ! bash $target_dir/COREPATCH/update.sh; then
     exit 1
 fi
 
-# bootconfig phải vá TRƯỚC DISABLE_AVB: sửa boot.img làm lệch vbmeta, nên bước
-# vbmeta phải chạy sau cùng để tính lại trên ảnh đã sửa.
-bash $target_dir/BOOTCONFIG/apply.sh
+# Fake lock o tang property: dat script + init service vao system image.
+# Chay truoc DISABLE_AVB chi de gom nhom; no khong dung vbmeta.
+bash $target_dir/FAKELOCK/apply.sh
 
 bash $target_dir/DISABLE_AVB/DISABLEavb.sh
 bash $target_dir/RefreshRate/1hz.sh
