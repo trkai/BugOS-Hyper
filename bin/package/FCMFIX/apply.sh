@@ -28,6 +28,54 @@ mkdir -p "$SYS/etc/init"
 install -m 0644 "$SRC/fcm-fix.rc" "$SYS/etc/init/bugos-fcm.rc" \
     || { error "FCMFix: không chép được init service"; exit 1; }
 
+# ---------------------------------------------------------------------------
+# Tat Greezer ngay trong build.prop (khong chi luc chay).
+#
+# Greezer/powmillet la co che cua MIUI giam process app khi xuong nen. No pha
+# vo quy tac "co quyen thong bao thi co thong bao": dumpsys cho thay app co
+# notification record day du nhung process van bi giam (Frozen pids), nen thong
+# bao den muon 5-15 phut.
+#
+# Do tren annibale 21/11:
+#   /product/etc/build.prop dong 175: persist.sys.powmillet.enable=true
+#   cmd greezer ls -> enable=true (persist.sys.powmillet.enable)
+#                                 (persist.sys.gz.enable)
+#
+# Vi sao sua build.prop chu khong chi setprop luc chay:
+#   - build.prop duoc doc truoc khi GreezeManagerService khoi tao, nen no tat
+#     ngay tu dau, khong co khoang thoi gian app bi giam trong luc boot.
+#   - persist.sys.* ghi de len gia tri build.prop, nen ai da doi bang tay thi
+#     van con gia tri cu; script luc chay (fcm-fix.sh) xu ly not truong hop do.
+#
+# `ro.millet.netlink` KHONG dong: chi la so hieu netlink, khong bat/tat gi.
+GREEZER_OFF=$(grep -m1 '^fcm_fix_greezer_off=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+case "$GREEZER_OFF" in
+    true|1|"") GREEZER_OFF=1 ;;
+    *) GREEZER_OFF=0 ;;
+esac
+if [ "$GREEZER_OFF" = "1" ]; then
+    PBP="$work_dir/build/baserom/images/product/etc/build.prop"
+    if [ -f "$PBP" ]; then
+        if grep -q '^persist\.sys\.powmillet\.enable=' "$PBP"; then
+            sed -i -E 's|^persist\.sys\.powmillet\.enable=.*|persist.sys.powmillet.enable=false|' "$PBP"
+        else
+            echo "persist.sys.powmillet.enable=false" >> "$PBP"
+        fi
+        # gz.enable khong co san trong build.prop cua ROM nay - them vao de
+        # GreezeManagerService doc duoc ngay tu dau.
+        if grep -q '^persist\.sys\.gz\.enable=' "$PBP"; then
+            sed -i -E 's|^persist\.sys\.gz\.enable=.*|persist.sys.gz.enable=false|' "$PBP"
+        else
+            echo "persist.sys.gz.enable=false" >> "$PBP"
+        fi
+        mods "FCMFix: Greezer tắt trong build.prop (powmillet + gz = false)"
+    else
+        warn "FCMFix: không thấy $PBP - Greezer chỉ được tắt lúc chạy"
+    fi
+else
+    debug "FCMFix: fcm_fix_greezer_off=0 - giữ Greezer bật"
+fi
+
 # Cau hinh luc chay: chi 2 tuy chon nay thay doi theo y nguoi dung.
 # Phan GMS/PowerKeeper/GCM luon chay - do la loi cua ROM China, khong phai
 # tuy chon.
