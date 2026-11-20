@@ -637,6 +637,23 @@ patch_settings_apk() {
                 mkdir -p "$(dirname "$dst")"
                 cp -f "$src" "$dst" && kashi_n=$((kashi_n + 1))
             done < <(cd "$kashi_dir" && find res -type f \( -name "*.xml" -o -name "*.png" \) | sort)
+
+            # File ĐÈ lên file có sẵn (không thêm public entry, id đã tồn tại).
+            # miui_version_card.xml: tool online sửa layout này để chèn
+            # VersionBgImageView (@id/device_info_version_card_bg) và
+            # device_name_in_banner. Thiếu nó thì setVersionCardBgElement gọi
+            # findViewById -> null -> NPE ở setOnClickListener, crash ngay khi
+            # mở "Thiết bị của tôi". Đã gặp thật ở build 890a561.
+            if [ -d "$kashi_dir/replace/res" ]; then
+                while IFS= read -r rel; do
+                    [ -n "$rel" ] || continue
+                    src="$kashi_dir/replace/$rel"
+                    dst="$resroot/${rel#res/}"
+                    [ -f "$src" ] || continue
+                    mkdir -p "$(dirname "$dst")"
+                    cp -f "$src" "$dst" && kashi_n=$((kashi_n + 1))
+                done < <(cd "$kashi_dir/replace" && find res -type f | sort)
+            fi
         done
 
         if [ "$kashi_n" -gt 0 ]; then
@@ -664,8 +681,14 @@ want = [("layout", "device_info_item_kashi"),
         ("drawable", "version_card_img_dark"),
         ("drawable", "version_card_img_light"),
         ("id", "storage_progress_kchi"),
+        ("id", "device_info_version_card_bg"),
+        ("id", "device_name_in_banner"),
         ("color", "bw"),
         ("color", "storage_progress_bg")]
+
+# id phải khai trong values/ids.xml trước, public.xml chỉ gán số.
+NEW_IDS = ["storage_progress_kchi", "device_info_version_card_bg",
+           "device_name_in_banner"]
 
 # color phải có khai báo giá trị trong colors.xml trước, public.xml chỉ gán số.
 COLORS = {"bw": "#ff000000", "storage_progress_bg": "#11000000"}
@@ -682,13 +705,18 @@ for root, _dirs, files in os.walk(out):
             open(p, "w", encoding="utf-8", newline="\n").write(s)
 
 # id phải khai trong values/ids.xml trước, public.xml chỉ gán số.
+NEW_IDS = ["storage_progress_kchi", "device_info_version_card_bg",
+           "device_name_in_banner"]
 for root, _dirs, files in os.walk(out):
     if "ids.xml" in files and os.path.basename(root) == "values":
         p = os.path.join(root, "ids.xml")
         s = open(p, encoding="utf-8", errors="replace").read()
-        if 'name="storage_progress_kchi"' not in s:
-            s = s.replace("</resources>",
-                          '  <id name="storage_progress_kchi" />\n</resources>')
+        add = ""
+        for n in NEW_IDS:
+            if 'name="%s"' % n not in s:
+                add += '  <id name="%s" />\n' % n
+        if add:
+            s = s.replace("</resources>", add + "</resources>")
             open(p, "w", encoding="utf-8", newline="\n").write(s)
 
 pubs = []
