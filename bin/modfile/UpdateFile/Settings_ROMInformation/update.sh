@@ -608,14 +608,25 @@ patch_settings_apk() {
     # và id storage_progress_kchi (layout tham chiếu @id/...).
     # Màu my_device_info_item_background_color KHÔNG thêm: APK gốc đã có.
     # 10 class mới + 5 method sửa đã được vá ở PRECHINAFIX
-    # (Settings-classes12.json / Settings-classes3.json), chạy TRƯỚC bước này.
+    # (Settings-coloros-classes3.json / -classes12.json), chạy TRƯỚC bước này.
+    #
+    # PHẢI đi cùng cờ settings_coloros với phần dex. Nếu chỉ vá dex mà thiếu
+    # resource (hoặc ngược lại), Settings crash ngay khi mở "Thiết bị của tôi":
+    # code gọi Resources.getIdentifier("device_info_item_kashi") -> trả 0 ->
+    # inflate(0). Đã gặp thật ở build 20/11 15:54.
     #
     # Smali của bản vá tra resource THEO TÊN lúc chạy
     # (Resources.getIdentifier) chứ không nhúng id, nên chỉ cần đúng tên -
     # không phải trùng id với APK gốc. Vì vậy cấp id mới cho từng entry là đủ.
     local kashi_dir="$SRC_DIR/kashi"
     local kashi_n=0
-    if [ -d "$kashi_dir" ]; then
+    local coloros_on
+    coloros_on=$(grep -m1 '^settings_coloros=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    if [ "$coloros_on" != "true" ]; then
+        kashi_dir=""
+        debug "Settings: settings_coloros != true - không thêm resource ColorOS"
+    fi
+    if [ -n "$kashi_dir" ] && [ -d "$kashi_dir" ]; then
         local rel src dst
         for resroot in "${resroots[@]}"; do
             while IFS= read -r rel; do

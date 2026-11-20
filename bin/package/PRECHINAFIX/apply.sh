@@ -239,13 +239,22 @@ fi
 # Settings: vá TRƯỚC Settings_ROMInformation (chạy trong insupdate.sh). Bước đó
 # decode lại chính file này rồi rebuild với branding BugOS, nên 7 method vẫn
 # còn. Nếu bước branding fail và giữ APK gốc, patch vẫn không mất.
-#
-# classes12: nơi chứa 10 class mới của bản vá "About phone kiểu ColorOS"
-# (com.kashi.settings.view.*, com.android.settings.kashi.Utils). Bản gốc không
-# có classes12 patch nào nên phải thêm vào danh sách này.
 SETAPK=$(find "$MAIN_FOLDER" -type f -name "Settings.apk" 2>/dev/null | head -n1)
 if [ -n "$SETAPK" ]; then
-    apply_dex_patch "$SETAPK" Settings classes2.dex classes3.dex classes4.dex classes12.dex
+    apply_dex_patch "$SETAPK" Settings classes2.dex classes3.dex classes4.dex
+
+    # Bản vá "About phone kiểu ColorOS" tách riêng và có cờ riêng, vì nó KHÔNG
+    # tự đứng một mình: 5 method ở classes3 gọi 10 class mới ở classes12, và
+    # các class đó lại inflate 2 layout + 4 drawable do update.sh thêm vào
+    # Settings.apk ở bước sau. Thiếu một trong hai nửa là Settings crash khi mở
+    # "Thiết bị của tôi" (getIdentifier trả 0 -> inflate 0). Vì vậy phải bật/tắt
+    # CẢ HAI cùng lúc bằng settings_coloros.
+    COLOROS=$(grep -m1 '^settings_coloros=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    if [ "$COLOROS" = "true" ]; then
+        apply_dex_patch "$SETAPK" Settings-coloros classes3.dex classes12.dex
+    else
+        log_msg "Settings: settings_coloros != true - bỏ qua bản vá ColorOS (classes3 + classes12)"
+    fi
 else
     warn_msg "ROM không có Settings.apk - bỏ qua"
 fi

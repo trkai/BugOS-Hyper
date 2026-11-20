@@ -1558,12 +1558,13 @@ apply_miui_services_floating() {
 # ---------------------------------------------------------------------------
 patch_is_international_in_method() {
   local decompile_dir="$1" rel="$2" method="$3"
-  local d f start end total i hits=0
+  local d f start end total i hits=0 found=0
   for d in "$decompile_dir"/smali "$decompile_dir"/smali_classes*; do
     f="$d/$rel"
     [ -f "$f" ] || continue
     start=$(grep -n "^[[:space:]]*\.method.* $method" "$f" | cut -d: -f1 | head -n1)
     [ -z "$start" ] && continue
+    found=1
     total=$(wc -l < "$f")
     end=0
     i=$start
@@ -1577,7 +1578,15 @@ patch_is_international_in_method() {
       hits=$((hits + 1))
     fi
   done
-  [ "$hits" -gt 0 ] || warn "ChinaBroadcast: không thấy IS_INTERNATIONAL_BUILD trong $rel::$method"
+  if [ "$found" -eq 1 ] && [ "$hits" -eq 0 ]; then
+    # Method co nhung khong con doc IS_INTERNATIONAL_BUILD. Thuong la
+    # PRECHINAFIX da thay ca than method truoc do (no chay TRUOC COREPATCH) va
+    # da hard-code ket qua - vd: const/4 v0, 0x1 thay cho sget-boolean
+    # IS_INTERNATIONAL_BUILD. Khi do patch nay khong con gi de lam, va day la
+    # trang thai DUNG, khong phai loi. Chi bao o muc debug.
+    debug "ChinaBroadcast: $rel::$method đã được PRECHINAFIX xử lý trước - bỏ qua"
+  fi
+  return 0
 }
 
 apply_china_broadcast_unblock() {
@@ -1590,6 +1599,9 @@ apply_china_broadcast_unblock() {
   fi
 
   local rel_am="com/android/server/am/BroadcastQueueModernStubImpl.smali"
+  local before=$(grep -rl "Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z" \
+      "$decompile_dir"/smali* 2>/dev/null | wc -l)
+
   patch_is_international_in_method "$decompile_dir" "$rel_am" \
     "isInternationalSpecialAction(Ljava/lang/String;Landroid/content/pm/ResolveInfo;)Z"
   patch_is_international_in_method "$decompile_dir" "$rel_am" "updateBlockBroadcast()V"
@@ -1605,7 +1617,16 @@ apply_china_broadcast_unblock() {
     "com/android/server/am/ProcessSceneCleaner.smali" \
     "killAppForHasOtherTask(ILmiui/process/ProcessConfig;)Z"
 
-  log "ChinaBroadcast: 6 method chuyển IS_INTERNATIONAL_BUILD -> IS_MIUI"
+  # Khong in "6 method da chuyen" mot cach vo dieu kien: PRECHINAFIX chay
+  # TRUOC va da thay than 6 method nay (hard-code ket qua), nen o day thuong
+  # khong con gi de doi. Bao dung su that thay vi bao so luong cho co.
+  local after=$(grep -rl "Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z" \
+      "$decompile_dir"/smali* 2>/dev/null | wc -l)
+  if [ "${before:-0}" = "${after:-0}" ]; then
+    log "ChinaBroadcast: 6 method đã được PRECHINAFIX xử lý trước (không còn IS_INTERNATIONAL_BUILD để đổi)"
+  else
+    log "ChinaBroadcast: đổi IS_INTERNATIONAL_BUILD -> IS_MIUI trong $((before - after)) file"
+  fi
 }
 
 patch_miui_services() {
