@@ -646,15 +646,40 @@ import re
 import sys
 
 out = sys.argv[1]
-# 7 resource mới. my_device_info_item_background_color KHÔNG nằm ở đây vì
+# 9 resource mới. my_device_info_item_background_color KHÔNG nằm ở đây vì
 # APK gốc đã có sẵn màu đó.
+#
+# bw + storage_progress_bg: HAI MÀU NÀY LÀ BẮT BUỘC, không phải trang trí.
+# Vector ic_device_name_info.xml và storage_progress_drawable.xml tham chiếu
+# @color/bw và @color/storage_progress_bg - cả hai do tool online thêm vào,
+# APK gốc không có. Thiếu chúng thì APKEditor dừng với:
+#     java.io.IOException: Resource not found for: '@color/bw'
+#     at line = 7, <path android:fillColor="@color/bw"
+# và "Settings: Rebuild FAILED" -> giữ APK gốc. Đã gặp thật ở build 20/11
+# 15:54, và đây chính là lý do bản vá ColorOS không vào được ROM.
 want = [("layout", "device_info_item_kashi"),
         ("layout", "storage_info_item_kashi"),
         ("drawable", "ic_device_name_info"),
         ("drawable", "storage_progress_drawable"),
         ("drawable", "version_card_img_dark"),
         ("drawable", "version_card_img_light"),
-        ("id", "storage_progress_kchi")]
+        ("id", "storage_progress_kchi"),
+        ("color", "bw"),
+        ("color", "storage_progress_bg")]
+
+# color phải có khai báo giá trị trong colors.xml trước, public.xml chỉ gán số.
+COLORS = {"bw": "#ff000000", "storage_progress_bg": "#11000000"}
+for root, _dirs, files in os.walk(out):
+    if "colors.xml" in files and os.path.basename(root) == "values":
+        p = os.path.join(root, "colors.xml")
+        s = open(p, encoding="utf-8", errors="replace").read()
+        add = ""
+        for n, v in COLORS.items():
+            if 'name="%s"' % n not in s:
+                add += '  <color name="%s">%s</color>\n' % (n, v)
+        if add:
+            s = s.replace("</resources>", add + "</resources>")
+            open(p, "w", encoding="utf-8", newline="\n").write(s)
 
 # id phải khai trong values/ids.xml trước, public.xml chỉ gán số.
 for root, _dirs, files in os.walk(out):
