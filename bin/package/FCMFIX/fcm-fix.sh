@@ -121,6 +121,44 @@ if command -v content >/dev/null 2>&1; then
     done
 fi
 
+# --- 2b. Greezer: tha app ra va tat launch-freeze -------------------------
+# Do tren annibale (21/11): GMS da duoc mien tru hoan toan (gms_control=false,
+# bgControl=noRestrict, cgroup.freeze=0, doze 3 muc) nhung Telegram/nekogram
+# VAN cham. Nguyen nhan la Greezer, khong phai GMS:
+#
+#     cmd greezer ls
+#       -> Frozen pids: [16411, 18030]
+#       -> /proc/18030/cmdline = tw.nekomimi.nekogram
+#     cmd greezer history
+#       -> th: launch_mode   (115 lan trong 1 phien)
+#
+# Greezer giam process khi app xuong nen, nen thong bao bi giu lai den lan mo
+# app ke tiep. Mien tru doze/AppOps khong cham toi no - hai co che khac nhau.
+#
+# Do duoc cach xu ly:
+#   setprop persist.sys.gz.enable false        -> tat Greezer
+#   setprop persist.sys.powmillet.enable false -> tat cong tac chinh
+#   cmd greezer thaw                           -> tha moi process dang bi giam
+# Sau do 2 phut theo doi: nekogram khong bi giam lai.
+#
+# Luu y: `cmd greezer enable false` chi tat launch-freeze trong phien, khong
+# ghi prop, nen boot sau lai bat. Phai dung setprop.
+GZ_OFF=$(conf_get greezer_off)
+if [ "$GZ_OFF" != "0" ] && [ "$GZ_OFF" != "false" ]; then
+    if cmd greezer ls >/dev/null 2>&1; then
+        setprop persist.sys.gz.enable false
+        setprop persist.sys.powmillet.enable false
+        # Tha ngay, khong doi app nao bi giam san tu truoc.
+        cmd greezer thaw >/dev/null 2>&1
+        frozen=$(cmd greezer ls 2>/dev/null | sed -n 's/^Frozen pids: //p')
+        say "Greezer: da tat (gz.enable=false, powmillet=false), thaw -> frozen=${frozen:-?}"
+    else
+        say "Greezer: khong co lenh cmd greezer - bo qua"
+    fi
+else
+    say "Greezer: greezer_off=0 - giu nguyen"
+fi
+
 # --- 3. Ep GCM noi lai socket ---------------------------------------------
 # Khong co tac dung phu: day la broadcast noi bo cua GMS.
 am broadcast -a com.google.android.intent.action.GCM_RECONNECT -p com.google.android.gms >/dev/null 2>&1

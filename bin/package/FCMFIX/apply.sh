@@ -33,6 +33,8 @@ install -m 0644 "$SRC/fcm-fix.rc" "$SYS/etc/init/bugos-fcm.rc" \
 # tuy chon.
 wake=$(grep -m1 '^fcm_fix_wake_screen=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
 content=$(grep -m1 '^fcm_fix_lockscreen_content=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+greezer_off=$(grep -m1 '^fcm_fix_greezer_off=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+case "$greezer_off" in true|1|"") greezer_off=1 ;; *) greezer_off=0 ;; esac
 # case thay cho `[ ] && ...`: chuoi && cuoi cung tra ma khac 0 se lam chet
 # script khi functions.sh bat set -e.
 case "$wake" in true|1) wake=1 ;; *) wake=0 ;; esac
@@ -42,8 +44,12 @@ case "$content" in true|1) content=1 ;; *) content=0 ;; esac
     echo "# BugOS FCM fix - cau hinh luc chay."
     echo "# wake_screen=1: bat man hinh khi co thong bao."
     echo "# lockscreen_content=1: hien day du noi dung tren man hinh khoa (rieng tu)."
+    echo "# greezer_off=1: tat Greezer (giam process khi app xuong nen)."
+    echo "#   0 = giu nguyen. Xem fcm-fix.sh phan 2b: do tren annibale, Greezer la"
+    echo "#   thu pham rieng, khong lien quan GMS; mien tru doze khong cham toi no."
     echo "wake_screen=$wake"
     echo "lockscreen_content=$content"
+    echo "greezer_off=${greezer_off:-1}"
 } > "$SYS/etc/bugos-fcm.conf"
 chmod 0644 "$SYS/etc/bugos-fcm.conf"
 
