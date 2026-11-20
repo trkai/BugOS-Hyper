@@ -753,7 +753,7 @@ for p in pubs:
     if added:
         open(p, "w", encoding="utf-8", newline="\n").write(s)
 PYEOF
-            mods "Settings: bản vá ColorOS - $kashi_n file + 2 màu (bw, storage_progress_bg) + id storage_progress_kchi"
+            mods "Settings: bản vá ColorOS - $kashi_n file + 2 màu + 3 id (storage_progress_kchi, device_info_version_card_bg, device_name_in_banner)"
         else
             warn "Settings: không chép được resource bản vá ColorOS"
         fi
