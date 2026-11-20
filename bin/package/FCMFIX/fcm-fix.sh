@@ -121,6 +121,60 @@ if command -v content >/dev/null 2>&1; then
     done
 fi
 
+# --- 2a. App nguoi dung can thong bao: bgControl=noRestrict ----------------
+# Day la phan tra loi cau hoi "cap quyen thong bao thi co duoc on dinh khong".
+# Tra loi: KHONG. Quyen thong bao chi cho phep HIEN thi; no khong ngan duoc
+# PowerKeeper/Greezer giam process. Hai tang khac nhau:
+#   - Quyen thong bao (POST_NOTIFICATIONS) -> NotificationManager co hien hay khong
+#   - bgControl trong PowerKeeper userTable -> process co bi giam khi xuong nen
+#
+# Do tren annibale 21/11 voi nekogram (da co quyen thong bao, da co notification
+# record trong dumpsys):
+#   bgControl=miuiAuto + Greezer bat -> Frozen pids co 18030 (chinh nekogram),
+#       thong bao cham 5-15 phut. Quyen thong bao khong cuu duoc.
+#   bgControl=noRestrict + Greezer bat -> ve nen + tat man hinh 3 phut, pid
+#       18030 van song, khong bi giam.
+#   Greezer tat han -> cung khong bi giam.
+# => noRestrict la du; khong phai tat Greezer toan cuc (do la danh doi pin).
+#
+# Nen: set bgControl=noRestrict cho tung app trong fcm_fix_keep_apps, va de
+# Greezer bat nhu mac dinh ROM.
+KEEP=$(conf_get fcm_fix_keep_apps)
+if [ -n "$KEEP" ]; then
+    _n=0
+    for p in $(echo "$KEEP" | tr ',' ' '); do
+        [ -n "$p" ] || continue
+        # Bo qua GMS/Vending: da xu ly trong pk_disarm.
+        case "$p" in
+            com.google.android.gms|com.android.vending) continue ;;
+        esac
+        # Chi lam voi app da cai - tranh tao row rac trong userTable.
+        if ! pm list packages 2>/dev/null | grep -qF "package:$p"; then
+            say "keep-apps: $p chua cai - bo qua"
+            continue
+        fi
+        has=$(content query --uri content://com.miui.powerkeeper.configure/userTable \
+              --where "pkgName='${p}' AND userId=0" 2>/dev/null | grep -cF "pkgName=$p")
+        if [ "$has" = "0" ]; then
+            content insert --uri content://com.miui.powerkeeper.configure/userTable \
+                --bind pkgName:s:"$p" --bind userId:i:0 --bind bgControl:s:noRestrict 2>/dev/null
+        else
+            content update --uri content://com.miui.powerkeeper.configure/userTable \
+                --bind bgControl:s:noRestrict \
+                --where "pkgName='${p}' AND userId=0" 2>/dev/null
+        fi
+        # Xac nhan bang cach doc lai, khong tin exit code (xem ghi chu o pk_disarm).
+        now=$(content query --uri content://com.miui.powerkeeper.configure/userTable \
+              --where "pkgName='${p}' AND userId=0" 2>/dev/null | grep -o 'bgControl=[^,]*' | head -n1 | cut -d= -f2)
+        if [ "$now" = "noRestrict" ]; then
+            _n=$((_n + 1))
+        else
+            say "keep-apps: $p -> bgControl=$now (khong dat duoc)"
+        fi
+    done
+    say "keep-apps: $_n app da dat bgControl=noRestrict"
+fi
+
 # --- 2b. Greezer: tha app ra va tat launch-freeze -------------------------
 # Do tren annibale (21/11): GMS da duoc mien tru hoan toan (gms_control=false,
 # bgControl=noRestrict, cgroup.freeze=0, doze 3 muc) nhung Telegram/nekogram

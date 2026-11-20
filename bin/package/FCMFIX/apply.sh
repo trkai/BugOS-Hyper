@@ -35,6 +35,7 @@ wake=$(grep -m1 '^fcm_fix_wake_screen=' "$work_dir/config.env" 2>/dev/null | cut
 content=$(grep -m1 '^fcm_fix_lockscreen_content=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
 greezer_off=$(grep -m1 '^fcm_fix_greezer_off=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
 case "$greezer_off" in true|1|"") greezer_off=1 ;; *) greezer_off=0 ;; esac
+keep_apps=$(grep -m1 '^fcm_fix_keep_apps=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2- | tr -d ' \r\n')
 # case thay cho `[ ] && ...`: chuoi && cuoi cung tra ma khac 0 se lam chet
 # script khi functions.sh bat set -e.
 case "$wake" in true|1) wake=1 ;; *) wake=0 ;; esac
@@ -47,9 +48,12 @@ case "$content" in true|1) content=1 ;; *) content=0 ;; esac
     echo "# greezer_off=1: tat Greezer (giam process khi app xuong nen)."
     echo "#   0 = giu nguyen. Xem fcm-fix.sh phan 2b: do tren annibale, Greezer la"
     echo "#   thu pham rieng, khong lien quan GMS; mien tru doze khong cham toi no."
+    echo "# keep_apps: package cach nhau bang dau phay, duoc dat bgControl=noRestrict"
+    echo "#   -> Greezer KHONG giam khi app xuong nen. Quyen thong bao KHONG du."
     echo "wake_screen=$wake"
     echo "lockscreen_content=$content"
     echo "greezer_off=${greezer_off:-1}"
+    echo "fcm_fix_keep_apps=$keep_apps"
 } > "$SYS/etc/bugos-fcm.conf"
 chmod 0644 "$SYS/etc/bugos-fcm.conf"
 
