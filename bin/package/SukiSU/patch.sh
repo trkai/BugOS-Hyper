@@ -336,8 +336,8 @@ fi
 # chỉ thực sự cài đúng một lần. Cài lỗi thì app hệ thống vẫn còn (chỉ là chưa
 # dùng được) - không mất app, không boot loop.
 # ---------------------------------------------------------------------------
-INSTALL_SH="$IMG/system_ext/bin/bugos_sukisu_manager.sh"
-INSTALL_RC="$IMG/system_ext/etc/init/init.bugos.sukisu.rc"
+INSTALL_SH="$IMG/system/bin/bugos_sukisu_manager.sh"
+INSTALL_RC="$IMG/system/etc/init/bugos-sukisu-manager.rc"
 if [ "$PREINSTALL" != "true" ]; then
     mods "SukiSU: bỏ qua service tự cài manager (đã tắt preinstall)"
 elif [ -d "$IMG/system_ext" ]; then
@@ -403,31 +403,33 @@ SHEOF
     chmod 0755 "$INSTALL_SH"
 
     cat > "$INSTALL_RC" << 'RCEOF'
-# BugOS - cài SukiSU Ultra vào /data/app ở lần boot đầu.
-# Xem bin/package/SukiSU/patch.sh.
+# BugOS - cai SukiSU Ultra vao /data/app o lan boot dau.
 #
-# VÌ SAO PHẢI ĐI QUA `su`:
-# Bản trước dùng `seclabel u:r:shell:s0` với giả định "chỉ domain shell mới có
-# binder". Đo trên annibale (A17/OS4.0.6) thì SAI: từ domain shell,
-#     runcon u:r:shell:s0 cat /system_ext/bin/bugos_sukisu_manager.sh -> rc=126
-#     runcon u:r:shell:s0 sh -c 'echo x > /data/local/tmp/_t'        -> denied
-#     runcon u:r:shell:s0 pm path android                             -> rc=126
-# tức không đọc được script, không ghi được log, không gọi được pm. Service có
-# start (ro.boottime có ghi) nhưng `sh` không mở nổi file nên thoát ngay, không
-# một dòng log nào - đúng hiện tượng đã gặp.
+# VI SAO PHAI O /system/etc/init/ (khong phai /system_ext/etc/init/):
+# Do tren annibale (A17/OS4.0.6): dat rc o system_ext thi init KHONG he nap.
+# Bang chung: getprop khong co init.svc.bugos_sukisu_manager, va cac service
+# khac cung nam o do (dmadio, gptresize, hybrid_control) cung khong co
+# init.svc.*. Nghia la ROM nay chi quet /system/etc/init/, khong quet
+# system_ext/etc/init/ nhu AOSP. Doi sang /system/etc/init/ la init nap duoc.
 #
-# Domain duy nhất trên máy này có đủ quyền là u:r:ksu:s0 (domain của `su`).
-# Nên: service chạy /system/bin/su -c ... để KernelSU tự chuyển domain.
-# /system/bin/su do ksud tạo lúc boot, nên dùng trigger boot_completed thay vì
-# class main (ở 5 giây đầu file đó có thể chưa có).
-service bugos_sukisu_manager /system/bin/su -c "/system/bin/sh /system_ext/bin/bugos_sukisu_manager.sh"
+# VI SAO KHONG dung `su`: /system/bin/su do ksud tao ra LUC BOOT, ma ksud chi
+# chay khi kernel da nhan manager. Manager chi duoc nhan khi APK nam trong
+# /data/app. Service nay chinh la thu dua APK vao /data/app -> neu phu thuoc
+# su thi thanh vong lap khong loi ra (dung hien tuong: root thanh cong nhung
+# app bao chua cai dat, cai lai bang tay thi duoc).
+#
+# Domain: u:r:shell:s0, theo khuon co san trong init.miui.ext.rc
+# (pubcert_download: init exec /system/bin/sh voi seclabel shell).
+# Tren may nay tu shell KHONG doc duoc /system_ext/bin/* (da do: rc=126), nen
+# script phai nam o /system/bin/ va co nhan system_file.
+service bugos_sukisu_manager /system/bin/sh /system/bin/bugos_sukisu_manager.sh
     class late_start
     user root
     group root system
     oneshot
+    seclabel u:r:shell:s0
     disabled
 
-# Trigger theo boot_completed: lúc đó ksud đã tạo xong /system/bin/su.
 on property:sys.boot_completed=1
     start bugos_sukisu_manager
 RCEOF
@@ -437,16 +439,22 @@ RCEOF
     # gốc). Với file của mình thì phải là 0755, nếu không `sh` không đọc được
     # khi service không chạy bằng uid 0 - đúng lỗi đã gặp. Ghi thẳng vào
     # fs_config: fspatch giữ nguyên entry đã có, nên entry này thắng.
-    FS_CFG="$IMG/config/system_ext_fs_config"
-    if [ -f "$FS_CFG" ]; then
-        {
-            echo "system_ext/bin/bugos_sukisu_manager.sh 0 0 0755"
-            echo "system_ext/etc/init/init.bugos.sukisu.rc 0 0 0644"
-        } >> "$FS_CFG"
-        mods "SukiSU: fs_config -> script 0755, rc 0644"
-    else
-        warn "SukiSU: không thấy $FS_CFG - script có thể bị đóng 0750 và không chạy được"
-    fi
+    for FS_CFG in "$IMG/config/system_fs_config" "$IMG/config/system_ext_fs_config"; do
+        [ -f "$FS_CFG" ] || continue
+        case "$FS_CFG" in
+            *system_ext_fs_config)
+                # rc gio nam o /system/etc/init, chi can khai bao script o day
+                # neu ban ROM co dat no duoi system_ext (khong con).
+                ;;
+            *)
+                {
+                    echo "system/bin/bugos_sukisu_manager.sh 0 0 0755"
+                    echo "system/etc/init/bugos-sukisu-manager.rc 0 0 0644"
+                } >> "$FS_CFG"
+                ;;
+        esac
+    done
+    mods "SukiSU: fs_config -> script /system/bin 0755, rc /system/etc/init 0644"
 
     mods "SukiSU: script cài manager vào /data/app ở boot đầu -> system_ext/bin"
 else
