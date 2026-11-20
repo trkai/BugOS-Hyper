@@ -401,6 +401,17 @@ patch_settings_apk() {
     aspect=$(aspect_of "$SRC_DIR/ic_hyper_os.xml")
     debug "Settings: Wordmark aspect: $aspect"
 
+    # settings_brand_logo=false: KHÔNG thay logo/wordmark nào trong Settings và
+    # không đổi chiều cao ô logo. Trang "Thiết bị của tôi" giữ nguyên artwork
+    # của ROM. Dùng khi người dùng chỉ muốn đổi bố cục (OxygenOS) mà không muốn
+    # logo BugOS đè lên.
+    local brand_logo
+    brand_logo=$(grep -m1 '^settings_brand_logo=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    if [ "$brand_logo" != "true" ]; then
+        brand_logo=false
+        debug "Settings: settings_brand_logo != true - giữ logo gốc của ROM"
+    fi
+
     local total=0
     local strings_done=0
     local png_used=0
@@ -413,10 +424,12 @@ patch_settings_apk() {
         local f
 
         # ---- A. by resource name -------------------------------------------
-        while IFS= read -r f; do [ -n "$f" ] && cands+=("$f"); done < <(
-            find "$resroot" -type f \( -name "*.xml" -o -name "*.png" -o -name "*.webp" \) 2>/dev/null \
-            | grep -Ei '/(drawable|mipmap)[^/]*/[^/]*(hyper_?os|bugos|os_?logo|logo_?os|os_?wordmark|brand_?logo|miui_?logo|mi_?logo|rom_?logo|xiaomi_?logo|device_?info_?logo)[^/]*\.(xml|png|webp)$'
-        )
+        if [ "$brand_logo" = "true" ]; then
+            while IFS= read -r f; do [ -n "$f" ] && cands+=("$f"); done < <(
+                find "$resroot" -type f \( -name "*.xml" -o -name "*.png" -o -name "*.webp" \) 2>/dev/null \
+                | grep -Ei '/(drawable|mipmap)[^/]*/[^/]*(hyper_?os|bugos|os_?logo|logo_?os|os_?wordmark|brand_?logo|miui_?logo|mi_?logo|rom_?logo|xiaomi_?logo|device_?info_?logo)[^/]*\.(xml|png|webp)$'
+            )
+        fi
 
         # ---- B. layout driven: chỉ lấy drawable DẠNG DẢI (wordmark) được
         #         tham chiếu từ layout trang Giới thiệu điện thoại -------------
@@ -573,6 +586,7 @@ patch_settings_apk() {
     # Đã kiểm dimen này CÓ tác dụng: 40dp -> 118px, 5dp -> 15px, 94dp -> 277px.
     local logo_h
     logo_h=$(grep -m1 '^settings_logo_height_dp=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    [ "$brand_logo" = "true" ] || logo_h=""
     if [ -n "$logo_h" ]; then
         for resroot in "${resroots[@]}"; do
             local dx old found=0
@@ -663,35 +677,34 @@ import re
 import sys
 
 out = sys.argv[1]
-# 9 resource mới. my_device_info_item_background_color KHÔNG nằm ở đây vì
-# APK gốc đã có sẵn màu đó.
+# Bản vá "About phone kiểu OxygenOS": 6 file + 5 id + 1 màu.
+# my_device_info_item_background_color và my_device_update_text KHÔNG thêm -
+# APK gốc đã có.
 #
-# bw + storage_progress_bg: HAI MÀU NÀY LÀ BẮT BUỘC, không phải trang trí.
-# Vector ic_device_name_info.xml và storage_progress_drawable.xml tham chiếu
-# @color/bw và @color/storage_progress_bg - cả hai do tool online thêm vào,
-# APK gốc không có. Thiếu chúng thì APKEditor dừng với:
-#     java.io.IOException: Resource not found for: '@color/bw'
-#     at line = 7, <path android:fillColor="@color/bw"
-# và "Settings: Rebuild FAILED" -> giữ APK gốc. Đã gặp thật ở build 20/11
-# 15:54, và đây chính là lý do bản vá ColorOS không vào được ROM.
+# oos_blue_tint_color: BẮT BUỘC, không phải trang trí. ic_device_oos_bg.xml và
+# oos_progress_drawable.xml tham chiếu @color/oos_blue_tint_color; thiếu nó thì
+# APKEditor dừng với "Resource not found for: '@color/oos_blue_tint_color'" -
+# đúng loại lỗi đã gặp với @color/bw ở bản ColorOS trước.
 want = [("layout", "device_info_item_kashi"),
         ("layout", "storage_info_item_kashi"),
-        ("drawable", "ic_device_name_info"),
-        ("drawable", "storage_progress_drawable"),
-        ("drawable", "version_card_img_dark"),
-        ("drawable", "version_card_img_light"),
+        ("drawable", "ic_device_oos_bg"),
+        ("drawable", "ic_device_oos_inner"),
+        ("drawable", "oos_progress_drawable"),
         ("id", "storage_progress_kchi"),
-        ("id", "device_info_version_card_bg"),
+        ("id", "device_info_wallpaper_blur_bg"),
         ("id", "device_name_in_banner"),
-        ("color", "bw"),
-        ("color", "storage_progress_bg")]
+        ("id", "about_phone_rom_name_info"),
+        ("id", "build_dev_info"),
+        ("color", "oos_blue_tint_color")]
 
-# id phải khai trong values/ids.xml trước, public.xml chỉ gán số.
-NEW_IDS = ["storage_progress_kchi", "device_info_version_card_bg",
-           "device_name_in_banner"]
+# color phải có giá trị trong colors.xml trước, public.xml chỉ gán số.
+COLORS = {"oos_blue_tint_color": "#ff2144bf"}
 
-# color phải có khai báo giá trị trong colors.xml trước, public.xml chỉ gán số.
-COLORS = {"bw": "#ff000000", "storage_progress_bg": "#11000000"}
+# id phải khai trong values/ids.xml trước.
+NEW_IDS = ["storage_progress_kchi", "device_info_wallpaper_blur_bg",
+           "device_name_in_banner", "about_phone_rom_name_info",
+           "build_dev_info"]
+
 for root, _dirs, files in os.walk(out):
     if "colors.xml" in files and os.path.basename(root) == "values":
         p = os.path.join(root, "colors.xml")
@@ -704,9 +717,6 @@ for root, _dirs, files in os.walk(out):
             s = s.replace("</resources>", add + "</resources>")
             open(p, "w", encoding="utf-8", newline="\n").write(s)
 
-# id phải khai trong values/ids.xml trước, public.xml chỉ gán số.
-NEW_IDS = ["storage_progress_kchi", "device_info_version_card_bg",
-           "device_name_in_banner"]
 for root, _dirs, files in os.walk(out):
     if "ids.xml" in files and os.path.basename(root) == "values":
         p = os.path.join(root, "ids.xml")
