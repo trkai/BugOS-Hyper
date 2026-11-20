@@ -440,26 +440,72 @@ on property:sys.boot_completed=1
 RCEOF
     chmod 0644 "$INSTALL_RC"
 
-    # fspatch.py tự đóng 0750 cho mọi file .sh nằm dưới /bin (quy ước của ROM
-    # gốc). Với file của mình thì phải là 0755, nếu không `sh` không đọc được
-    # khi service không chạy bằng uid 0 - đúng lỗi đã gặp. Ghi thẳng vào
-    # fs_config: fspatch giữ nguyên entry đã có, nên entry này thắng.
-    for FS_CFG in "$IMG/config/system_fs_config" "$IMG/config/system_ext_fs_config"; do
-        [ -f "$FS_CFG" ] || continue
-        case "$FS_CFG" in
+    # fspatch.py tu dong 0750 cho MOI file .sh nam duoi /bin (quy uoc ROM goc,
+    # xem bin/fspatch.py dong 103-104). Voi script cua minh thi phai 0755, neu
+    # khong `sh` khong doc duoc vi no chay duoi domain shell - dung loi da gap
+    # tren may: /system/bin/bugos_sukisu_manager.sh -> -rwxr-x--- root shell,
+    # service o trang thai "stopped", manager khong duoc cai, root khong song.
+    #
+    # Cach sua: ghi de entry vao fs_config TRUOC khi packROM goi fspatch.py.
+    # fs_patch() co `if fs_file.get(i): new_fs[i] = fs_file[i]` nen entry da co
+    # se thang phan suy luan 0750. Nhung phai ghi vao DUNG file ma packROM dung:
+    #   python3 fspatch.py $IMG_DIR/${pname} $IMG_DIR/config/${pname}_fs_config
+    # tuc la config/system_fs_config (khong phai system_ext_fs_config).
+    #
+    # Truoc day khoi nay: (a) chi ghi khi file da ton tai, (b) van in "0755"
+    # du khong ghi duoc gi -> log noi doi. Gio ghi ca khi file chua co, va bao
+    # dung so entry da ghi.
+    _fc_written=0
+    for _fc in "$IMG/config/system_fs_config" "$IMG/config/system_ext_fs_config"; do
+        # rc nam o /system/etc/init (thuoc partition system) nen chi can ghi vao
+        # system_fs_config. Van ghi ca system_ext neu ban ROM co dat o do.
+        case "$_fc" in
             *system_ext_fs_config)
-                # rc gio nam o /system/etc/init, chi can khai bao script o day
-                # neu ban ROM co dat no duoi system_ext (khong con).
-                ;;
-            *)
-                {
-                    echo "system/bin/bugos_sukisu_manager.sh 0 0 0755"
-                    echo "system/etc/init/bugos-sukisu-manager.rc 0 0 0644"
-                } >> "$FS_CFG"
+                # Khong co file nao cua BugOS trong system_ext -> khong ghi.
+                continue
                 ;;
         esac
+        mkdir -p "$(dirname "$_fc")" 2>/dev/null
+        # Dung python: sửa tại chỗ, idempotent, và không phụ thuộc `mv -f` /
+        # `cat >` (cả hai đều hỏng trên MSYS khi ghi đè file đang mở).
+        python3 - "$_fc" <<'PYEOF'
+import sys, os
+p = sys.argv[1]
+rows = {
+    "system/bin/bugos_sukisu_manager.sh": "system/bin/bugos_sukisu_manager.sh 0 2000 0755",
+    "system/etc/init/bugos-sukisu-manager.rc": "system/etc/init/bugos-sukisu-manager.rc 0 0 0644",
+}
+out, seen = [], set()
+if os.path.exists(p):
+    with open(p, encoding="utf-8", errors="replace") as f:
+        # splitlines() chu khong split("\n"): tranh sinh dong trong o cuoi file.
+        for line in f.read().splitlines():
+            if not line.strip():
+                continue
+            key = line.split(" ")[0]
+            if key in rows:
+                if key in seen:
+                    continue
+                out.append(rows[key]); seen.add(key)
+            else:
+                out.append(line.rstrip())
+for k, v in rows.items():
+    if k not in seen:
+        out.append(v)
+# Ghi ra file tam roi os.replace: atomic, va tranh loi khoa file tren
+# Windows/MSYS khi ghi de truc tiep.
+tmp = p + ".bugos_tmp"
+with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+    f.write("\n".join(out) + "\n")
+os.replace(tmp, p)
+PYEOF
+        _fc_written=$((_fc_written + 1))
     done
-    mods "SukiSU: fs_config -> script /system/bin 0755, rc /system/etc/init 0644"
+    if [ "$_fc_written" -gt 0 ]; then
+        mods "SukiSU: fs_config -> script /system/bin 0755 (gid 2000, khop ROM goc), rc 0644"
+    else
+        warn "SukiSU: khong ghi duoc fs_config - script co the bi dong 0750 va khong chay"
+    fi
 
     mods "SukiSU: script cài manager vào /data/app ở boot đầu -> system/bin + system/etc/init"
 else

@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<!-- BugOS: ban OxygenOS cua device_layout.xml.
+     Khac ban goc Xiaomi o cho: MiuiDeviceNameCard va MiuiMemoryCard nam NGANG
+     (2 cot, weight 1) thay vi xep doc full width.
+
+     Hai layout item cua bo kashi da duoc thiet ke cho dung kieu nay - margin
+     bat doi xung:
+        device_info_item_kashi : marginStart 12dp, marginEnd 8dp
+        storage_info_item_kashi: marginStart  4dp, marginEnd 12dp
+     Ghep lai thanh 12dp le ngoai + 12dp khe giua (8+4), dung y do.
+
+     layout_height 130dp co dinh: item layout cung 130dp
+     (16 marginTop + 38 icon/progress + 12 + title + 4 + summary + 16 padding).
+     width 0dp + weight 1: cach dung chuan cho chia doi; dat fill_parent nhu
+     ban tool van ra 50/50 nhung de gay nham lan.
+
+     Phai chep ca file nay, khong chi cac layout item: neu thieu, ROM dung ban
+     goc cua Xiaomi (xep doc) va 2 card se chiem het chieu rong. -->
+<LinearLayout android:orientation="vertical"
+              android:clipChildren="true"
+              android:layout_width="fill_parent"
+              android:layout_height="wrap_content" xmlns:android="http://schemas.android.com/apk/res/android">
+  <com.android.settings.device.MiuiVersionNameCard android:id="@id/version_name_card_view"
+                        android:layout_width="0.0dp"
+                        android:layout_height="0.0dp" />
+  <LinearLayout android:orientation="vertical"
+                android:id="@id/device_basic_layout"
+                android:clipChildren="true"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content">
+    <LinearLayout android:orientation="horizontal"
+                  android:clipChildren="true"
+                  android:layout_width="fill_parent"
+                  android:layout_height="wrap_content">
+      <com.android.settings.device.MiuiDeviceNameCard android:id="@id/device_name_card_view"
+                            android:layout_width="0.0dp"
+                            android:layout_height="130.0dp"
+                            android:layout_weight="1.0" />
+      <com.android.settings.device.MiuiMemoryCard android:id="@id/device_memory_card_view"
+                            android:layout_width="0.0dp"
+                            android:layout_height="130.0dp"
+                            android:layout_weight="1.0" />
+    </LinearLayout>
+    <com.android.settings.device.MiuiGuaranteeCard android:id="@id/device_guarantee_card_view"
+                          android:layout_width="fill_parent"
+                          android:layout_height="wrap_content" />
+    <com.android.settings.device.MiuiDeviceBenefitsCard android:id="@id/device_mall_card_view"
+                          android:layout_width="fill_parent"
+                          android:layout_height="wrap_content" />
+  </LinearLayout>
+</LinearLayout>

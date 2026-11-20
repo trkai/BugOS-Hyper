@@ -796,6 +796,42 @@ PYEOF
             # log cu ghi "2 màu + 3 id" trong khi thuc te la 1 mau + 4 id, va
             # van goi la "ColorOS" sau khi da chuyen sang bo OxygenOS.
             mods "Settings: bản vá OxygenOS - $kashi_n file + $(printf '%s\n' "${want[@]}" | grep -c 'color') màu + $(printf '%s\n' "${want[@]}" | grep -c 'id') id (storage_progress_kchi, device_info_wallpaper_blur_bg, device_name_in_banner, about_phone_rom_name_info)"
+
+            # ---- Chieu cao o card dau (dimen) -----------------------------
+            # my_device_settings.xml:
+            #   <com.android.settings.device.MiuiVersionCard
+            #        android:layout_height="@dimen/my_device_os_logo_area_height" />
+            # Dimen goc = 389dp, do la chieu cao danh cho card logo HyperOS doi
+            # cu (anh lon + khoang trong). Layout OxygenOS chi can ~157dp.
+            #
+            # Do tren may 21/11 08:39 bang uiautomator dump:
+            #   version_card_click_view : 309..1454 = 1145 px
+            #   version_layout          : 356..798  =  442 px
+            #   -> thua 703 px (~250dp) thanh khoang trong giua card dau va
+            #      card "Ten thiet bi". Dung loi thay trong anh chup.
+            #
+            # 389dp -> 200dp: 168dp (noi dung card: anh 150dp + marginTop 18dp)
+            # + 32dp (marginVertical 16dp x2 cua version_layout) = 200dp.
+            #
+            # KHONG gate theo brand_logo: day la dimen cua LAYOUT, khong phai
+            # logo. Khi brand_logo=false (logo goc ROM) ma khong sua dimen thi
+            # card van trong y nhu vay.
+            local card_h
+            card_h=$(grep -m1 '^settings_about_card_height_dp=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+            [ -n "$card_h" ] || card_h=200
+            local dim_found=0
+            for resroot in "${resroots[@]}"; do
+                local dx2 old2
+                while IFS= read -r dx2; do
+                    [ -n "$dx2" ] || continue
+                    grep -q 'name="my_device_os_logo_area_height"' "$dx2" 2>/dev/null || continue
+                    old2=$(grep -oE 'name="my_device_os_logo_area_height">[^<]+' "$dx2" | head -1 | sed 's/.*>//')
+                    sed -i -E "s|(<dimen name=\"my_device_os_logo_area_height\">)[^<]*(</dimen>)|\1${card_h}dp\2|" "$dx2"
+                    mods "Settings: my_device_os_logo_area_height ${old2:-?} -> ${card_h}dp"
+                    dim_found=$((dim_found + 1))
+                done < <(find "$resroot" -type f -name "dimens.xml" -path "*/values*/*" 2>/dev/null)
+            done
+            [ "$dim_found" -eq 0 ] && warn "Settings: không thấy dimen my_device_os_logo_area_height - card đầu giữ chiều cao ROM"
         else
             warn "Settings: không chép được resource bản vá ColorOS"
         fi
