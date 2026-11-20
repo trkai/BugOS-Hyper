@@ -37,6 +37,15 @@ UID_GMS=$(pm list packages -U "$GMS" 2>/dev/null | grep -E "^package:$GMS " | gr
 [ -z "$UID_GMS" ] && UID_GMS=$(stat -c %u "/data/data/$GMS" 2>/dev/null)
 
 if [ -n "$UID_GMS" ]; then
+    # GMS co the bi MIUI tat han (khong chi dong bang). Do tren annibale:
+    #   dumpsys package com.google.android.gms -> enabled=0
+    #   logcat: MIUIAutoUIManagerImpl: pkg = com.google.android.gms is disabled by system
+    # Khong co lenh disable nao trong build script - MIUI tu tat khi PowerKeeper
+    # chua co cau hinh gms_control. Bat lai truoc khi lam gi khac.
+    if dumpsys package "$GMS" 2>/dev/null | grep -q "enabled=0"; then
+        pm enable "$GMS" 2>/dev/null && say "GMS bi disable - da bat lai"
+    fi
+
     cmd deviceidle whitelist +"$GMS" 2>/dev/null
     cmd deviceidle sys-whitelist +"$GMS" 2>/dev/null
     cmd appops set "$GMS" RUN_IN_BACKGROUND allow 2>/dev/null
