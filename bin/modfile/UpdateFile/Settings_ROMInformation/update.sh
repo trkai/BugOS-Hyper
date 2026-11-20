@@ -690,11 +690,12 @@ want = [("layout", "device_info_item_kashi"),
         ("drawable", "ic_device_oos_bg"),
         ("drawable", "ic_device_oos_inner"),
         ("drawable", "oos_progress_drawable"),
+        ("drawable", "ic_bugos_wordmark_dark"),
+        ("drawable", "ic_bugos_wordmark_light"),
         ("id", "storage_progress_kchi"),
         ("id", "device_info_wallpaper_blur_bg"),
         ("id", "device_name_in_banner"),
         ("id", "about_phone_rom_name_info"),
-        ("id", "build_dev_info"),
         ("color", "oos_blue_tint_color")]
 
 # color phải có giá trị trong colors.xml trước, public.xml chỉ gán số.
@@ -702,8 +703,7 @@ COLORS = {"oos_blue_tint_color": "#ff2144bf"}
 
 # id phải khai trong values/ids.xml trước.
 NEW_IDS = ["storage_progress_kchi", "device_info_wallpaper_blur_bg",
-           "device_name_in_banner", "about_phone_rom_name_info",
-           "build_dev_info"]
+           "device_name_in_banner", "about_phone_rom_name_info"]
 
 for root, _dirs, files in os.walk(out):
     if "colors.xml" in files and os.path.basename(root) == "values":

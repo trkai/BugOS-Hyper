@@ -1,4 +1,6 @@
 <?xml version='1.0' encoding='utf-8' ?>
+<!-- BugOS: ban sua tu layout OxygenOS cua tool online. Thay TextView ten ROM (34sp)
+     bang ImageView logo BugOS, bo dong build info (#UI Built by Kashi). -->
 <FrameLayout android:id="@id/version_layout"
              android:clipToPadding="false"
              android:layout_width="fill_parent"
@@ -39,16 +41,13 @@
                     android:layout_marginTop="-1.5dp"
                     android:layout_weight="1.0"
                     android:layout_marginStart="-2.0dp">
-        <com.kashi.settings.view.SpecsTextView android:textSize="34.0sp"
-                              android:textStyle="bold"
-                              android:textColor="@android:color/system_accent1_50"
-                              android:ellipsize="marquee"
-                              android:id="@id/about_phone_rom_name_info"
-                              android:layout_width="fill_parent"
-                              android:layout_height="wrap_content"
-                              android:text="HyperOS"
-                              android:singleLine="true"
-                              android:fontFamily="@android:string/config_oem_enabled_satellite_s2cell_file" />
+        <ImageView android:id="@id/about_phone_rom_name_info"
+                              android:layout_width="200.0dp"
+                              android:layout_height="64.0dp"
+                              android:layout_marginTop="4.0dp"
+                              android:scaleType="fitStart"
+                              android:adjustViewBounds="true"
+                              android:src="@drawable/ic_bugos_wordmark_dark" />
         <com.kashi.settings.view.SpecsTextView android:textSize="16.0sp"
                               android:textColor="@android:color/system_accent1_50"
                               android:id="@id/device_name_in_banner"
@@ -58,15 +57,7 @@
                               android:singleLine="true"
                               android:layout_below="@id/about_phone_rom_name_info"
                               android:layout_alignStart="@id/about_phone_rom_name_info" />
-        <com.kashi.settings.view.SpecsTextView android:textSize="11.0sp"
-                              android:textColor="#66ffffff"
-                              android:id="@id/build_dev_info"
-                              android:layout_width="fill_parent"
-                              android:layout_height="wrap_content"
-                              android:text="\#Private build by Kashi"
-                              android:singleLine="true"
-                              android:layout_below="@id/about_phone_rom_name_info"
-                              android:layout_alignStart="@id/about_phone_rom_name_info" />
+        
       </LinearLayout>
       <FrameLayout android:layout_width="wrap_content"
                    android:layout_height="wrap_content"
