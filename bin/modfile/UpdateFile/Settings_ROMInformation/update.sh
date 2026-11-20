@@ -725,7 +725,7 @@ for p in pubs:
     if added:
         open(p, "w", encoding="utf-8", newline="\n").write(s)
 PYEOF
-            mods "Settings: bản vá ColorOS - $kashi_n file resource + id storage_progress_kchi"
+            mods "Settings: bản vá ColorOS - $kashi_n file + 2 màu (bw, storage_progress_bg) + id storage_progress_kchi"
         else
             warn "Settings: không chép được resource bản vá ColorOS"
         fi

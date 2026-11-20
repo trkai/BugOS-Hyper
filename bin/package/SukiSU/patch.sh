@@ -371,16 +371,34 @@ if [ ! -f "$APK" ]; then
 fi
 
 # Đã là app dữ liệu rồi thì thôi (cài rồi, hoặc người dùng đã tự cài).
-pm_path=$(pm path com.sukisu.ultra 2>&1)
-echo "--- pm path: $pm_path" >> "$LOG" 2>&1
-case "$pm_path" in
-    *"/data/app/"*) echo "--- đã ở /data/app, không làm gì" >> "$LOG" 2>&1; exit 0 ;;
-esac
+#
+# Tên package KHÔNG hard-code một giá trị: bản APK này là com.sukisu.nova, không
+# phải com.sukisu.ultra như các bản SukiSU khác. Đo trên máy: pm list packages
+# chỉ có com.sukisu.nova, nên mọi lệnh `pm path com.sukisu.ultra` luôn rỗng và
+# guard "đã cài rồi" không bao giờ đúng -> cài lại mỗi lần boot.
+find_pkg() {
+    for _p in com.sukisu.nova com.sukisu.ultra; do
+        case "$(pm path "$_p" 2>/dev/null)" in
+            *"/data/app/"*) echo "$_p"; return 0 ;;
+        esac
+    done
+    # Fallback: dò theo tên gói, phòng khi bản sau đổi tên lần nữa.
+    pm list packages 2>/dev/null | sed -n 's/^package:\(com\.sukisu\.[a-z0-9._]*\)$/\1/p' | head -n1
+}
+
+PKG=$(find_pkg)
+echo "--- package hiện có: ${PKG:-khong-co}" >> "$LOG" 2>&1
+if [ -n "$PKG" ] && [ "$(pm path "$PKG" 2>/dev/null | head -n1)" != "" ]; then
+    case "$(pm path "$PKG" 2>/dev/null)" in
+        *"/data/app/"*) echo "--- đã ở /data/app, không làm gì" >> "$LOG" 2>&1; exit 0 ;;
+    esac
+fi
 
 echo "--- pm install -r $APK" >> "$LOG" 2>&1
 pm install -r "$APK" >> "$LOG" 2>&1
-echo "--- pm exit=$?" >> "$LOG" 2>&1
-echo "--- sau cài: $(pm path com.sukisu.ultra 2>&1)" >> "$LOG" 2>&1
+_rc=$?
+echo "--- pm exit=$_rc" >> "$LOG" 2>&1
+echo "--- sau cài: $(pm path "$(find_pkg)" 2>&1)" >> "$LOG" 2>&1
 SHEOF
     chmod 0755 "$INSTALL_SH"
 
@@ -388,25 +406,28 @@ SHEOF
 # BugOS - cài SukiSU Ultra vào /data/app ở lần boot đầu.
 # Xem bin/package/SukiSU/patch.sh.
 #
-# seclabel u:r:shell:s0: chỉ domain shell mới có binder gọi được `pm`; domain
-# init thì không. Đây là khuôn có sẵn trong init.rc (service console).
+# VÌ SAO PHẢI ĐI QUA `su`:
+# Bản trước dùng `seclabel u:r:shell:s0` với giả định "chỉ domain shell mới có
+# binder". Đo trên annibale (A17/OS4.0.6) thì SAI: từ domain shell,
+#     runcon u:r:shell:s0 cat /system_ext/bin/bugos_sukisu_manager.sh -> rc=126
+#     runcon u:r:shell:s0 sh -c 'echo x > /data/local/tmp/_t'        -> denied
+#     runcon u:r:shell:s0 pm path android                             -> rc=126
+# tức không đọc được script, không ghi được log, không gọi được pm. Service có
+# start (ro.boottime có ghi) nhưng `sh` không mở nổi file nên thoát ngay, không
+# một dòng log nào - đúng hiện tượng đã gặp.
 #
-# KHÔNG dùng `on property:sys.boot_completed=1` nữa: lần trước service có được
-# start (ro.boottime có ghi) nhưng script không chạy được dòng nào. Nguyên nhân
-# đo được trên máy: file script bị fspatch đóng 0750 root:root nên nếu tiến
-# trình không phải uid 0 thì `sh` không đọc nổi file -> thoát ngay, không log.
-# Giờ: file 0755 (ép trong fs_config), service nằm ở class main (init chắc chắn
-# start mỗi lần boot) và tự chờ sys.boot_completed - bỏ hẳn phụ thuộc trigger.
-service bugos_sukisu_manager /system/bin/sh /system_ext/bin/bugos_sukisu_manager.sh
-    class main
+# Domain duy nhất trên máy này có đủ quyền là u:r:ksu:s0 (domain của `su`).
+# Nên: service chạy /system/bin/su -c ... để KernelSU tự chuyển domain.
+# /system/bin/su do ksud tạo lúc boot, nên dùng trigger boot_completed thay vì
+# class main (ở 5 giây đầu file đó có thể chưa có).
+service bugos_sukisu_manager /system/bin/su -c "/system/bin/sh /system_ext/bin/bugos_sukisu_manager.sh"
+    class late_start
     user root
     group root system
     oneshot
-    seclabel u:r:shell:s0
+    disabled
 
-# Lưới an toàn: nếu vì lý do nào đó class main không start được service này,
-# trigger boot_completed vẫn kích hoạt nó. Script idempotent (thấy /data/app là
-# thoát), nên chạy hai đường không sao.
+# Trigger theo boot_completed: lúc đó ksud đã tạo xong /system/bin/su.
 on property:sys.boot_completed=1
     start bugos_sukisu_manager
 RCEOF
