@@ -74,15 +74,27 @@ fi
 pk_disarm() {
     content call --uri content://com.miui.powerkeeper.configure/SimpleSettings/misc \
         --method PUT_misc --arg gms_control --extra value:s:false 2>/dev/null || return 1
+
+    # Doc lai de chac row da ghi. Tren may that, PUT_misc tra "Result: null"
+    # nhung row duoc tao that (da thu tren annibale: _id=121 gms_control=false),
+    # nen khong dung ket qua tra ve lam dieu kien.
+    got=$(content query --uri content://com.miui.powerkeeper.configure/SimpleSettings/misc \
+          --where "name='gms_control'" 2>/dev/null | grep -o "value=[^,]*" | head -n1 | cut -d= -f2-)
+    [ "$got" = "false" ] || return 1
+
     for p in com.google.android.gms com.android.vending; do
         content update --uri content://com.miui.powerkeeper.configure/userTable \
             --bind bgControl:s:noRestrict \
             --where "pkgName='${p}' AND userId=0" 2>/dev/null
+        # grep -F chi de chac chan: "$p" chua dau cham nen neu de grep hieu la
+        # regex thi ve li thuyet khop rong. Tren du lieu that no van dung, nhung
+        # -F loai bo hoan toan kha nang do.
         has=$(content query --uri content://com.miui.powerkeeper.configure/userTable \
-              --where "pkgName='${p}' AND userId=0" 2>/dev/null | grep -c "pkgName=$p")
-        [ "$has" = "0" ] && content insert \
-            --uri content://com.miui.powerkeeper.configure/userTable \
-            --bind pkgName:s:"$p" --bind userId:i:0 --bind bgControl:s:noRestrict 2>/dev/null
+              --where "pkgName='${p}' AND userId=0" 2>/dev/null | grep -cF "pkgName=$p")
+        if [ "$has" = "0" ]; then
+            content insert --uri content://com.miui.powerkeeper.configure/userTable \
+                --bind pkgName:s:"$p" --bind userId:i:0 --bind bgControl:s:noRestrict 2>/dev/null
+        fi
     done
     iptables -F gms_wall 2>/dev/null
     ip6tables -F gms_wall 2>/dev/null
