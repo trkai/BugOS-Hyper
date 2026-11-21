@@ -433,10 +433,6 @@ service bugos_sukisu_manager /system/bin/sh /system/bin/bugos_sukisu_manager.sh
     group root system
     oneshot
     seclabel u:r:shell:s0
-    disabled
-
-on property:sys.boot_completed=1
-    start bugos_sukisu_manager
 RCEOF
     chmod 0644 "$INSTALL_RC"
 

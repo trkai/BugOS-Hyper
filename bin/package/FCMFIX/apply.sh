@@ -15,6 +15,8 @@ fi
 
 SYS="$work_dir/build/baserom/images/system/system"
 SRC="$work_dir/bin/package/FCMFIX"
+# packROM.sh goi: python3 fspatch.py $IMG_DIR/system $IMG_DIR/config/system_fs_config
+IMG_CONFIG="$work_dir/build/baserom/images/config/system_fs_config"
 
 if [ ! -d "$SYS/bin" ]; then
     warn "FCMFix: không thấy $SYS/bin - bỏ qua"
@@ -27,6 +29,43 @@ install -m 0755 "$SRC/fcm-fix.sh" "$SYS/bin/bugos-fcm.sh" \
 mkdir -p "$SYS/etc/init"
 install -m 0644 "$SRC/fcm-fix.rc" "$SYS/etc/init/bugos-fcm.rc" \
     || { error "FCMFix: không chép được init service"; exit 1; }
+
+# fspatch.py dong 0750 cho MOI file .sh duoi /bin (quy uoc ROM goc), nen
+# `install -m 0755` o tren bi nuot o buoc mkfs. Service chay
+# `/system/bin/sh /system/bin/bugos-fcm.sh`: sh mo file de doc, quyen 0750
+# nghia la chi root:shell doc duoc - van duoc vi service chay user root, NHUNG
+# khi script goi `su`/`cmd` hoac bi chay duoi domain khac thi hong. Ghi entry
+# fs_config de fspatch giu 0755, dong thoi dung gid 2000 cho khop ROM goc
+# (apexd-lsof.sh = 0 2000 0755).
+python3 - "$IMG_CONFIG" <<'PYEOF'
+import sys, os
+p = sys.argv[1]
+rows = {
+    "system/bin/bugos-fcm.sh": "system/bin/bugos-fcm.sh 0 2000 0755",
+    "system/etc/init/bugos-fcm.rc": "system/etc/init/bugos-fcm.rc 0 0 0644",
+}
+out, seen = [], set()
+if os.path.exists(p):
+    with open(p, encoding="utf-8", errors="replace") as f:
+        for line in f.read().splitlines():
+            if not line.strip():
+                continue
+            key = line.split(" ")[0]
+            if key in rows:
+                if key in seen:
+                    continue
+                out.append(rows[key]); seen.add(key)
+            else:
+                out.append(line.rstrip())
+for k, v in rows.items():
+    if k not in seen:
+        out.append(v)
+tmp = p + ".bugos_tmp"
+with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+    f.write("\n".join(out) + "\n")
+os.replace(tmp, p)
+PYEOF
+mods "FCMFix: fs_config -> script /system/bin 0755 (gid 2000), rc 0644"
 
 # ---------------------------------------------------------------------------
 # Tat Greezer ngay trong build.prop (khong chi luc chay).

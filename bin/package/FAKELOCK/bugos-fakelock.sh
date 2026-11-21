@@ -23,6 +23,13 @@ say() { echo "$LOG_TAG: $*" > /dev/kmsg 2>/dev/null; }
 
 # SukiSU dat ksud o /data/adb, co the chua co o lan boot dau. Cho toi 90s roi
 # bo qua - khong duoc treo boot vi mot prop.
+#
+# Bo sung: cho sys.boot_completed. Truoc day rc dung
+# `disabled` + `on property:sys.boot_completed=1` de init goi luc boot xong,
+# nhung trigger do KHONG chay tren ROM nay (da do: dmesgd/boottrace cua ROM
+# cung dung trigger nay va cung khong chay). Bo disabled -> service chay som
+# hon, nen phai tu doi boot_completed thi framework moi san sang cho ksud
+# resetprop.
 KS=/data/adb/ksud
 i=0
 while [ ! -x "$KS" ] && [ "$i" -lt 90 ]; do
@@ -33,6 +40,13 @@ if [ ! -x "$KS" ]; then
     say "khong thay $KS sau ${i}s - bo qua"
     exit 0
 fi
+
+i=0
+while [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ] && [ "$i" -lt 120 ]; do
+    sleep 2
+    i=$((i + 1))
+done
+say "boot_completed=$(getprop sys.boot_completed 2>/dev/null) sau ${i} lan cho"
 
 ok=0
 total=0
