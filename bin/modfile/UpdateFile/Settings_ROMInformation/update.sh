@@ -792,7 +792,10 @@ for p in pubs:
     if added:
         open(p, "w", encoding="utf-8", newline="\n").write(s)
 PYEOF
-            mods "Settings: bản vá ColorOS - $kashi_n file + 2 màu + 3 id (storage_progress_kchi, device_info_version_card_bg, device_name_in_banner)"
+            # Dem so id/mau tu chinh danh sach 'want' thay vi viet cung: dong
+            # log cu ghi "2 màu + 3 id" trong khi thuc te la 1 mau + 4 id, va
+            # van goi la "ColorOS" sau khi da chuyen sang bo OxygenOS.
+            mods "Settings: bản vá OxygenOS - $kashi_n file + $(printf '%s\n' "${want[@]}" | grep -c 'color') màu + $(printf '%s\n' "${want[@]}" | grep -c 'id') id (storage_progress_kchi, device_info_wallpaper_blur_bg, device_name_in_banner, about_phone_rom_name_info)"
         else
             warn "Settings: không chép được resource bản vá ColorOS"
         fi
