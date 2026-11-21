@@ -1,5 +1,5 @@
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 
 # Unlock Advanced Texture
 if ! is_property_exists persist.sys.background_blur_supported build/baserom/images/product/etc/build.prop; then

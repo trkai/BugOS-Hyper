@@ -1,5 +1,5 @@
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 sdkLevel=$(cat $work_dir/bin/ddevice/sdkLevel.txt)
 deviceTYPE=$(cat $work_dir/bin/ddevice/device_type.txt)
 rom_os=$(cat $work_dir/bin/ddevice/rom_os.txt)
@@ -14,7 +14,10 @@ jar_util()
     fi
 
     if [[ $1 == "d" ]]; then
-        patch "Patching $2 : "
+        # Chi tiet nay khong can o muc INFO: caller da noi dang lam gi, va
+        # "[PATCH] Patching miui-services.jar : " (co dau hai cham cuoi dong)
+        # la nua cau, doc log rat roi.
+        debug "jar_util: tach $2"
         if [[ -f $work_dir/build/baserom/images/system_ext/framework/miui-services.jar ]]; then
             sudo cp $work_dir/build/baserom/images/system_ext/framework/miui-services.jar $work_dir/jar_temp
             sudo chown $(whoami) $work_dir/jar_temp/$2
@@ -32,9 +35,6 @@ jar_util()
                         [[ -d "$dex.out" ]] && rm -rf $dex        
                     fi
                 done
-                # Create necessary directories and copy xBuild.smali
-                # mkdir -p $work_dir/jar_temp/$2.out/classes.dex.out/miuix/os
-                # cp $work_dir/bin/shPlugin/NOTIFICATION_FIX/A13/xBuild.smali $work_dir/jar_temp/$2.out/classes.dex.out/miuix/os/
             fi
         fi
     else 
@@ -59,33 +59,15 @@ jar_util()
                     sudo cp -rf $work_dir/jar_temp/$2 $work_dir/build/baserom/images/system_ext/framework/miui-services.jar
                     final_dir="$work_dir/module/*"
                     #7za a -tzip "$work_dir/miui-services_patched_$(date "+%d%m%y").zip" $final_dir
-                    patch "Success"
+                    debug "jar_util: dong goi $2 xong"
                     rm -rf $work_dir/jar_temp/$2.out $work_dir/jar_temp/$2_notal 
                 else
-                    patch "Fail"
+                    error "jar_util: KHONG dong goi duoc $2 - giu nguyen jar goc"
                 fi
             fi
         fi
     fi
 }
-find_and_replace_miui() {
-    local search=$1
-    local replace=$2
-    local base_dir=$work_dir/jar_temp/miui-services.jar.out
-    local files=(
-        "MiuiKeyShortcutManager$MiuiOtherSettingsObserver.smali"
-    )
-
-    for file in "${files[@]}"; do
-        file_path=$(find "$base_dir" -name "$file")
-        if [[ -n $file_path ]]; then
-            if grep -q "$search" "$file_path"; then
-                sed -i "s|$search|$replace|g" "$file_path"
-            fi
-        fi
-    done
-}
-
 find_and_replace_hyperos() {
     local search=$1
     local replace=$2
@@ -107,16 +89,10 @@ find_and_replace_hyperos() {
 miui-services() {
     jar_util d "miui-services.jar" fw
 
-    if [[ $rom_os == "MIUI" ]];then
-
-    find_and_replace_miui "sget-boolean v0, Lmiui/os/Build;->IS_GLOBAL_BUILD:Z" "const/4 v0, 0x1"
-
-    else
-
+    # Chỉ còn HyperOS 4: nhánh MIUI (dùng find_and_replace_miui + anchor khác)
+    # đã bị xoá. find_and_replace_hyperos là hàm duy nhất còn định nghĩa.
     find_and_replace_hyperos "sget-boolean v0, Lmiui/os/Build;->IS_GLOBAL_BUILD:Z" "const/4 v0, 0x1"
 
-    fi
-    
     jar_util a "miui-services.jar" 
 }
 
@@ -125,6 +101,7 @@ if [[ ! -d $work_dir/jar_temp ]]; then
 fi
 
 if [[ $deviceTYPE == "China" ]]; then
-patch "Fixing Delay Power Button..."
+patch "Framework: bỏ độ trễ menu nguồn"
 miui-services
+patch "Framework: bỏ độ trễ menu nguồn - xong"
 fi

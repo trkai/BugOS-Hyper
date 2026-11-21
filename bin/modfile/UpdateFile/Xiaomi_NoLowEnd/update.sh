@@ -32,7 +32,7 @@ fi
 [ "$DEVICE_CODENAME" = "missi" ] && DEVICE_CODENAME="unknown"
 # ---> KẾT THÚC SỬA LỖI <---
 
-echo "Current device codename: $DEVICE_CODENAME"
+debug "Xiaomi_NoLowEnd: codename=$DEVICE_CODENAME"
 
 # Quét prop CHỈ trong images đã bung (trước đây là "find ." nên còn sửa cả .prop nằm
 # trong bin/, không liên quan tới ROM)
@@ -74,4 +74,7 @@ if [ -d "$MAIN_FOLDER" ]; then
     done
 else
     warn "Xiaomi_NoLowEnd: không thấy $MAIN_FOLDER - bỏ qua"
+    exit 0
 fi
+
+mods "Xiaomi_NoLowEnd: hạ ngưỡng low-RAM + bật framepacing ($DEVICE_CODENAME)"

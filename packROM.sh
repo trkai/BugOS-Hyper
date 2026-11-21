@@ -1,5 +1,5 @@
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 tools_dir=${work_dir}/bin/$(uname)/$(uname -m)
 export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$PATH
 
@@ -23,11 +23,10 @@ else
     status="Official"
 fi
 
-if [[ $rom_os == "MIUI" ]]; then
-    os_type="MIUI"
-else
-    os_type="HyperOS"
-fi
+# os_type đọc từ bin/ddevice/os_type.txt (do build.sh ghi, mang brand name).
+# Trước đây có rẽ nhánh MIUI/HyperOS ở đây; nhánh đó đã bỏ cùng target MIUI,
+# nhưng KHÔNG được ghi đè os_type thành hằng số - giá trị này dùng để đặt tên
+# file ROM ở dưới.
 
 # ==================== KIỂM TRA ĐẦU VÀO ====================
 IMG_DIR="$work_dir/build/baserom/images"

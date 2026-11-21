@@ -1,0 +1,24 @@
+{
+ "com/android/settings/utils/SettingsFeatures.smali": {
+  "methods": {
+   "public static isLocationNeeded(Landroid/content/Context;)Z": [
+    ".method public static isLocationNeeded(Landroid/content/Context;)Z",
+    "    .registers 2",
+    "",
+    "    const/4 v0, 0x1",
+    "",
+    "    return v0",
+    ".end method"
+   ],
+   "public static isPrivacyNeeded(Landroid/content/Context;)Z": [
+    ".method public static isPrivacyNeeded(Landroid/content/Context;)Z",
+    "    .registers 2",
+    "",
+    "    const/4 v0, 0x1",
+    "",
+    "    return v0",
+    ".end method"
+   ]
+  }
+ }
+}

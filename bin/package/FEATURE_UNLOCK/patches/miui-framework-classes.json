@@ -1,0 +1,64 @@
+{
+ "android/util/MiuiMultiWindowAdapter.smali": {
+  "methods": {
+   "public static blacklist getFreeformBlackList()Ljava/util/List;": [
+    ".method public static blacklist getFreeformBlackList()Ljava/util/List;",
+    "    .registers 1",
+    "    .annotation system Ldalvik/annotation/Signature;",
+    "        value = {",
+    "            \"()\",",
+    "            \"Ljava/util/List<\",",
+    "            \"Ljava/lang/String;\",",
+    "            \">;\"",
+    "        }",
+    "    .end annotation",
+    "",
+    "    new-instance v0, Ljava/util/ArrayList;",
+    "",
+    "    invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V",
+    "",
+    "    return-object v0",
+    ".end method"
+   ],
+   "public static blacklist getFreeformBlackListFromCloud(Landroid/content/Context;)Ljava/util/List;": [
+    ".method public static blacklist getFreeformBlackListFromCloud(Landroid/content/Context;)Ljava/util/List;",
+    "    .registers 2",
+    "    .annotation system Ldalvik/annotation/Signature;",
+    "        value = {",
+    "            \"(\",",
+    "            \"Landroid/content/Context;\",",
+    "            \")\",",
+    "            \"Ljava/util/List<\",",
+    "            \"Ljava/lang/String;\",",
+    "            \">;\"",
+    "        }",
+    "    .end annotation",
+    "",
+    "    new-instance v0, Ljava/util/ArrayList;",
+    "",
+    "    invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V",
+    "",
+    "    return-object v0",
+    ".end method"
+   ]
+  }
+ },
+ "miui/drm/ThemeReceiver.smali": {
+  "methods": {
+   "static bridge synthetic blacklist -$$Nest$mvalidateTheme(Lmiui/drm/ThemeReceiver;Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V": [
+    ".method static bridge synthetic blacklist -$$Nest$mvalidateTheme(Lmiui/drm/ThemeReceiver;Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V",
+    "    .registers 6",
+    "",
+    "    return-void",
+    ".end method"
+   ],
+   "private blacklist validateTheme(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V": [
+    ".method private blacklist validateTheme(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V",
+    "    .registers 6",
+    "",
+    "    return-void",
+    ".end method"
+   ]
+  }
+ }
+}

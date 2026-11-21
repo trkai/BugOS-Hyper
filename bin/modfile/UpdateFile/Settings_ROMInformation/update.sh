@@ -52,11 +52,11 @@ my_props=(
 # Lấy version ROM.
 #
 # NGUỒN CHÍNH là base_rom_code - chuỗi lấy từ TÊN FILE ROM, ví dụ
-#   annibale-ota_full-OS3.0.307.0.WPKCNXM-user-16.0-....zip  ->  OS3.0.307.0.WPKCNXM
+#   annibale-ota_full-OS4.0.6.0.XPKCNXM-user-17.0-...zip  ->  OS4.0.6.0.XPKCNXM
 # Đây đúng là chuỗi mà trang Giới thiệu điện thoại hiển thị ở dòng "Phiên bản OS".
 #
 # Trước đây lấy từ build.prop trước, và trên ROM thật nó ra
-#   "16OS3.1.260716.235326947.QCPECN"   (sai hoàn toàn)
+#   "17OS4.1.260716.235326947.QCPECN"   (sai hoàn toàn)
 # vì ro.mi.os.version.incremental của bản build này không cùng định dạng.
 # Prop chỉ còn là fallback, và phải qua bước kiểm tra định dạng.
 rom_version_name=""
@@ -157,7 +157,7 @@ for p in "${my_props[@]}"; do
     [ -n "$(tail -c1 "$p")" ] && echo "" >> "$p"
 
     # Dòng "Phiên bản OS" (trang Giới thiệu) đọc ro.mi.os.version.name.
-    # Giữ nguyên tiền tố gốc (vd "OS3.0.307.0.WPKCNXM") rồi nối thêm brand, để
+    # Giữ nguyên tiền tố gốc (vd "OS4.0.6.0.XPKCNXM") rồi nối thêm brand, để
     # các đoạn code so sánh startsWith("OS") vẫn đúng.
     if grep -q '^ro\.mi\.os\.version\.name=' "$p" 2>/dev/null; then
         cur_name=$(grep -m1 '^ro\.mi\.os\.version\.name=' "$p" | cut -d= -f2- | tr -d '\r\n')
@@ -311,7 +311,7 @@ if [ -n "$FP_BRAND" ] && [ -n "$FP_PROD" ] && [ -n "$FP_DEV" ] && [ -n "$FP_REL"
     if [ "$FP_DONE" -eq 0 ]; then
         warn "OS version: không tìm được build.prop nào để ghi fingerprint"
     else
-        mods "OS version: fingerprint = ${CLEAN_FP}"
+        debug "OS version: fingerprint = ${CLEAN_FP}"
     fi
 else
     if [ "$FP_GENERIC" -eq 1 ]; then
@@ -374,7 +374,7 @@ patch_settings_apk() {
     rm -rf "$work"
     mkdir -p "$work"
 
-    mods "Settings: Decode: ${apk#$MAIN_FOLDER/}"
+    debug "Settings: Decode: ${apk#$MAIN_FOLDER/}"
     if ! $APKEDITOR d -f -i "$apk" -o "$out" > "$work/decode.log" 2>&1; then
         warn "Settings: Decode FAILED - giữ APK gốc. Log:"
         tail -n 5 "$work/decode.log" 2>/dev/null
@@ -387,7 +387,7 @@ patch_settings_apk() {
         warn "Settings: Decode ra không có resources/ -> bỏ qua"
         return 1
     fi
-    mods "Settings: res roots: ${#resroots[@]}"
+    debug "Settings: res roots: ${#resroots[@]}"
 
     # Chẩn đoán: nếu header là TextView (không phải ảnh) thì chuỗi sẽ nằm ở values
     local hit
@@ -399,7 +399,18 @@ patch_settings_apk() {
 
     local aspect
     aspect=$(aspect_of "$SRC_DIR/ic_hyper_os.xml")
-    mods "Settings: Wordmark aspect: $aspect"
+    debug "Settings: Wordmark aspect: $aspect"
+
+    # settings_brand_logo=false: KHÔNG thay logo/wordmark nào trong Settings và
+    # không đổi chiều cao ô logo. Trang "Thiết bị của tôi" giữ nguyên artwork
+    # của ROM. Dùng khi người dùng chỉ muốn đổi bố cục (OxygenOS) mà không muốn
+    # logo BugOS đè lên.
+    local brand_logo
+    brand_logo=$(grep -m1 '^settings_brand_logo=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    if [ "$brand_logo" != "true" ]; then
+        brand_logo=false
+        debug "Settings: settings_brand_logo != true - giữ logo gốc của ROM"
+    fi
 
     local total=0
     local strings_done=0
@@ -413,14 +424,18 @@ patch_settings_apk() {
         local f
 
         # ---- A. by resource name -------------------------------------------
-        while IFS= read -r f; do [ -n "$f" ] && cands+=("$f"); done < <(
-            find "$resroot" -type f \( -name "*.xml" -o -name "*.png" -o -name "*.webp" \) 2>/dev/null \
-            | grep -Ei '/(drawable|mipmap)[^/]*/[^/]*(hyper_?os|bugos|os_?logo|logo_?os|os_?wordmark|brand_?logo|miui_?logo|mi_?logo|rom_?logo|xiaomi_?logo|device_?info_?logo)[^/]*\.(xml|png|webp)$'
-        )
+        if [ "$brand_logo" = "true" ]; then
+            while IFS= read -r f; do [ -n "$f" ] && cands+=("$f"); done < <(
+                find "$resroot" -type f \( -name "*.xml" -o -name "*.png" -o -name "*.webp" \) 2>/dev/null \
+                | grep -Ei '/(drawable|mipmap)[^/]*/[^/]*(hyper_?os|bugos|os_?logo|logo_?os|os_?wordmark|brand_?logo|miui_?logo|mi_?logo|rom_?logo|xiaomi_?logo|device_?info_?logo)[^/]*\.(xml|png|webp)$'
+            )
+        fi
 
         # ---- B. layout driven: chỉ lấy drawable DẠNG DẢI (wordmark) được
         #         tham chiếu từ layout trang Giới thiệu điện thoại -------------
-        if [ ${#cands[@]} -eq 0 ]; then
+        # Cung phai gate theo brand_logo. Build 21/11 07:00 cho thay A da dung
+        # nhung B/C van chay, nen heuristic bat nham asset ROM (xem ghi chu C).
+        if [ "$brand_logo" = "true" ] && [ ${#cands[@]} -eq 0 ]; then
             local lay name cand w h
             while IFS= read -r lay; do
                 while IFS= read -r name; do
@@ -441,23 +456,50 @@ patch_settings_apk() {
         fi
 
         # ---- C. content heuristic: wide vector with a huge pathData --------
-        if [ ${#cands[@]} -eq 0 ]; then
+        # CHI chay khi brand_logo=true. Khi settings_brand_logo=false thi khong
+        # duoc thay asset nao ca - day la nguon loi that o build 21/11 07:00:
+        # heuristic bat nham res/drawable/battery_indicator_percent_out.xml
+        # (79x26dp, ti le 3.04) va res/drawable/log_image.xml (248x36dp, ti le
+        # 6.9) - ca hai la asset cua ROM, bi thay bang logo BugOS.
+        if [ "$brand_logo" = "true" ] && [ ${#cands[@]} -eq 0 ]; then
             warn "Settings: Không khớp theo tên/layout -> dò theo nội dung (vector rộng)"
             while IFS= read -r f; do
-                local w h plen
+                local w h plen base
+                base=$(basename "$f")
+                # Loai thang theo ten: icon chuc nang cua ROM, khong bao gio la logo.
+                case "$base" in
+                    *battery*|*percent*|*log_image*|*indicator*|*signal*|*wifi*|*bluetooth*|\
+                    *progress*|*divider*|*scrollbar*|*btn*|*button*|*switch*|*check*|*arrow*|\
+                    *chevron*|*expand*|*collapse*|*seekbar*|*slider*|*tab_*|*badge_*|*ripple*)
+                        continue ;;
+                esac
                 w=$(grep -oE 'android:width="[0-9.]+dp"' "$f" 2>/dev/null | head -1 | grep -oE '[0-9.]+')
                 h=$(grep -oE 'android:height="[0-9.]+dp"' "$f" 2>/dev/null | head -1 | grep -oE '[0-9.]+')
                 plen=$(grep -o 'android:pathData="[^"]*"' "$f" 2>/dev/null | wc -c)
                 # bỏ qua asset đã được brand từ trước (idempotent)
                 grep -aq "106.32 72.58" "$f" 2>/dev/null && continue
+                # Ti le that cua wordmark la ~2.98 (824x277 o dang goc, 280x94 tren may).
+                # Khoang 2.2..4.2 phu ca hai, va loai battery (3.04 - qua nho,
+                # w=79 < 140) lan log_image (6.89 - qua dai). Da thu bang so.
                 if [ -n "$w" ] && [ -n "$h" ] && [ "$plen" -gt 1500 ] \
-                   && awk -v w="$w" -v h="$h" 'BEGIN{exit !(h>0 && w/h >= 3.0 && w >= 60 && w <= 400 && h <= 90)}'; then
+                   && awk -v w="$w" -v h="$h" 'BEGIN{r=w/h; exit !(h>0 && r >= 2.2 && r <= 4.2 && w >= 140 && w <= 900 && h >= 40 && h <= 320)}'; then
                     cands+=("$f")
                 fi
             done < <(find "$resroot" -type f -path "*/drawable*/*" -name "*.xml" 2>/dev/null | xargs -r grep -l '<vector' 2>/dev/null)
+        elif [ "$brand_logo" != "true" ]; then
+            debug "Settings: settings_brand_logo=false - khong doi asset logo nao"
         fi
 
         if [ ${#cands[@]} -eq 0 ]; then
+            # Khi brand_logo=false thi "khong co cands" la DUNG Y DO, khong phai
+            # loi. Truoc day khoi nay van chay: in canh bao + dump 20 webp rac,
+            # va nghiem trong hon la goi patch_strings.py lam DOI STRING cua ROM
+            # (log build 21/11 07:29 in hang chuc dong "[skip] ... khong phai
+            # wordmark thuan"). Gio bo qua hoan toan khi brand_logo != true.
+            if [ "$brand_logo" != "true" ]; then
+                debug "Settings: brand_logo=false - bo qua chan doan/patch string"
+                continue
+            fi
             warn "Settings: không thấy asset logo dạng drawable. Drawable nghi vấn (nếu có):"
             find "$resroot" -type f -path "*/drawable*/*" 2>/dev/null \
                 | grep -Ei '/(hyper|bugos|os_logo|logo|wordmark|brand|miui_|rom_)' \
@@ -573,6 +615,7 @@ patch_settings_apk() {
     # Đã kiểm dimen này CÓ tác dụng: 40dp -> 118px, 5dp -> 15px, 94dp -> 277px.
     local logo_h
     logo_h=$(grep -m1 '^settings_logo_height_dp=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    [ "$brand_logo" = "true" ] || logo_h=""
     if [ -n "$logo_h" ]; then
         for resroot in "${resroots[@]}"; do
             local dx old found=0
@@ -585,7 +628,7 @@ patch_settings_apk() {
                 found=$((found + 1))
             done < <(find "$resroot" -type f -name "dimens.xml" -path "*/values*/*" 2>/dev/null)
             if [ "$found" -eq 0 ]; then
-                # Tên dimen đọc được trên Settings OS4 (a17); OS3 (a16) chưa kiểm
+                # Tên dimen đọc được trên Settings OS4 (a17)
                 # trực tiếp. Nếu bản ROM đang build đặt tên khác thì logo không
                 # to lên - in ra các dimen nghi vấn để lần sau sửa đúng chỗ,
                 # thay vì chỉ nói "không thấy".
@@ -603,198 +646,163 @@ patch_settings_apk() {
 
     mods "Settings: drawable=$total  string=$strings_done"
 
-    # ---- Icon mục Toolbox ------------------------------------------------
-    # Icon RIÊNG (không ghi đè ic_other_advanced_settings nữa - bản cũ làm mục
-    # "Cài đặt bổ sung" mất icon gốc). Copy cùng tên vào mọi thư mục drawable*
-    # để đủ biến thể mật độ/night.
+    # ---- Bản vá "About phone kiểu ColorOS" (kashi) -----------------------
+    # 7 resource mới: 2 layout, 2 vector drawable, 2 PNG nền card phiên bản,
+    # và id storage_progress_kchi (layout tham chiếu @id/...).
+    # Màu my_device_info_item_background_color KHÔNG thêm: APK gốc đã có.
+    # 10 class mới + 5 method sửa đã được vá ở PRECHINAFIX
+    # (Settings-coloros-classes3.json / -classes12.json), chạy TRƯỚC bước này.
     #
-    # BẮT BUỘC khai báo tên resource trong public.xml, nếu không APKEditor báo:
-    #     ERROR: Local resource not defined: @drawable/ic_bugos_toolbox,
-    #            for path: res/drawable/ic_bugos_toolbox.xml
-    # -> rebuild Settings thất bại -> giữ APK gốc -> mất toàn bộ bản vá.
-    # (Đo trên Settings.apk thật: thêm file + ID vào public.xml thì build OK,
-    #  resources.arsc có 0x7f0818ed drawable/ic_bugos_toolbox, 40 biến thể.)
+    # PHẢI đi cùng cờ settings_coloros với phần dex. Nếu chỉ vá dex mà thiếu
+    # resource (hoặc ngược lại), Settings crash ngay khi mở "Thiết bị của tôi":
+    # code gọi Resources.getIdentifier("device_info_item_kashi") -> trả 0 ->
+    # inflate(0). Đã gặp thật ở build 20/11 15:54.
     #
-    # Chỉ khai báo ĐÚNG MỘT lần cho tên resource: các bản drawable-<qualifier>
-    # là biến thể của cùng entry, không phải entry mới.
-    local tb_icon="$SRC_DIR/ic_bugos_toolbox.xml"
-    if [ -f "$tb_icon" ]; then
-        local tb_n=0 d
-        while IFS= read -r d; do
-            [ -n "$d" ] || continue
-            cp -f "$tb_icon" "$d/ic_bugos_toolbox.xml" && tb_n=$((tb_n + 1))
-        done < <(find "$out" -path '*/res/drawable*' -type d 2>/dev/null)
-        if [ "$tb_n" -gt 0 ]; then
-            mods "Settings: them drawable ic_bugos_toolbox -> $tb_n thu muc"
+    # Smali của bản vá tra resource THEO TÊN lúc chạy
+    # (Resources.getIdentifier) chứ không nhúng id, nên chỉ cần đúng tên -
+    # không phải trùng id với APK gốc. Vì vậy cấp id mới cho từng entry là đủ.
+    local kashi_dir="$SRC_DIR/kashi"
+    local kashi_n=0
+    local coloros_on
+    coloros_on=$(grep -m1 '^settings_coloros=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+    if [ "$coloros_on" != "true" ]; then
+        kashi_dir=""
+        debug "Settings: settings_coloros != true - không thêm resource ColorOS"
+    fi
+    if [ -n "$kashi_dir" ] && [ -d "$kashi_dir" ]; then
+        local rel src dst
+        for resroot in "${resroots[@]}"; do
+            while IFS= read -r rel; do
+                [ -n "$rel" ] || continue
+                src="$kashi_dir/$rel"
+                dst="$resroot/${rel#res/}"
+                [ -f "$src" ] || continue
+                mkdir -p "$(dirname "$dst")"
+                cp -f "$src" "$dst" && kashi_n=$((kashi_n + 1))
+            done < <(cd "$kashi_dir" && find res -type f \( -name "*.xml" -o -name "*.png" \) | sort)
+
+            # File ĐÈ lên file có sẵn (không thêm public entry, id đã tồn tại).
+            # miui_version_card.xml: tool online sửa layout này để chèn
+            # VersionBgImageView (@id/device_info_version_card_bg) và
+            # device_name_in_banner. Thiếu nó thì setVersionCardBgElement gọi
+            # findViewById -> null -> NPE ở setOnClickListener, crash ngay khi
+            # mở "Thiết bị của tôi". Đã gặp thật ở build 890a561.
+            if [ -d "$kashi_dir/replace/res" ]; then
+                while IFS= read -r rel; do
+                    [ -n "$rel" ] || continue
+                    src="$kashi_dir/replace/$rel"
+                    dst="$resroot/${rel#res/}"
+                    [ -f "$src" ] || continue
+                    mkdir -p "$(dirname "$dst")"
+                    cp -f "$src" "$dst" && kashi_n=$((kashi_n + 1))
+                done < <(cd "$kashi_dir/replace" && find res -type f | sort)
+            fi
+        done
+
+        if [ "$kashi_n" -gt 0 ]; then
             python3 - "$out" <<'PYEOF'
-import io, os, re, sys
+import os
+import re
+import sys
 
 out = sys.argv[1]
-name = 'ic_bugos_toolbox'
+# Bản vá "About phone kiểu OxygenOS": 6 file + 5 id + 1 màu.
+# my_device_info_item_background_color và my_device_update_text KHÔNG thêm -
+# APK gốc đã có.
+#
+# oos_blue_tint_color: BẮT BUỘC, không phải trang trí. ic_device_oos_bg.xml và
+# oos_progress_drawable.xml tham chiếu @color/oos_blue_tint_color; thiếu nó thì
+# APKEditor dừng với "Resource not found for: '@color/oos_blue_tint_color'" -
+# đúng loại lỗi đã gặp với @color/bw ở bản ColorOS trước.
+want = [("layout", "device_info_item_kashi"),
+        ("layout", "storage_info_item_kashi"),
+        ("drawable", "ic_device_oos_bg"),
+        ("drawable", "ic_device_oos_inner"),
+        ("drawable", "oos_progress_drawable"),
+        ("drawable", "ic_bugos_wordmark_dark"),
+        ("drawable", "ic_bugos_wordmark_light"),
+        ("id", "storage_progress_kchi"),
+        ("id", "device_info_wallpaper_blur_bg"),
+        ("id", "device_name_in_banner"),
+        ("id", "about_phone_rom_name_info"),
+        ("color", "oos_blue_tint_color")]
+
+# color phải có giá trị trong colors.xml trước, public.xml chỉ gán số.
+COLORS = {"oos_blue_tint_color": "#ff2144bf"}
+
+# id phải khai trong values/ids.xml trước.
+NEW_IDS = ["storage_progress_kchi", "device_info_wallpaper_blur_bg",
+           "device_name_in_banner", "about_phone_rom_name_info"]
+
+for root, _dirs, files in os.walk(out):
+    if "colors.xml" in files and os.path.basename(root) == "values":
+        p = os.path.join(root, "colors.xml")
+        s = open(p, encoding="utf-8", errors="replace").read()
+        add = ""
+        for n, v in COLORS.items():
+            if 'name="%s"' % n not in s:
+                add += '  <color name="%s">%s</color>\n' % (n, v)
+        if add:
+            s = s.replace("</resources>", add + "</resources>")
+            open(p, "w", encoding="utf-8", newline="\n").write(s)
+
+for root, _dirs, files in os.walk(out):
+    if "ids.xml" in files and os.path.basename(root) == "values":
+        p = os.path.join(root, "ids.xml")
+        s = open(p, encoding="utf-8", errors="replace").read()
+        add = ""
+        for n in NEW_IDS:
+            if 'name="%s"' % n not in s:
+                add += '  <id name="%s" />\n' % n
+        if add:
+            s = s.replace("</resources>", add + "</resources>")
+            open(p, "w", encoding="utf-8", newline="\n").write(s)
+
 pubs = []
 for root, _dirs, files in os.walk(out):
-    if 'public.xml' not in files:
-        continue
-    if os.path.basename(os.path.dirname(root)) == 'res' and os.path.basename(root) == 'values':
-        pubs.append(os.path.join(root, 'public.xml'))
-
+    if "public.xml" in files and os.path.basename(root) == "values":
+        pubs.append(os.path.join(root, "public.xml"))
 if not pubs:
-    print('  [WARN] khong thay public.xml - icon se thieu resource')
+    print("  [WARN] khong thay public.xml - resource moi se thieu id")
     raise SystemExit(0)
 
 for p in pubs:
-    s = io.open(p, encoding='utf-8', errors='replace').read()
-    if 'name="%s"' % name in s:
-        continue
-    # type id của drawable lấy từ entry có sẵn (không hardcode: 0x7f08 ở
-    # Settings này, nhưng có thể khác ở ROM khác).
-    m = re.search(r'<public id="(0x7f[0-9a-f]{2})[0-9a-f]{4}" type="drawable"', s)
-    if not m:
-        print('  [WARN] public.xml khong co drawable nao de suy ra type id')
-        continue
-    tid = m.group(1)
-    ids = [int(x, 16) for x in
-           re.findall(r'<public id="(%s[0-9a-f]{4})" type="drawable"' % tid, s)]
-    if not ids:
-        continue
-    nxt = max(ids) + 1
-    if nxt > int(tid + 'ffff', 16):
-        print('  [WARN] het id trong type drawable %s' % tid)
-        continue
-    entry = '  <public id="0x%08x" type="drawable" name="%s" />\n' % (nxt, name)
-    s = s.replace('</resources>', entry + '</resources>')
-    io.open(p, 'w', encoding='utf-8', newline='\n').write(s)
-    print('  [OK] khai bao drawable %s = 0x%08x trong public.xml' % (name, nxt))
+    s = open(p, encoding="utf-8", errors="replace").read()
+    added = 0
+    for typ, name in want:
+        if 'type="%s" name="%s"' % (typ, name) in s:
+            continue
+        m = re.search(r'<public id="(0x7f[0-9a-f]{2})[0-9a-f]{4}" type="%s"' % typ, s)
+        if not m:
+            print("  [WARN] public.xml khong co entry type=%s" % typ)
+            continue
+        tid = m.group(1)
+        ids = [int(x, 16) for x in
+               re.findall(r'<public id="(%s[0-9a-f]{4})" type="%s"' % (tid, typ), s)]
+        if not ids:
+            continue
+        nxt = max(ids) + 1
+        if nxt > int(tid + "ffff", 16):
+            print("  [WARN] het id trong type %s" % typ)
+            continue
+        s = s.replace("</resources>",
+                      '  <public id="0x%08x" type="%s" name="%s" />\n</resources>'
+                      % (nxt, typ, name))
+        added += 1
+    if added:
+        open(p, "w", encoding="utf-8", newline="\n").write(s)
 PYEOF
+            # Dem so id/mau tu chinh danh sach 'want' thay vi viet cung: dong
+            # log cu ghi "2 màu + 3 id" trong khi thuc te la 1 mau + 4 id, va
+            # van goi la "ColorOS" sau khi da chuyen sang bo OxygenOS.
+            mods "Settings: bản vá OxygenOS - $kashi_n file + $(printf '%s\n' "${want[@]}" | grep -c 'color') màu + $(printf '%s\n' "${want[@]}" | grep -c 'id') id (storage_progress_kchi, device_info_wallpaper_blur_bg, device_name_in_banner, about_phone_rom_name_info)"
         else
-            warn "Settings: khong thu muc drawable de them icon"
+            warn "Settings: không chép được resource bản vá ColorOS"
         fi
     fi
 
-    # ---- Menu: Tích hợp Toolbox vào Cài đặt -> Mod ------------------------
-    local mod_ok=0
-    # Target của mục Toolbox do bin/ddevice/apply_mode.sh ghi vào config.env
-    # (root -> com.khai.roottoolbox, kaorios -> com.kousei.kaorios). Truyền qua
-    # env để patch_settings_mod.py không phụ thuộc thư mục đang đứng.
-    if [ -f "$(pwd)/config.env" ]; then
-        export TOOLBOX_TARGET_PACKAGE="$(grep -m1 '^toolbox_target_package=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
-        export TOOLBOX_TARGET_CLASS="$(grep -m1 '^toolbox_target_class=' "$(pwd)/config.env" | cut -d= -f2 | tr -d ' \r\n')"
-    fi
-    if [ -f "$SRC_DIR/patch_settings_mod.py" ]; then
-        python3 "$SRC_DIR/patch_settings_mod.py" "$out" && mod_ok=1 || warn "Settings: tích hợp 'Mod' thất bại"
-    fi
-
-    # ---- Preferences: BugOS Toolbox (ngôn ngữ, theme, spoof, hiệu năng) ----
-    # CẢNH BÁO (đo trên build thật 17/11): KHỐI NÀY PHẢI TẮT MẶC ĐỊNH.
-    #
-    # APKEditor (ARSCLib 1.3.5) KHÔNG tạo được entry resource kiểu "values"
-    # (string, string-array) khi build lại. Đã thử đủ cách, đều báo:
-    #     ERROR: Undefined entry name: <string-array name="bugos_perf_entries"/>...
-    #   - thêm file arrays_bugos.xml vào res/values-*        -> FAIL
-    #   - thêm vào arrays.xml có sẵn                          -> FAIL
-    #   - khai báo ID trong public.xml (đúng type id 0x7f03)  -> FAIL
-    #   - thêm file values mới (kể cả chỉ 1 string ASCII)     -> FAIL
-    # Trong khi đó: SỬA array có sẵn thì OK, THÊM drawable mới thì OK
-    # (kiểm chứng cùng một APK) -> giới hạn nằm ở loại resource values.
-    #
-    # Hậu quả khi bật: rebuild Settings thất bại -> "giữ APK gốc" -> MẤT TOÀN BỘ
-    # bản vá Settings (icon Toolbox, menu Toolbox, logo BugOS, đổi version).
-    # Vì vậy mặc định TẮT. Bật lại bằng settings_bugos_prefs=true khi có công cụ
-    # resource khác (aapt2 link toàn phần) thay được APKEditor.
-    local BUGOS_PREFS
-    BUGOS_PREFS=$(grep -m1 '^settings_bugos_prefs=' "$WORK_DIR/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
-    [ -z "$BUGOS_PREFS" ] && BUGOS_PREFS=false
-
-    local bugos_prefs_ok=0
-    local bugos_src_dir="$SRC_DIR/../Settings_ZBugOSToolbox"
-    local prefs_xml="$bugos_src_dir/prefs_bugos.xml"
-    local arrays_xml="$bugos_src_dir/arrays_bugos.xml"
-    local receiver_smali="$bugos_src_dir/BugOSBootReceiver.smali"
-
-    if [ "$BUGOS_PREFS" = "true" ] && [ -f "$prefs_xml" ] && [ -f "$arrays_xml" ] && [ -f "$receiver_smali" ]; then
-        # 1. Thêm arrays_bugos.xml vào các thư mục values
-        while IFS= read -r values_dir; do
-            [ -n "$values_dir" ] || continue
-            cp -f "$arrays_xml" "$values_dir/arrays_bugos.xml" 2>/dev/null && \
-                mods "Settings: thêm arrays_bugos.xml -> $values_dir"
-        done < <(find "$out" -type d -name "values*" -path "*/res/*" 2>/dev/null)
-
-        # 2. Chèn PreferenceCategory BugOS Toolbox vào top_level_settings*.xml
-        while IFS= read -r tls; do
-            [ -n "$tls" ] || continue
-            if grep -q "BugOS Toolbox" "$tls" 2>/dev/null; then
-                continue
-            fi
-            python3 - "$tls" "$prefs_xml" << 'PYEOF'
-import sys
-tls_path, prefs_path = sys.argv[1], sys.argv[2]
-with open(tls_path, 'r', encoding='utf-8', errors='replace') as f:
-    content = f.read()
-with open(prefs_path, 'r', encoding='utf-8', errors='replace') as f:
-    prefs = f.read().strip()
-if 'BugOS Toolbox' in content:
-    sys.exit(0)
-marker = '</PreferenceScreen>'
-idx = content.rfind(marker)
-if idx < 0:
-    content = content.rstrip() + '\n' + prefs + '\n'
-else:
-    content = content[:idx] + prefs + '\n' + content[idx:]
-with open(tls_path, 'w', encoding='utf-8', newline='\n') as f:
-    f.write(content)
-print(f"  [OK] Đã chèn PreferenceCategory BugOS Toolbox vào {tls_path}")
-PYEOF
-            bugos_prefs_ok=1
-        done < <(find "$out" -type f -name "top_level_settings*.xml" 2>/dev/null)
-
-        # 3. Thêm BugOSBootReceiver.smali vào thư mục smali đầu tiên (tránh trùng lớp đa dex)
-        local smali_added=0
-        while IFS= read -r smali_dir; do
-            [ -n "$smali_dir" ] || continue
-            if [ "$smali_added" -eq 1 ]; then
-                continue
-            fi
-            mkdir -p "$smali_dir/com/bugos/settings"
-            cp -f "$receiver_smali" "$smali_dir/com/bugos/settings/BugOSBootReceiver.smali" && \
-                mods "Settings: thêm BugOSBootReceiver.smali" && smali_added=1
-        done < <(find "$out" -type d \( -name "smali" -o -name "smali_classes*" \) 2>/dev/null | sort | head -n 1)
-
-        # 4. Sửa AndroidManifest.xml: thêm permission + receiver
-        while IFS= read -r manifest; do
-            [ -n "$manifest" ] || continue
-            if grep -q "BugOSBootReceiver" "$manifest" 2>/dev/null; then
-                continue
-            fi
-            python3 - "$manifest" << 'PYEOF'
-import sys
-manifest_path = sys.argv[1]
-with open(manifest_path, 'r', encoding='utf-8', errors='replace') as f:
-    content = f.read()
-if 'BugOSBootReceiver' in content:
-    sys.exit(0)
-perm = '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n'
-receiver = '    <receiver android:name="com.bugos.settings.BugOSBootReceiver" android:enabled="true" android:exported="false">\n        <intent-filter>\n            <action android:name="android.intent.action.BOOT_COMPLETED" />\n        </intent-filter>\n    </receiver>\n'
-marker = '</manifest>'
-idx = content.rfind(marker)
-if idx < 0:
-    content = content.rstrip() + '\n' + perm + receiver + '</manifest>\n'
-else:
-    content = content[:idx] + perm + receiver + content[idx:]
-with open(manifest_path, 'w', encoding='utf-8', newline='\n') as f:
-    f.write(content)
-print(f"  [OK] Đã đăng ký BugOSBootReceiver trong {manifest_path}")
-PYEOF
-            mods "Settings: đăng ký BugOSBootReceiver trong AndroidManifest.xml"
-        done < <(find "$out" -type f -name "AndroidManifest.xml" 2>/dev/null)
-
-        if [ "$bugos_prefs_ok" -eq 1 ]; then
-            mods "Settings: Đã thêm phần mềm BugOS Toolbox (ngôn ngữ, theme, spoof, hiệu năng)"
-            mod_ok=1
-        fi
-    fi
-
-    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ] && [ "$mod_ok" -eq 0 ]; then
-        warn "Settings: không thay đổi được asset, string lẫn mục Mod - giữ APK gốc"
+    if [ "$total" -eq 0 ] && [ "$strings_done" -eq 0 ] && [ "$kashi_n" -eq 0 ]; then
+        warn "Settings: không thay đổi được asset lẫn string - giữ APK gốc"
         return 1
     fi
 
@@ -868,11 +876,20 @@ PYEOF
     # NOTE: resource file names are often obfuscated inside the APK (res/hu.xml),
     # so we cannot look the entry up by its decoded name.  The pathData string is
     # stored verbatim in the binary XML string pool -> scan every res xml instead.
-    local ok=0 ok_str=0 ok_png=0
+    local ok=0 ok_str=0 ok_png=0 ok_kashi=0
     # marker 1: pathData của logo (drawable vector - chỉ có khi KHÔNG dùng PNG)
     ok=$(unzip -p "$work/new.apk" 'res/*.xml' 2>/dev/null | grep -ac "M 106.32 72.58 Q 99.29 80.61")
     # marker 2: chữ đã đổi (strings) - "Xiaomi Bug" nằm trong string pool
     ok_str=$(unzip -p "$work/new.apk" 'resources.arsc' 2>/dev/null | grep -ac "Xiaomi Bug")
+    # marker 2b: bản vá giao diện (ColorOS/OxygenOS) đã vào. Day la marker DUNG
+    # khi settings_brand_logo=false: luc do khong co logo nao duoc thay nen 3
+    # marker branding o tren deu bang 0, va verify cu bao "that bai" roi giu APK
+    # goc -> MAT TOAN BO ban va giao dien. Da gap that o build 21/11 07:29.
+    # Ten resource khong bi obfuscate trong resources.arsc, nen grep thang.
+    if [ "$kashi_n" -gt 0 ] 2>/dev/null; then
+        ok_kashi=$(unzip -p "$work/new.apk" 'resources.arsc' 2>/dev/null \
+                   | grep -ac "device_info_item_kashi")
+    fi
     # marker 3: PNG logo có mặt trong APK. Tên file trong res/ bị obfuscate nên
     # phải so theo nội dung: đếm entry .png có sha256 trùng logo nguồn.
     if [ -f "$SRC_DIR/logo_light.png" ]; then
@@ -894,8 +911,9 @@ print(n)
 PY
 )
     fi
-    if [ "${ok:-0}" -eq 0 ] && [ "${ok_str:-0}" -eq 0 ] && [ "${ok_png:-0}" -eq 0 ]; then
-        warn "Settings: Verify thất bại (không thấy marker drawable/PNG lẫn string) - giữ APK gốc"
+    if [ "${ok:-0}" -eq 0 ] && [ "${ok_str:-0}" -eq 0 ] && [ "${ok_png:-0}" -eq 0 ] \
+       && [ "${ok_kashi:-0}" -eq 0 ]; then
+        warn "Settings: Verify thất bại (không thấy marker drawable/PNG/string/kashi) - giữ APK gốc"
         return 1
     fi
 
@@ -909,11 +927,11 @@ PY
             warn "Settings: PNG có trong APK nhưng resource 'xiaomi_os_logo' biến mất - giữ APK gốc"
             return 1
         fi
-        mods "Settings: resource name còn trong ARSC (verify $ok_name)"
     fi
 
     cp -f "$work/new.apk" "$apk"
-    mods "Settings: DONE - drawable=$total (verify $ok vector, $ok_png png), string=$strings_done (verify $ok_str) trong ${apk#$MAIN_FOLDER/}"
+    mods "Settings: DONE - $total drawable + $strings_done string trong ${apk#$MAIN_FOLDER/}"
+    debug "Settings: verify vector=$ok png=$ok_png arsc=$ok_name string=$ok_str"
     rm -rf "$work"
     return 0
 }

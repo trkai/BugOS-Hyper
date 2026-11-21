@@ -1,6 +1,6 @@
 #!/bin/bash
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 
 os_type=$(cat $work_dir/bin/ddevice/os_type.txt 2>/dev/null | tr -d '\r\n')
 base_rom_code=$(cat $work_dir/bin/ddevice/base_rom_code.txt 2>/dev/null | tr -d '\r\n')

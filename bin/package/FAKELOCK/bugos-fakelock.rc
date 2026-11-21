@@ -1,0 +1,20 @@
+# BugOS fakelock - gia verified-boot state o tang property.
+#
+# Chay sau sys.boot_completed, khong phai post-fs-data: script can
+# /data/adb/ksud cua SukiSU, ma ksud chi co sau khi userdata mount xong va
+# KernelSU cai userspace. Dat o late_start + disabled de init khong tu chay
+# truoc khi /data san sang.
+#
+# Neu service khong chay, kiem tra:
+#   dmesg | grep -E "avc.*bugos|bugos-fakelock"
+#   getprop ro.boot.verifiedbootstate
+# Service ghi ket qua vao /dev/kmsg voi tag "bugos-fakelock".
+service bugos-fakelock /system/bin/sh /system/bin/bugos-fakelock.sh
+    class late_start
+    user root
+    group root system
+    oneshot
+    disabled
+
+on property:sys.boot_completed=1
+    start bugos-fakelock

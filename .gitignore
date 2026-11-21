@@ -33,3 +33,6 @@ bin/ddevice/superSize.txt
 bin/ddevice/ximi_type.txt
 preview_settings_mod.html
 preview_banner_default.jpg
+
+# Thư mục tạm của PRECHINAFIX (mktemp trong repo root).
+.prechina.*

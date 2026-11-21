@@ -21,7 +21,7 @@ source "$work_dir/functions.sh"
 #       if (bundle == null) return v3;                    // launcher chưa trả lời
 #
 # Bản vá trước chỉ đổi hằng số mặc định 2 -> 3. Nó không ăn, vì:
-#   * hằng số đó nằm trong một thanh ghi cụ thể (bản OS3 là v3, bản OS4 có thể
+#   * hằng số đó nằm trong một thanh ghi cụ thể (bản OS4 có thể
 #     là v0/v1/v2) nên điều kiện 'const/4 v3, 0x2' không khớp -> script lặng lẽ
 #     bỏ qua, giữ nguyên APK gốc;
 #   * và kể cả khi khớp, nếu launcher kịp trả lời provider thì giá trị mặc định
@@ -42,9 +42,10 @@ DEXTOOL="$work_dir/bin/tools/apk_dex_patch.py"
 DUMPDIR="$work_dir/documentation/provision_src"
 PKG="com.android.provision"
 
-# Mặc định TẮT. Launcher giờ là bản gốc của ROM (đã bỏ launcher mod Kashi), nên
-# bước setup hiện đúng những gì bản gốc hỗ trợ. Provision là app sống-còn của
-# lần boot đầu nên không đụng vào trừ khi bật rõ ràng trong config.env.
+# Mặc định TẮT. Launcher là bản gốc của ROM (mod launcher Rust/Kashi đã bị xoá
+# cùng bin/modfile/OS4/Launcher_RustMod), nên bước setup hiện đúng những gì bản
+# gốc hỗ trợ. Provision là app sống-còn của lần boot đầu nên không đụng vào trừ
+# khi bật rõ ràng trong config.env.
 ENABLE=$(grep -m1 '^patch_provision_recents=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d '\r\n ')
 if [ "$ENABLE" != "true" ]; then
     mods "Provision: bỏ qua bộ chọn kiểu Gần đây (patch_provision_recents != true)"

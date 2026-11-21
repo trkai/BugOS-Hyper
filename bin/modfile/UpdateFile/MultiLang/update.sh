@@ -1,6 +1,6 @@
 work_dir=${work_dir:-$(pwd)}
 MAIN_FOLDER="$work_dir/build/baserom/images"
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 deviceTYPE=$(cat $work_dir/bin/ddevice/device_type.txt 2>/dev/null)
 rom_os=$(cat $work_dir/bin/ddevice/rom_os.txt 2>/dev/null | tr -d '\r\n ')
 
@@ -37,17 +37,12 @@ if [[ $deviceTYPE == "China" ]]; then
 
     mkdir -p $MAIN_FOLDER/product/overlay/
 
-    # 1. Chọn gói Overlay tương thích theo phiên bản HyperOS
-    # Cả OS3 và OS4 dùng CÙNG một họ overlay (ZK Multi, file BugOS.Multi.*).
-    # OS4 có thư mục riêng để sau này chỉnh riêng nếu cần; hiện nội dung giống hệt
-    # updatesource/ nên git chỉ lưu một bản (blob trùng nội dung).
-    if [[ "$rom_os" == "OS4" ]] || [[ "$rom_os" =~ ^OS[4-9] ]]; then
-        mods "OS4: overlay BugOS.Multi (thư mục updatesource_os4)"
-        cp -rf "$work_dir/bin/modfile/UpdateFile/MultiLang/updatesource_os4/"* "$MAIN_FOLDER/product/overlay/"
-    else
-        mods "Applying HyperOS/MIUI MultiLanguage Overlays (ZK Multi)..."
-        cp -rf $work_dir/bin/modfile/UpdateFile/MultiLang/updatesource/* $MAIN_FOLDER/product/overlay/
-    fi
+    # 1. Gói Overlay (ZK Multi, file BugOS.Multi.*)
+    # Trước đây có hai thư mục: updatesource/ (OS3) và updatesource_os4/ (OS4).
+    # Đã kiểm tra 62 file của hai bên giống hệt nhau từng byte, nên chỉ giữ
+    # bản OS4 - tránh hai nguồn có thể lệch nhau về sau.
+    mods "Applying BugOS.Multi overlay (updatesource_os4)"
+    cp -rf "$work_dir/bin/modfile/UpdateFile/MultiLang/updatesource_os4/"* "$MAIN_FOLDER/product/overlay/"
 
     # 2. Thiết lập cấu hình vùng cho First-Boot OOBE
     if [ -d "$MAIN_FOLDER/system_ext" ] && [ -f "$work_dir/bin/modfile/UpdateFile/MultiLang/cust.prop" ]; then
@@ -158,5 +153,5 @@ if [[ $deviceTYPE == "China" ]]; then
     }
     region_summary
 
-    mods "Done!"
+    debug "Done!"
 fi
