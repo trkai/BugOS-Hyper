@@ -433,7 +433,9 @@ patch_settings_apk() {
 
         # ---- B. layout driven: chỉ lấy drawable DẠNG DẢI (wordmark) được
         #         tham chiếu từ layout trang Giới thiệu điện thoại -------------
-        if [ ${#cands[@]} -eq 0 ]; then
+        # Cung phai gate theo brand_logo. Build 21/11 07:00 cho thay A da dung
+        # nhung B/C van chay, nen heuristic bat nham asset ROM (xem ghi chu C).
+        if [ "$brand_logo" = "true" ] && [ ${#cands[@]} -eq 0 ]; then
             local lay name cand w h
             while IFS= read -r lay; do
                 while IFS= read -r name; do
@@ -454,20 +456,38 @@ patch_settings_apk() {
         fi
 
         # ---- C. content heuristic: wide vector with a huge pathData --------
-        if [ ${#cands[@]} -eq 0 ]; then
+        # CHI chay khi brand_logo=true. Khi settings_brand_logo=false thi khong
+        # duoc thay asset nao ca - day la nguon loi that o build 21/11 07:00:
+        # heuristic bat nham res/drawable/battery_indicator_percent_out.xml
+        # (79x26dp, ti le 3.04) va res/drawable/log_image.xml (248x36dp, ti le
+        # 6.9) - ca hai la asset cua ROM, bi thay bang logo BugOS.
+        if [ "$brand_logo" = "true" ] && [ ${#cands[@]} -eq 0 ]; then
             warn "Settings: Không khớp theo tên/layout -> dò theo nội dung (vector rộng)"
             while IFS= read -r f; do
-                local w h plen
+                local w h plen base
+                base=$(basename "$f")
+                # Loai thang theo ten: icon chuc nang cua ROM, khong bao gio la logo.
+                case "$base" in
+                    *battery*|*percent*|*log_image*|*indicator*|*signal*|*wifi*|*bluetooth*|\
+                    *progress*|*divider*|*scrollbar*|*btn*|*button*|*switch*|*check*|*arrow*|\
+                    *chevron*|*expand*|*collapse*|*seekbar*|*slider*|*tab_*|*badge_*|*ripple*)
+                        continue ;;
+                esac
                 w=$(grep -oE 'android:width="[0-9.]+dp"' "$f" 2>/dev/null | head -1 | grep -oE '[0-9.]+')
                 h=$(grep -oE 'android:height="[0-9.]+dp"' "$f" 2>/dev/null | head -1 | grep -oE '[0-9.]+')
                 plen=$(grep -o 'android:pathData="[^"]*"' "$f" 2>/dev/null | wc -c)
                 # bỏ qua asset đã được brand từ trước (idempotent)
                 grep -aq "106.32 72.58" "$f" 2>/dev/null && continue
+                # Ti le that cua wordmark la ~2.98 (824x277 o dang goc, 280x94 tren may).
+                # Khoang 2.2..4.2 phu ca hai, va loai battery (3.04 - qua nho,
+                # w=79 < 140) lan log_image (6.89 - qua dai). Da thu bang so.
                 if [ -n "$w" ] && [ -n "$h" ] && [ "$plen" -gt 1500 ] \
-                   && awk -v w="$w" -v h="$h" 'BEGIN{exit !(h>0 && w/h >= 3.0 && w >= 60 && w <= 400 && h <= 90)}'; then
+                   && awk -v w="$w" -v h="$h" 'BEGIN{r=w/h; exit !(h>0 && r >= 2.2 && r <= 4.2 && w >= 140 && w <= 900 && h >= 40 && h <= 320)}'; then
                     cands+=("$f")
                 fi
             done < <(find "$resroot" -type f -path "*/drawable*/*" -name "*.xml" 2>/dev/null | xargs -r grep -l '<vector' 2>/dev/null)
+        elif [ "$brand_logo" != "true" ]; then
+            debug "Settings: settings_brand_logo=false - khong doi asset logo nao"
         fi
 
         if [ ${#cands[@]} -eq 0 ]; then

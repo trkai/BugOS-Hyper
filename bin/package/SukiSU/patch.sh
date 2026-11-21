@@ -336,11 +336,16 @@ fi
 # chỉ thực sự cài đúng một lần. Cài lỗi thì app hệ thống vẫn còn (chỉ là chưa
 # dùng được) - không mất app, không boot loop.
 # ---------------------------------------------------------------------------
-INSTALL_SH="$IMG/system/bin/bugos_sukisu_manager.sh"
-INSTALL_RC="$IMG/system/etc/init/bugos-sukisu-manager.rc"
+# LUU Y duong dan: IMG="$work_dir/build/baserom/images" (chua cac .img da
+# bung). Partition system nam trong IMG/system/system, KHONG phai IMG/system.
+# Build 21/11 07:00 dung IMG/system/bin -> "No such file or directory" va
+# script/rc khong duoc tao, nen service cai manager khong bao gio chay.
+SYSDIR="$IMG/system/system"
+INSTALL_SH="$SYSDIR/bin/bugos_sukisu_manager.sh"
+INSTALL_RC="$SYSDIR/etc/init/bugos-sukisu-manager.rc"
 if [ "$PREINSTALL" != "true" ]; then
     mods "SukiSU: bỏ qua service tự cài manager (đã tắt preinstall)"
-elif [ -d "$IMG/system_ext" ]; then
+elif [ -d "$SYSDIR" ]; then
     mkdir -p "$(dirname "$INSTALL_SH")" "$(dirname "$INSTALL_RC")"
 
     cat > "$INSTALL_SH" << 'SHEOF'
@@ -456,7 +461,7 @@ RCEOF
     done
     mods "SukiSU: fs_config -> script /system/bin 0755, rc /system/etc/init 0644"
 
-    mods "SukiSU: script cài manager vào /data/app ở boot đầu -> system_ext/bin"
+    mods "SukiSU: script cài manager vào /data/app ở boot đầu -> system/bin + system/etc/init"
 else
     warn "SukiSU: không thấy system_ext/ - manager chỉ nằm ở /product/app và sẽ báo 'chưa cài đặt'"
 fi
