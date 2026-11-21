@@ -491,6 +491,15 @@ patch_settings_apk() {
         fi
 
         if [ ${#cands[@]} -eq 0 ]; then
+            # Khi brand_logo=false thi "khong co cands" la DUNG Y DO, khong phai
+            # loi. Truoc day khoi nay van chay: in canh bao + dump 20 webp rac,
+            # va nghiem trong hon la goi patch_strings.py lam DOI STRING cua ROM
+            # (log build 21/11 07:29 in hang chuc dong "[skip] ... khong phai
+            # wordmark thuan"). Gio bo qua hoan toan khi brand_logo != true.
+            if [ "$brand_logo" != "true" ]; then
+                debug "Settings: brand_logo=false - bo qua chan doan/patch string"
+                continue
+            fi
             warn "Settings: không thấy asset logo dạng drawable. Drawable nghi vấn (nếu có):"
             find "$resroot" -type f -path "*/drawable*/*" 2>/dev/null \
                 | grep -Ei '/(hyper|bugos|os_logo|logo|wordmark|brand|miui_|rom_)' \
@@ -864,11 +873,20 @@ PYEOF
     # NOTE: resource file names are often obfuscated inside the APK (res/hu.xml),
     # so we cannot look the entry up by its decoded name.  The pathData string is
     # stored verbatim in the binary XML string pool -> scan every res xml instead.
-    local ok=0 ok_str=0 ok_png=0
+    local ok=0 ok_str=0 ok_png=0 ok_kashi=0
     # marker 1: pathData của logo (drawable vector - chỉ có khi KHÔNG dùng PNG)
     ok=$(unzip -p "$work/new.apk" 'res/*.xml' 2>/dev/null | grep -ac "M 106.32 72.58 Q 99.29 80.61")
     # marker 2: chữ đã đổi (strings) - "Xiaomi Bug" nằm trong string pool
     ok_str=$(unzip -p "$work/new.apk" 'resources.arsc' 2>/dev/null | grep -ac "Xiaomi Bug")
+    # marker 2b: bản vá giao diện (ColorOS/OxygenOS) đã vào. Day la marker DUNG
+    # khi settings_brand_logo=false: luc do khong co logo nao duoc thay nen 3
+    # marker branding o tren deu bang 0, va verify cu bao "that bai" roi giu APK
+    # goc -> MAT TOAN BO ban va giao dien. Da gap that o build 21/11 07:29.
+    # Ten resource khong bi obfuscate trong resources.arsc, nen grep thang.
+    if [ "$kashi_n" -gt 0 ] 2>/dev/null; then
+        ok_kashi=$(unzip -p "$work/new.apk" 'resources.arsc' 2>/dev/null \
+                   | grep -ac "device_info_item_kashi")
+    fi
     # marker 3: PNG logo có mặt trong APK. Tên file trong res/ bị obfuscate nên
     # phải so theo nội dung: đếm entry .png có sha256 trùng logo nguồn.
     if [ -f "$SRC_DIR/logo_light.png" ]; then
@@ -890,8 +908,9 @@ print(n)
 PY
 )
     fi
-    if [ "${ok:-0}" -eq 0 ] && [ "${ok_str:-0}" -eq 0 ] && [ "${ok_png:-0}" -eq 0 ]; then
-        warn "Settings: Verify thất bại (không thấy marker drawable/PNG lẫn string) - giữ APK gốc"
+    if [ "${ok:-0}" -eq 0 ] && [ "${ok_str:-0}" -eq 0 ] && [ "${ok_png:-0}" -eq 0 ] \
+       && [ "${ok_kashi:-0}" -eq 0 ]; then
+        warn "Settings: Verify thất bại (không thấy marker drawable/PNG/string/kashi) - giữ APK gốc"
         return 1
     fi
 
