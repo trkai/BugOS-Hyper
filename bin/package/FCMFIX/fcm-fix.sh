@@ -91,22 +91,48 @@ pk_disarm() {
           --where "name='gms_control'" 2>/dev/null | grep -o "value=[^,]*" | head -n1 | cut -d= -f2-)
     [ "$got" = "false" ] || return 1
 
+    # bgControl=noRestrict cho GMS + Play Store.
+    #
+    # VI SAO PHAI DOC LAI bgControl (khong chi kiem tra row ton tai):
+    #   `content update` tra exit 0 KE CA khi khong update duoc dong nao (row
+    #   chua co, hoac provider chua san sang), va `content insert` cung im lang
+    #   khi that bai. Ban cu chi grep -c "pkgName=" de biet row co ton tai roi
+    #   bo qua, KHONG kiem tra gia tri da doi chua -> khi update that bai script
+    #   van return 0 -> thoat vong retry -> bgControl giu "miuiAuto" ->
+    #   PowerKeeper tu giam GMS khi xuong nen -> FCM chet han.
+    #
+    #   Da gap tren may 22/11: gms_control=false (dung) nhung
+    #   bgControl=miuiAuto (sai), va MCS bao "DeviceID: null" + err:31.
+    #   Set tay bgControl=noRestrict xong thi FCM ket noi lai binh thuong.
+    bad=0
     for p in com.google.android.gms com.android.vending; do
         content update --uri content://com.miui.powerkeeper.configure/userTable \
             --bind bgControl:s:noRestrict \
             --where "pkgName='${p}' AND userId=0" 2>/dev/null
-        # grep -F chi de chac chan: "$p" chua dau cham nen neu de grep hieu la
-        # regex thi ve li thuyet khop rong. Tren du lieu that no van dung, nhung
-        # -F loai bo hoan toan kha nang do.
-        has=$(content query --uri content://com.miui.powerkeeper.configure/userTable \
-              --where "pkgName='${p}' AND userId=0" 2>/dev/null | grep -cF "pkgName=$p")
-        if [ "$has" = "0" ]; then
+
+        # grep -o "bgControl=[^,]*" thay cho grep -c "pkgName=": can GIA TRI chu
+        # khong phai su ton tai. Neu row chua co thi cur rong -> insert.
+        cur=$(content query --uri content://com.miui.powerkeeper.configure/userTable \
+              --where "pkgName='${p}' AND userId=0" 2>/dev/null \
+              | grep -o "bgControl=[^,]*" | head -n1 | cut -d= -f2-)
+
+        if [ -z "$cur" ]; then
             content insert --uri content://com.miui.powerkeeper.configure/userTable \
                 --bind pkgName:s:"$p" --bind userId:i:0 --bind bgControl:s:noRestrict 2>/dev/null
+            cur=$(content query --uri content://com.miui.powerkeeper.configure/userTable \
+                  --where "pkgName='${p}' AND userId=0" 2>/dev/null \
+                  | grep -o "bgControl=[^,]*" | head -n1 | cut -d= -f2-)
+        fi
+
+        if [ "$cur" != "noRestrict" ]; then
+            bad=1
         fi
     done
     iptables -F gms_wall 2>/dev/null
     ip6tables -F gms_wall 2>/dev/null
+    # Tra 1 de vong retry (0/5/15s) chay lai: provider co the chua san sang o
+    # lan dau sau boot.
+    [ "$bad" = "0" ] || return 1
     return 0
 }
 
@@ -117,7 +143,7 @@ if command -v content >/dev/null 2>&1; then
             say "PowerKeeper: gms_control=false, gms_wall da flush"
             break
         fi
-        [ "$d" = "15" ] && say "PowerKeeper: khong dat duoc gms_control (provider chua san sang)"
+        [ "$d" = "15" ] && say "PowerKeeper: khong dat duoc gms_control/bgControl (provider chua san sang)"
     done
 fi
 
