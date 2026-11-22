@@ -274,10 +274,18 @@ mods "SukiSU: boot.img đã vá - $out_sz byte (gốc $stock_sz)"
 APP_DIR="$IMG/product/app/SukiSUUltra"
 PREINSTALL=$(grep -m1 '^sukisu_preinstall_manager=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
 if [ "$PREINSTALL" != "true" ]; then
-    # Không cài sẵn app: người dùng mở Root Toolbox bấm "Cài". Kernel trong
-    # boot.img vẫn có root sẵn, chỉ là chưa có manager nào để nói chuyện.
-    mods "SukiSU: không cài sẵn manager (sukisu_preinstall_manager=false) - Root Toolbox lo"
+    # Không cài sẵn app: kernel trong boot.img vẫn có root sẵn, nhưng KHÔNG có
+    # app nào để nói chuyện với nó (Root Toolbox đã bị xoá khỏi repo). Người
+    # dùng phải tự cài APK manager thì mới có root dùng được.
+    mods "SukiSU: không cài sẵn manager (sukisu_preinstall_manager=false) - người dùng phải tự cài APK"
 elif [ -d "$IMG/product" ]; then
+    # Tải manager có thể đã thất bại ở trên (script in "bỏ qua root, build tiếp")
+    # nhưng preinstall vẫn chạy tới đây. Thiếu guard thì cp im lặng, unzip im
+    # lặng, rồi báo nhầm là "APK không có lib".
+    if [ ! -f "$APK" ]; then
+        error "SukiSU: không có file manager APK ($APK) - không cài sẵn được"
+        exit 1
+    fi
     mkdir -p "$APP_DIR"
     cp -f "$APK" "$APP_DIR/SukiSUUltra.apk"
     chmod 0644 "$APP_DIR/SukiSUUltra.apk"
@@ -328,11 +336,16 @@ fi
 # chỉ thực sự cài đúng một lần. Cài lỗi thì app hệ thống vẫn còn (chỉ là chưa
 # dùng được) - không mất app, không boot loop.
 # ---------------------------------------------------------------------------
-INSTALL_SH="$IMG/system_ext/bin/bugos_sukisu_manager.sh"
-INSTALL_RC="$IMG/system_ext/etc/init/init.bugos.sukisu.rc"
+# LUU Y duong dan: IMG="$work_dir/build/baserom/images" (chua cac .img da
+# bung). Partition system nam trong IMG/system/system, KHONG phai IMG/system.
+# Build 21/11 07:00 dung IMG/system/bin -> "No such file or directory" va
+# script/rc khong duoc tao, nen service cai manager khong bao gio chay.
+SYSDIR="$IMG/system/system"
+INSTALL_SH="$SYSDIR/bin/bugos_sukisu_manager.sh"
+INSTALL_RC="$SYSDIR/etc/init/bugos-sukisu-manager.rc"
 if [ "$PREINSTALL" != "true" ]; then
     mods "SukiSU: bỏ qua service tự cài manager (đã tắt preinstall)"
-elif [ -d "$IMG/system_ext" ]; then
+elif [ -d "$SYSDIR" ]; then
     mkdir -p "$(dirname "$INSTALL_SH")" "$(dirname "$INSTALL_RC")"
 
     cat > "$INSTALL_SH" << 'SHEOF'
@@ -363,66 +376,141 @@ if [ ! -f "$APK" ]; then
 fi
 
 # Đã là app dữ liệu rồi thì thôi (cài rồi, hoặc người dùng đã tự cài).
-pm_path=$(pm path com.sukisu.ultra 2>&1)
-echo "--- pm path: $pm_path" >> "$LOG" 2>&1
-case "$pm_path" in
-    *"/data/app/"*) echo "--- đã ở /data/app, không làm gì" >> "$LOG" 2>&1; exit 0 ;;
-esac
+#
+# Tên package KHÔNG hard-code một giá trị: bản APK này là com.sukisu.nova, không
+# phải com.sukisu.ultra như các bản SukiSU khác. Đo trên máy: pm list packages
+# chỉ có com.sukisu.nova, nên mọi lệnh `pm path com.sukisu.ultra` luôn rỗng và
+# guard "đã cài rồi" không bao giờ đúng -> cài lại mỗi lần boot.
+find_pkg() {
+    for _p in com.sukisu.nova com.sukisu.ultra; do
+        case "$(pm path "$_p" 2>/dev/null)" in
+            *"/data/app/"*) echo "$_p"; return 0 ;;
+        esac
+    done
+    # Fallback: dò theo tên gói, phòng khi bản sau đổi tên lần nữa.
+    pm list packages 2>/dev/null | sed -n 's/^package:\(com\.sukisu\.[a-z0-9._]*\)$/\1/p' | head -n1
+}
+
+PKG=$(find_pkg)
+echo "--- package hiện có: ${PKG:-khong-co}" >> "$LOG" 2>&1
+if [ -n "$PKG" ] && [ "$(pm path "$PKG" 2>/dev/null | head -n1)" != "" ]; then
+    case "$(pm path "$PKG" 2>/dev/null)" in
+        *"/data/app/"*) echo "--- đã ở /data/app, không làm gì" >> "$LOG" 2>&1; exit 0 ;;
+    esac
+fi
 
 echo "--- pm install -r $APK" >> "$LOG" 2>&1
 pm install -r "$APK" >> "$LOG" 2>&1
-echo "--- pm exit=$?" >> "$LOG" 2>&1
-echo "--- sau cài: $(pm path com.sukisu.ultra 2>&1)" >> "$LOG" 2>&1
+_rc=$?
+echo "--- pm exit=$_rc" >> "$LOG" 2>&1
+echo "--- sau cài: $(pm path "$(find_pkg)" 2>&1)" >> "$LOG" 2>&1
 SHEOF
     chmod 0755 "$INSTALL_SH"
 
     cat > "$INSTALL_RC" << 'RCEOF'
-# BugOS - cài SukiSU Ultra vào /data/app ở lần boot đầu.
-# Xem bin/package/SukiSU/patch.sh.
+# BugOS - cai SukiSU Ultra vao /data/app o lan boot dau.
 #
-# seclabel u:r:shell:s0: chỉ domain shell mới có binder gọi được `pm`; domain
-# init thì không. Đây là khuôn có sẵn trong init.rc (service console).
+# VI SAO PHAI O /system/etc/init/ (khong phai /system_ext/etc/init/):
+# Do tren annibale (A17/OS4.0.6): dat rc o system_ext thi init KHONG he nap.
+# Bang chung: getprop khong co init.svc.bugos_sukisu_manager, va cac service
+# khac cung nam o do (dmadio, gptresize, hybrid_control) cung khong co
+# init.svc.*. Nghia la ROM nay chi quet /system/etc/init/, khong quet
+# system_ext/etc/init/ nhu AOSP. Doi sang /system/etc/init/ la init nap duoc.
 #
-# KHÔNG dùng `on property:sys.boot_completed=1` nữa: lần trước service có được
-# start (ro.boottime có ghi) nhưng script không chạy được dòng nào. Nguyên nhân
-# đo được trên máy: file script bị fspatch đóng 0750 root:root nên nếu tiến
-# trình không phải uid 0 thì `sh` không đọc nổi file -> thoát ngay, không log.
-# Giờ: file 0755 (ép trong fs_config), service nằm ở class main (init chắc chắn
-# start mỗi lần boot) và tự chờ sys.boot_completed - bỏ hẳn phụ thuộc trigger.
-service bugos_sukisu_manager /system/bin/sh /system_ext/bin/bugos_sukisu_manager.sh
-    class main
+# VI SAO KHONG dung `su`: /system/bin/su do ksud tao ra LUC BOOT, ma ksud chi
+# chay khi kernel da nhan manager. Manager chi duoc nhan khi APK nam trong
+# /data/app. Service nay chinh la thu dua APK vao /data/app -> neu phu thuoc
+# su thi thanh vong lap khong loi ra (dung hien tuong: root thanh cong nhung
+# app bao chua cai dat, cai lai bang tay thi duoc).
+#
+# Domain: u:r:shell:s0, theo khuon co san trong init.miui.ext.rc
+# (pubcert_download: init exec /system/bin/sh voi seclabel shell).
+# Tren may nay tu shell KHONG doc duoc /system_ext/bin/* (da do: rc=126), nen
+# script phai nam o /system/bin/ va co nhan system_file.
+service bugos_sukisu_manager /system/bin/sh /system/bin/bugos_sukisu_manager.sh
+    class late_start
     user root
     group root system
     oneshot
     seclabel u:r:shell:s0
-
-# Lưới an toàn: nếu vì lý do nào đó class main không start được service này,
-# trigger boot_completed vẫn kích hoạt nó. Script idempotent (thấy /data/app là
-# thoát), nên chạy hai đường không sao.
-on property:sys.boot_completed=1
-    start bugos_sukisu_manager
 RCEOF
     chmod 0644 "$INSTALL_RC"
 
-    # fspatch.py tự đóng 0750 cho mọi file .sh nằm dưới /bin (quy ước của ROM
-    # gốc). Với file của mình thì phải là 0755, nếu không `sh` không đọc được
-    # khi service không chạy bằng uid 0 - đúng lỗi đã gặp. Ghi thẳng vào
-    # fs_config: fspatch giữ nguyên entry đã có, nên entry này thắng.
-    FS_CFG="$IMG/config/system_ext_fs_config"
-    if [ -f "$FS_CFG" ]; then
-        {
-            echo "system_ext/bin/bugos_sukisu_manager.sh 0 0 0755"
-            echo "system_ext/etc/init/init.bugos.sukisu.rc 0 0 0644"
-        } >> "$FS_CFG"
-        mods "SukiSU: fs_config -> script 0755, rc 0644"
+    # fspatch.py tu dong 0750 cho MOI file .sh nam duoi /bin (quy uoc ROM goc,
+    # xem bin/fspatch.py dong 103-104). Voi script cua minh thi phai 0755, neu
+    # khong `sh` khong doc duoc vi no chay duoi domain shell - dung loi da gap
+    # tren may: /system/bin/bugos_sukisu_manager.sh -> -rwxr-x--- root shell,
+    # service o trang thai "stopped", manager khong duoc cai, root khong song.
+    #
+    # Cach sua: ghi de entry vao fs_config TRUOC khi packROM goi fspatch.py.
+    # fs_patch() co `if fs_file.get(i): new_fs[i] = fs_file[i]` nen entry da co
+    # se thang phan suy luan 0750. Nhung phai ghi vao DUNG file ma packROM dung:
+    #   python3 fspatch.py $IMG_DIR/${pname} $IMG_DIR/config/${pname}_fs_config
+    # tuc la config/system_fs_config (khong phai system_ext_fs_config).
+    #
+    # Truoc day khoi nay: (a) chi ghi khi file da ton tai, (b) van in "0755"
+    # du khong ghi duoc gi -> log noi doi. Gio ghi ca khi file chua co, va bao
+    # dung so entry da ghi.
+    _fc_written=0
+    for _fc in "$IMG/config/system_fs_config" "$IMG/config/system_ext_fs_config"; do
+        # rc nam o /system/etc/init (thuoc partition system) nen chi can ghi vao
+        # system_fs_config. Van ghi ca system_ext neu ban ROM co dat o do.
+        case "$_fc" in
+            *system_ext_fs_config)
+                # Khong co file nao cua BugOS trong system_ext -> khong ghi.
+                continue
+                ;;
+        esac
+        mkdir -p "$(dirname "$_fc")" 2>/dev/null
+        # Dung python: sửa tại chỗ, idempotent, và không phụ thuộc `mv -f` /
+        # `cat >` (cả hai đều hỏng trên MSYS khi ghi đè file đang mở).
+        python3 - "$_fc" <<'PYEOF'
+import sys, os
+p = sys.argv[1]
+rows = {
+    "system/bin/bugos_sukisu_manager.sh": "system/bin/bugos_sukisu_manager.sh 0 2000 0755",
+    "system/etc/init/bugos-sukisu-manager.rc": "system/etc/init/bugos-sukisu-manager.rc 0 0 0644",
+}
+out, seen = [], set()
+if os.path.exists(p):
+    with open(p, encoding="utf-8", errors="replace") as f:
+        # splitlines() chu khong split("\n"): tranh sinh dong trong o cuoi file.
+        for line in f.read().splitlines():
+            if not line.strip():
+                continue
+            key = line.split(" ")[0]
+            if key in rows:
+                if key in seen:
+                    continue
+                out.append(rows[key]); seen.add(key)
+            else:
+                out.append(line.rstrip())
+for k, v in rows.items():
+    if k not in seen:
+        out.append(v)
+# Ghi ra file tam roi os.replace: atomic, va tranh loi khoa file tren
+# Windows/MSYS khi ghi de truc tiep.
+tmp = p + ".bugos_tmp"
+with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+    f.write("\n".join(out) + "\n")
+os.replace(tmp, p)
+PYEOF
+        _fc_written=$((_fc_written + 1))
+    done
+    if [ "$_fc_written" -gt 0 ]; then
+        mods "SukiSU: fs_config -> script /system/bin 0755 (gid 2000, khop ROM goc), rc 0644"
     else
-        warn "SukiSU: không thấy $FS_CFG - script có thể bị đóng 0750 và không chạy được"
+        warn "SukiSU: khong ghi duoc fs_config - script co the bi dong 0750 va khong chay"
     fi
 
-    mods "SukiSU: script cài manager vào /data/app ở boot đầu -> system_ext/bin"
+    mods "SukiSU: script cài manager vào /data/app ở boot đầu -> system/bin + system/etc/init"
 else
     warn "SukiSU: không thấy system_ext/ - manager chỉ nằm ở /product/app và sẽ báo 'chưa cài đặt'"
 fi
 
-mods "SukiSU: xong - kernel có root sẵn; manager do Root Toolbox cài khi người dùng bấm"
+if [ "$PREINSTALL" = "true" ]; then
+    mods "SukiSU: xong - root sẵn; manager cài sẵn, tự sang /data/app ở boot đầu"
+else
+    mods "SukiSU: xong - kernel có root sẵn; KHÔNG có manager, người dùng phải tự cài APK"
+fi
 exit 0

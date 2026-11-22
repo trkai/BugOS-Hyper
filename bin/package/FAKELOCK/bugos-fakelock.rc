@@ -1,0 +1,30 @@
+# BugOS fakelock - gia verified-boot state o tang property.
+#
+# Chay o class late_start, KHONG dung `disabled` + trigger.
+#
+# VI SAO BO `disabled` + `on property:sys.boot_completed=1`:
+#   Do tren annibale (A17/OS4.0.6, build 21/11) ca 3 service cua BugOS deu
+#   khong chay. Kiem tra cheo tren chinh ROM do: dmesgd, boottrace,
+#   aisealhostservice - service CUA ROM, cung dung trigger
+#   `on property:sys.boot_completed=1` - cung khong chay (init.svc rong),
+#   trong khi gatekeeperd / traced (late_start, KHONG disabled) thi running.
+#   => trigger do khong con hieu luc tren ROM nay.
+#
+# Script TU CHO ca hai thu:
+#   - /data/adb/ksud (toi da 90s) - ksud chi co sau khi userdata mount va
+#     KernelSU cai userspace
+#   - sys.boot_completed (vong while) - framework phai len truoc khi goi
+#     `ksud resetprop`
+# nen khong can trigger nua, va late_start la dung lop (chay sau khi
+# userdata mount xong).
+#
+# Neu service khong chay, kiem tra:
+#   dmesg | grep -E "avc.*bugos|bugos-fakelock"
+#   getprop ro.boot.verifiedbootstate
+# Service ghi ket qua vao /dev/kmsg voi tag "bugos-fakelock".
+service bugos-fakelock /system/bin/sh /system/bin/bugos-fakelock.sh
+    class late_start
+    user root
+    group root system
+    oneshot
+    seclabel u:r:shell:s0

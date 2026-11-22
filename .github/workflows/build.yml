@@ -6,13 +6,6 @@ on:
       input_url:
         description: 'URL'
         required: true
-      toolbox_mode:
-        description: 'Toolbox trong Settings: root = có root + BugOS Toolbox; kaorios = không root + Kaorios Toolbox'
-        type: choice
-        options:
-          - root
-          - kaorios
-        default: root
 
 jobs:
   Initialize:
@@ -71,67 +64,12 @@ jobs:
         run: |
           sudo chmod 777 -R *
 
-      - name: Build prop-fix helper
-        run: |
-          set -e
-          SRC="bin/package/BugOSPropFix/bugos_propfix.c"
-          OUT="bin/package/BugOSPropFix/bugos_propfix"
-          if [ ! -f "$SRC" ]; then
-            echo "Không có $SRC - bỏ qua"
-            exit 0
-          fi
-
-          # Không dùng NDK: zip r27c giải nén ~5GB, runner hết đĩa giữa lúc unzip
-          # (ENOSPC trong liblldb.so) và chết cả job. Binary chỉ cần libc chuẩn,
-          # nên cross-gcc của Ubuntu (~120MB) là đủ và không phụ thuộc bionic.
-          #
-          # Phải kèm libc6-dev-arm64-cross: nếu thiếu, gcc không thấy sysroot
-          # arm64 và lấy nhầm /usr/include của host -> "bits/libc-header-start.h:
-          # No such file". `--no-install-recommends` KHÔNG cài kèm gói này.
-          CC=aarch64-linux-gnu-gcc
-          if ! command -v "$CC" >/dev/null 2>&1; then
-            echo "Cài cross-compiler aarch64 ..."
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq \
-              gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-          fi
-          "$CC" --version | head -1
-          echo "sysroot: $(aarch64-linux-gnu-gcc -print-sysroot)"
-
-          # Tự kiểm tra phần ghi serial bằng gcc của máy build TRƯỚC khi đóng
-          # binary vào ROM. Đây là chỗ từng sai mà không báo lỗi: serial giữ
-          # byte độ dài cũ -> bionic đọc lại value sai độ dài.
-          gcc -O1 -Wall -DBUGOS_SELFTEST -o /tmp/propfix_selftest "$SRC"
-          /tmp/propfix_selftest --selftest
-
-          # -static + -no-pie: ELF tĩnh không cần loader động, chạy được trên
-          # Android (kernel Linux, không đụng bionic).
-          "$CC" -Os -Wall -fno-stack-protector -static -no-pie -s -o "$OUT" "$SRC"
-          file "$OUT"
-          ls -la "$OUT"
-
-      - name: Apply toolbox mode
-        run: |
-          MODE="${{ inputs.toolbox_mode }}"
-          if [ -z "$MODE" ]; then MODE=root; fi
-          case "$MODE" in
-            root|kaorios) ;;
-            *) echo "toolbox_mode không hợp lệ: $MODE"; exit 1 ;;
-          esac
-          if grep -q '^toolbox_mode=' config.env; then
-            sed -i "s/^toolbox_mode=.*/toolbox_mode=$MODE/" config.env
-          else
-            echo "toolbox_mode=$MODE" >> config.env
-          fi
-          echo "--- toolbox_mode trong config.env ---"
-          grep -n '^toolbox_mode=' config.env
-
       - name: Build ROM...
         timeout-minutes: 90
         env:
           INPUT_URL: ${{ inputs.input_url }}
         run: |
-          sudo -E bash build.sh "$INPUT_URL" "${{ github.repository }}" "xiaomi" "${{ env.BUILDER_NAME }}" "${{ env.BUILDER_ID }}"
+          sudo -E bash build.sh "$INPUT_URL"
 
       - name: Pack ROM...
         timeout-minutes: 40
@@ -141,6 +79,16 @@ jobs:
       - name: Upload ROM...
         run: |
           sudo -E bash uploadROM.sh
+
+      - name: Free build disk before upload
+        if: success()
+        run: |
+          # uploadROM.sh da chiem xong out/ va ghi output_zip.txt; build/ khong
+          # con ai dung. De nguyen no lam root fs day 100% (log that: 718M/145G)
+          # -> rclone/Gofile de hong o nam cuoi cung.
+          echo "Truoc don: $(df -h / | tail -1)"
+          sudo rm -rf build
+          echo "Sau don:  $(df -h / | tail -1)"
 
       - name: Upload ROM to Google Drive
         id: drive
@@ -152,6 +100,7 @@ jobs:
         run: |
           if [ -z "$RCLONE_CONF" ]; then
             echo "Chưa cấu hình RCLONE_CONF -> bỏ qua Google Drive"
+            # exit 1 co chu: keep outcome=failure de step Gofile (outcome != success) chay.
             exit 1
           fi
 
@@ -162,6 +111,19 @@ jobs:
           fi
 
           DEST="${GDRIVE_DIR:-gdrive:BugOS}"
+
+          # setup.sh co `sudo apt install rclone` NHUNG khong co set -e: neu apt
+          # hong giua chung (PPA / het dia) step van xanh va day moi phat hien o day.
+          if ! command -v rclone >/dev/null 2>&1; then
+            echo "rclone khong co trong PATH -> tu cai lai"
+            sudo apt-get update -qq || true
+            sudo apt-get install -y -qq rclone || {
+              echo "Khong cai duoc rclone -> nhuong cho Gofile"
+              exit 1
+            }
+          fi
+          rclone version | head -n 1
+
           mkdir -p "$HOME/.config/rclone"
           printf '%s\n' "$RCLONE_CONF" > "$HOME/.config/rclone/rclone.conf"
 
@@ -201,20 +163,31 @@ jobs:
           fi
           echo "Gofile server: $SERVER"
 
-          AUTH=()
-          if [ -n "$GOFILE_TOKEN" ]; then
-            AUTH=(-F "token=${GOFILE_TOKEN}")
-          fi
+          # Co token thi thu token truoc. Neu Gofile tra `error-token` (secret sai
+          # hoac het han) thi BO TOKEN va upload an danh - cung cach cac build cu
+          # (trước khi co GOFILE_TOKEN) van upload thanh cong.
+          MODE=token
+          [ -z "$GOFILE_TOKEN" ] && MODE=anon
 
           LINK=""
-          for i in 1 2 3; do
+          for i in 1 2 3 4; do
+            AUTH=()
+            [ "$MODE" = "token" ] && AUTH=(-F "token=${GOFILE_TOKEN}")
+
             RES=$(curl -sS --max-time 3600 "${AUTH[@]}" \
                   -F "file=@${ROM_ZIP_PATH}" "https://${SERVER}.gofile.io/contents/uploadfile") || RES=""
-            echo "Lần $i: status=$(echo "$RES" | jq -r '.status' 2>/dev/null)"
-            LINK=$(echo "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
-            if [ -n "$LINK" ]; then
-              break
+            STATUS=$(printf '%s' "$RES" | jq -r '.status // empty' 2>/dev/null)
+            LINK=$(printf '%s' "$RES" | jq -r '.data.downloadPage // empty' 2>/dev/null)
+            echo "Lần $i (mode=$MODE): status=${STATUS:-curl-error}"
+
+            [ -n "$LINK" ] && break
+
+            if [ "$STATUS" = "error-token" ] && [ "$MODE" = "token" ]; then
+              echo "GOFILE_TOKEN bị Gofile từ chối -> đổi sang upload ẩn danh"
+              MODE=anon
+              continue
             fi
+            [ -n "$STATUS" ] && echo "  response: $(printf '%s' "$RES" | head -c 300)"
             sleep 10
           done
 

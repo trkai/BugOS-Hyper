@@ -1,5 +1,5 @@
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 rom_os=$(cat $WORK_DIR/bin/ddevice/rom_os.txt)
 regionTYPE=$(cat $work_dir/bin/ddevice/device_type.txt)
 androidVER=$(cat $WORK_DIR/bin/ddevice/androidver.txt)
@@ -97,7 +97,7 @@ fix_themereset() {
         return 0
     fi
     sed -i '/on boot/a\'$'\n''    chmod 0731 \/data\/system\/theme' "$InitRC1"
-    mods "Done"
+    debug "Done"
 }
 
 # Tổng kết các prop ảnh hưởng RAM để nhìn được ngay trong log build

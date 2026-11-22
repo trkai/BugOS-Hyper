@@ -2,7 +2,7 @@
 
 baserom="$1"
 work_dir=$(pwd)
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 # Check whether it is a local package or a link
 if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     info "Download link detected, starting a download..."
@@ -51,13 +51,7 @@ if [ ! -f "${baserom}" ] && [ "$(echo $baserom |grep http)" != "" ]; then
     done
 
     baserom="$rom_file"
-    if [ -f $work_dir/topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip ]; then
-        baserom="topaz-ota_full-OS3.0.2.0.WMGCNXM-user-16.0-b487e82659.zip"
-        info "BASEROM: ${baserom}"
-    elif [ -f $work_dir/munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip ]; then
-        baserom="munch-ota_full-OS2.0.215.0.VLMCNXM-user-15.0-7df6d5ee94.zip"
-        info "BASEROM: ${baserom}"
-    elif ! rom_zip_ok "${baserom}"; then
+    if ! rom_zip_ok "${baserom}"; then
         error "Download error! (thiếu hoặc hỏng: ${baserom})"
         exit 1
     fi
@@ -98,8 +92,6 @@ else
     base_rom_code="Unknown"
 fi
 
-device_f=$(echo $device_code | sed 's/\(Global\|EEAGlobal\|INGlobal\|IDGlobal\|RUGlobal\|TWGlobal\|TRGlobal\|JPGlobal\)$//' | tr '[:upper:]' '[:lower:]')
-
 # Determine Device Type
 info "Get Device Type"
 if echo "$device_code" | grep -q 'EEAGlobal'; then
@@ -122,21 +114,61 @@ else
     DEVICE_TYPE="China"
 fi
 
-#Check MIUI or Hyper
-if echo "$base_rom_code" | grep -q "OS1"; then
-    ROM_OS="OS1"
-elif echo "$base_rom_code" | grep -q "OS2"; then
-    ROM_OS="OS2"
-elif echo "$base_rom_code" | grep -q "OS3"; then
-    ROM_OS="OS3"
-elif echo "$base_rom_code" | grep -q "OS4"; then
+# ---------------------------------------------------------------------------
+# CHỈ NHẬN ROM CHINA.
+#
+# Mã vùng Xiaomi nằm ở ĐUÔI base_rom_code, dạng "<số hiệu>.<vùng>":
+#     OS4.0.6.0.XPKCNXM   -> đuôi CNXM    = China
+#     OS4.0.6.0.XMGEUXM   -> đuôi EUXM    = EEA (Global)
+#     OS4.0.6.0.XMGRU     -> đuôi RU      = Russia
+#
+# Trước đây bước này tin DEVICE_TYPE, mà DEVICE_TYPE chỉ là "China nếu
+# device_code không chứa chữ Global". Mã Global không phải lúc nào cũng có chữ
+# "global" trong tên file (XMGEUXM!), nên ROM EEA bị nhận là China và toàn bộ
+# mod de-China chạy sai base.
+#
+# Kiểm tra 2 lớp:
+#   (1) Ở đây - theo tên file, chặn TRƯỚC khi tải cả GB.
+#   (2) target_check.sh - đọc ro.miui.build.region từ build.prop sau khi bung,
+#       vì tên file có thể bị đổi.
+#
+# Đuôi nhận là China: CNXM (và biến thể chứa CN như CNXM/CHN).
+# ---------------------------------------------------------------------------
+ROM_REGION_TAIL=$(echo "$base_rom_code" | sed -E 's/^.*\.//; s/[0-9]+$//' | tr -d '\r\n ')
+
+case "$ROM_REGION_TAIL" in
+    CNXM|CNXM*|*CNXM)
+        : # China - nhận
+        ;;
+    "")
+        warn "ROM: không đọc được mã vùng từ tên file ('$base_rom_code') - sẽ kiểm lại bằng build.prop"
+        ;;
+    *)
+        echo "ROM vùng '$ROM_REGION_TAIL' (mã '$base_rom_code') KHÔNG phải China (CNXM)."
+        echo "Repo này chỉ build ROM CHINA. Dừng."
+        exit 1
+        ;;
+esac
+
+# Tên file có chữ "global" -> chắc chắn quốc tế, dừng luôn.
+if echo "$device_code" | grep -qi 'global'; then
+    echo "ROM quốc tế ('$device_code') - chỉ nhận ROM CHINA. Dừng."
+    exit 1
+fi
+
+# Chỉ hỗ trợ HyperOS 4. Các nhánh OS1/OS2/OS3 và MIUI (V13/V14) đã bị xoá cùng
+# toàn bộ mod/modfile của chúng — nhận nhầm một ROM cũ sẽ dựng ROM thiếu patch mà
+# không báo lỗi, nên ở đây phải DỪNG và nói rõ.
+if echo "$base_rom_code" | grep -q "OS4"; then
     ROM_OS="OS4"
+elif echo "$base_rom_code" | grep -qE "(OS1|OS2|OS3|V13|V14)"; then
+    echo "ROM này là '$(echo "$base_rom_code" | grep -oE '(OS[0-9]+|V1[34])' | head -n1)' - repo chỉ hỗ trợ OS4."
+    echo "Unsupport ROM Exiting..."
+    exit 1
 elif echo "$base_rom_code" | grep -qE "OS[0-9]+"; then
-    ROM_OS=$(echo "$base_rom_code" | grep -oE "OS[0-9]+" | head -n 1)
-elif echo "$base_rom_code" | grep -q "V14"; then
-    ROM_OS="MIUI"
-elif echo "$base_rom_code" | grep -q "V13"; then
-    ROM_OS="MIUI"
+    echo "ROM '$(echo "$base_rom_code" | grep -oE 'OS[0-9]+' | head -n1)' chưa có target - chỉ hỗ trợ OS4."
+    echo "Unsupport ROM Exiting..."
+    exit 1
 else
     echo "Unsupport ROM Exiting..."
     exit 1

@@ -1,31 +1,19 @@
-trap 'rc=$?; echo "[TRAP] build.sh kết thúc, mã thoát $rc"' EXIT
-
+# Chỉ nhận 1 tham số: đường dẫn/URL ROM. Các tham số repo_name/prefix_id/
+# builder_name/builder_id trước đây khai báo nhưng KHÔNG dùng ở đâu trong file -
+# notify.py được workflow gọi trực tiếp, không qua build.sh.
 baserom="$1"
-repo_name="$2"
-prefix_id="$3"
-builder_name="$4"
-builder_id="$5"
 work_dir=$(pwd)
 
 # Import functions
-tools_dir=${work_dir}/bin/$(uname)/$(uname -m)
 export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$PATH
 chmod 777 ${work_dir}/bin/*
 chmod 777 ${work_dir}/bin/Linux/x86_64/*
-source $work_dir/functions.sh
+source "$work_dir/functions.sh"
 
-# ==================== TOOLBOX MODE (root / kaorios) ====================
-# Ghi lại config.env TRƯỚC mọi bước patch, vì các script sau đọc file này
-# bằng grep chứ không đọc biến môi trường. Xem bin/ddevice/apply_mode.sh.
-bash "$work_dir/bin/ddevice/apply_mode.sh"
-
-if [[ $(git branch --show-current) == "beta" ]]; then
-    polyxver="$(cat Version)"
-    status="Development"
-else
-    polyxver="$(cat Version)"
-    status="Official"
-fi
+# Chỉ báo khi build THẤT BẠI. Bản cũ in "[TRAP] build.sh kết thúc, mã thoát 0" ở
+# MỌI lần build thành công, nên dòng cuối log trông như có sự cố và dễ bị đọc
+# nhầm là lỗi. Trap phải đặt SAU khi source functions.sh mới có hàm error.
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then error "build.sh dừng với mã $rc"; fi' EXIT
 
 # Fix lỗi cấu hình gói apt/dpkg và cài đặt các phụ thuộc cần thiết
 sudo dpkg --configure -a 2>/dev/null || true
@@ -40,13 +28,15 @@ rm -rf $work_dir/build
 mkdir -p $work_dir/out
 
 # Kiểm tra dung lượng trước khi tải/extract ROM
-df -h / "$work_dir"
 avail_gb=$(df -BG --output=avail "$work_dir" | tail -n 1 | tr -dc "0-9")
+info "Dung lượng trống: ${avail_gb}GB (cần >= 25GB)"
+[ "${DEBUG:-0}" = "1" ] && df -h / "$work_dir"
 if [ "${avail_gb:-0}" -lt 25 ]; then
     error "Workspace chỉ còn ${avail_gb}GB, cần >= 25GB. Kiểm tra bước Maximize build space trong workflow."
     exit 1
 fi
 
+step "Tải / nhận diện ROM"
 source "$work_dir/bin/ddevice/getROM.sh" "$baserom"
 
 # ==================== CHUẨN HÓA TÊN FILE ZIP ====================
@@ -98,9 +88,9 @@ unpack "Files cleaned up."
 mkdir -p build/baserom/images/
 
 # Extract partitions
+step "Bung partition"
 if [[ ${baserom_type} == 'payload' ]]; then
     unpack "Unpacking payload.bin"
-    df -h / "$work_dir"
 
     # Lấy payload.bin ra khỏi file zip (nếu chưa có)
     if [[ ! -f build/baserom/payload.bin ]]; then
@@ -115,9 +105,11 @@ if [[ ${baserom_type} == 'payload' ]]; then
     # Giải phóng dung lượng ngay: payload.bin không cần nữa
     rm -f build/baserom/payload.bin
 
-    echo "===== Sau khi payload-extract ====="
-    ls -la build/baserom/images/
-    df -h / "$work_dir"
+    if [ "${DEBUG:-0}" = "1" ]; then
+        echo "--- images/ sau payload-extract ---"
+        ls -la build/baserom/images/
+        df -h / "$work_dir"
+    fi
 
     # ---> FIX LỖI MẤT PHÂN VÙNG TRÊN PAYLOAD.BIN (A/B DEVICE) <---
     for i in build/baserom/images/*_a.img; do
@@ -185,17 +177,24 @@ fi
 
 for part in ${super_list}; do
     if [ -f "$work_dir/build/baserom/images/${part}.img" ]; then
-        echo ">>> extract ${part}"
-        extract_partition $work_dir/build/baserom/images/${part}.img $work_dir/build/baserom/images || echo "!!! extract ${part} THẤT BẠI"
-        PACK_TYPE=$(cat $work_dir/bin/ddevice/fstype.txt 2>/dev/null || echo "erofs")
+        # extract_partition tự log "[UNPACK] File X.img extracted." nên không in
+        # thêm dòng ">>> extract X" nữa (log build thật bị lặp 2 dòng/partition).
+        debug "extract ${part}"
+        extract_partition "$work_dir/build/baserom/images/${part}.img" "$work_dir/build/baserom/images" \
+            || error "extract ${part} thất bại"
     else
-        echo "!!! không thấy ${part}.img"
+        # odm_dlkm / product_dlkm ... không có trong payload của một số máy - bình
+        # thường. Partition BẮT BUỘC được kiểm riêng ngay dưới (vendor/system/
+        # product), nên ở đây chỉ cần mức debug.
+        debug "không có ${part}.img - bỏ qua"
     fi
 done
 
-echo "===== Sau khi extract các partition ====="
-ls -la $work_dir/build/baserom/images/
-df -h / "$work_dir"
+if [ "${DEBUG:-0}" = "1" ]; then
+    echo "--- images/ sau khi extract partition ---"
+    ls -la "$work_dir/build/baserom/images/"
+    df -h / "$work_dir"
+fi
 
 # Bắt buộc phải có các partition chính, nếu không thì dừng luôn (không "giả thành công")
 for must in vendor system product; do
@@ -208,53 +207,12 @@ done
 # ==================== ROOT SẴN (SukiSU Ultra LKM) ====================
 # Phải chạy TRƯỚC patchpackage.sh: bước đó gọi DISABLE_AVB, tính lại vbmeta
 # trên các image hiện có. Vá boot.img sau đó là vbmeta lệch.
+step "Root sẵn (SukiSU)"
 bash "$work_dir/bin/package/SukiSU/patch.sh"
 
-# ==================== ROOT TOOLBOX (app của user) ====================
-# App tự chứa SukiSU manager + module; ROM chỉ đặt vào product/app.
-bash "$work_dir/bin/package/RootToolbox/patch.sh"
-
-# ==================== KAORIOS TOOLBOX (mode không root) ====================
-# Chỉ chạy khi toolbox_mode=kaorios. APK giữ nguyên chữ ký của Kaorios.
-bash "$work_dir/bin/package/KaoriosToolbox/patch.sh"
-
-# ==================== APP SPOOF (game / Photos / ứng dụng) ====================
-# Đóng profile mặc định vào /system/etc/bugos/app-spoof.json.
-# Phần patch framework.jar nằm trong apply_app_spoof() - a17 có bản inline,
-# a15/a16 source từ bin/package/AppSpoof/apply.sh.
-bash "$work_dir/bin/package/AppSpoof/patch.sh"
-
-# ==================== FIX TÊN CODENAME THIẾT BỊ ====================
-detected_codename=""
-
-# 1. Ưu tiên codename thật lấy từ tên file ROM (khớp devices_data.txt)
-clean_rom_name=$(basename "$baserom" | tr '[:upper:]' '[:lower:]')
-if [ -f "$work_dir/bin/ddevice/data/devices_data.txt" ]; then
-    while read -r code; do
-        code_clean=$(echo "$code" | tr '[:upper:]' '[:lower:]' | tr -d '\r\n ')
-        if [ -n "$code_clean" ] && [[ "$clean_rom_name" =~ (^|[^a-z0-9])${code_clean}([^a-z0-9]|$) ]]; then
-            detected_codename="$code_clean"
-            break
-        fi
-    done < "$work_dir/bin/ddevice/data/devices_data.txt"
-fi
-
-# 2. Fallback: đọc build.prop, bỏ qua các giá trị chung chung (miproduct, missi...)
-if [ -z "$detected_codename" ]; then
-    for prop in \
-        "$work_dir/build/baserom/images/product/etc/build.prop" \
-        "$work_dir/build/baserom/images/vendor/build.prop" \
-        "$work_dir/build/baserom/images/system/system/build.prop" \
-        "$work_dir/build/baserom/images/odm/etc/build.prop"; do
-        if [ -f "$prop" ]; then
-            val=$(grep -E "^(ro\.product\.product\.device|ro\.product\.vendor\.device|ro\.product\.device|ro\.build\.product)=" "$prop" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '\r\n ' | tr '[:upper:]' '[:lower:]')
-            case "$val" in
-                ""|missi|miproduct|mivendor|product|generic|unknown|xiaomi|device|phone) ;;
-                *) detected_codename="$val"; break ;;
-            esac
-        fi
-    done
-fi
+# RootToolbox / KaoriosToolbox / AppSpoof / FPS_LIMITATION_PATCH đã bị xoá.
+# ROM giờ: root sẵn bằng SukiSU, không spoof, không giới hạn FPS patcher.
+# Bộ vá de-China nằm ở bin/package/PRECHINAFIX (xem dưới).
 
 # ==================== CHỐT CODENAME ====================
 # Nguyên tắc: CHỈ dùng codename có thật, đọc được từ chính ROM. Không suy đoán,
@@ -358,23 +316,58 @@ MY_BRAND_NAME="BugOS"
 echo "$MY_BRAND_NAME" > $work_dir/bin/ddevice/os_type.txt
 echo "$MY_BRAND_NAME" > $work_dir/bin/ddevice/brand.txt
 
-mods "Gathering Devices Infomations"
+step "Đọc thông tin thiết bị"
+# Không in thêm dòng "Gathering Devices Infomations" nữa: step() ngay trên đã
+# nói đúng việc đang làm, và dòng cũ còn sai chính tả.
 bash $work_dir/bin/ddevice/getname.sh "$getvar"
 bash $work_dir/bin/ddevice/fetchINFO.sh
 
 # Cổng chặn version: dừng NGAY nếu Android của ROM chưa có đủ bộ patch.
 # Không có bước này thì một ROM A17 thiếu jar_patcher_a17.sh sẽ build ra
 # framework.jar không được bypass verify chữ ký -> không boot được.
+step "Kiểm tra target Android"
 bash $work_dir/bin/ddevice/target_check.sh || { error "Dừng: Android target chưa được hỗ trợ đầy đủ"; exit 1; }
 
+step "Debloat"
+# debloat.sh tự in dòng tổng kết ("xoá N thư mục ..."), không cần "Done" ở đây.
 bash $work_dir/bin/ddevice/DEBLOAT/debloat.sh
-info "Done"
 
 # OS1/OS2 da bi xoa: chung chi co dispatcher, khong co mod nao ben trong.
-bash $work_dir/bin/modfile/OS3/insmod.sh
+step "Mod theo máy (OS4 / Universal)"
 bash $work_dir/bin/modfile/OS4/insmod.sh
 bash $work_dir/bin/modfile/Universal/insfile.sh
+
+# ==================== THỨ TỰ BẮT BUỘC - ĐỌC TRƯỚC KHI ĐỔI ====================
+# 1. PRECHINAFIX    -> vá bộ máy hệ thống (69 file / 209 method):
+#                      MiuiSystemUI, PowerKeeper, Settings, miui-services.jar,
+#                      miui-framework.jar. Mỗi dex có bảng riêng
+#                      (patches/<ten>-classesN.json).
+# 2. FEATURE_UNLOCK -> vá tính năng người dùng (22 file / 38 method):
+#                      mở chụp màn hình, bỏ giới hạn FPS, cửa sổ nổi,
+#                      Android/data, mua theme/vault, SetupWizard, bỏ chặn 10s.
+#                      Cũng vá services.jar (PRECHINAFIX KHÔNG đụng services.jar).
+# 3. insupdate.sh   -> Settings_ROMInformation decode lại Settings.apk ĐÃ VÁ rồi
+#                      mới gắn branding.
+# 4. patchpackage.sh -> COREPATCH decompile rồi VÁ + GHI ĐÈ cả 4 jar
+#                      (framework, services, miui-services, miui-framework).
+#
+# RÀNG BUỘC CHÍNH: COREPATCH GHI ĐÈ 4 jar bằng bản nó tự build, nên nó phải chạy
+# TRÊN bản mà PRECHINAFIX + FEATURE_UNLOCK vừa vá. Đảo thứ tự -> mất toàn bộ
+# patch và mất luôn bypass chữ ký -> ROM không boot.
+#
+# Hai bộ patch độc lập nhau (không file nào trùng), nên thứ tự giữa chúng không
+# quan trọng; nhưng cả hai PHẢI đứng trước patchpackage.sh.
+#
+# Patch dùng "thay thân method" nên vẫn sống sau khi COREPATCH decompile + build
+# lại jar.
+# =============================================================================
+step "Vá de-China (PRECHINAFIX)"
+bash $work_dir/bin/package/PRECHINAFIX/apply.sh
+step "Mở khoá tính năng (FEATURE_UNLOCK)"
+bash $work_dir/bin/package/FEATURE_UNLOCK/apply.sh
+step "Mod app (UpdateFile)"
 bash $work_dir/bin/modfile/UpdateFile/insupdate.sh
+step "COREPATCH + đóng gói package"
 bash $work_dir/bin/package/patchpackage.sh
 
 # ----> ĐIỀU KIỆN ÁP DỤNG ĐỊNH DANH VÀ BẢN QUYỀN <----

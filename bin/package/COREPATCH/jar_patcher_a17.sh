@@ -172,75 +172,6 @@ PY
   return 0
 }
 
-replace_move_result_after_invoke() {
-  local file="$1"
-  local invoke_pattern="$2"
-  local replacement="$3"
-
-  python3 - "$file" "$invoke_pattern" "$replacement" << 'PY'
-from pathlib import Path
-import re
-import sys
-
-path = Path(sys.argv[1])
-invoke_pattern = sys.argv[2]
-replacement = sys.argv[3]
-
-if not path.exists():
-    sys.exit(4)
-
-lines = path.read_text().splitlines()
-matched = False
-changed = False
-
-i = 0
-while i < len(lines):
-    line = lines[i]
-    if invoke_pattern in line:
-        matched = True
-        for j in range(i + 1, min(i + 6, len(lines))):
-            target = lines[j].strip()
-            if target.startswith('move-result'):
-                indent = re.match(r"\s*", lines[j]).group(0)
-                desired = f"{indent}{replacement}"
-                if target == replacement:
-                    break
-                if lines[j].strip() == replacement:
-                    break
-                lines[j] = desired
-                changed = True
-                break
-        i = i + 1
-    else:
-        i += 1
-
-if not matched:
-    sys.exit(3)
-
-if changed:
-    path.write_text("\n".join(lines) + "\n")
-PY
-
-  local status=$?
-  case "$status" in
-    0)
-      log "Replaced move-result after invoke '${invoke_pattern##*/}' in $(basename "$file")"
-      ;;
-    3)
-      warn "Invoke pattern '${invoke_pattern}' not found in $(basename "$file")"
-      ;;
-    4)
-      warn "File not found: $file"
-      ;;
-    *)
-      err "Failed to replace move-result in $file (status $status)"
-      return 1
-      ;;
-  esac
-
-  return 0
-}
-
 force_methods_return_const() {
   local file="$1"
   local method_substring="$2"
@@ -578,14 +509,14 @@ PY
 }
 
 # ----------------------------------------------
-# Framework patches (Android 16)
+# Framework patches (Android 17)
 # ----------------------------------------------
 
-# Apply signature verification bypass patches to framework.jar (Android 16)
+# Apply signature verification bypass patches to framework.jar (Android 17)
 apply_framework_signature_patches() {
   local decompile_dir="$1"
 
-  log "Applying signature verification patches to framework.jar (Android 16)..."
+  log "Applying signature verification patches to framework.jar (Android 17)..."
 
   local pkg_parser_file
   pkg_parser_file=$(find "$decompile_dir" -type f -path "*/android/content/pm/PackageParser.smali" | head -n1)
@@ -622,21 +553,19 @@ apply_framework_signature_patches() {
     warn "SigningDetails.smali not found"
   fi
 
-  local apk_sig_scheme_v2_file
-  apk_sig_scheme_v2_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSignatureSchemeV2Verifier.smali" | head -n1)
-  if [ -n "$apk_sig_scheme_v2_file" ]; then
-    replace_move_result_after_invoke "$apk_sig_scheme_v2_file" "invoke-static {v8, v4}, Ljava/security/MessageDigest;->isEqual([B[B)Z" "const/4 v0, 0x1"
-  else
-    warn "ApkSignatureSchemeV2Verifier.smali not found"
-  fi
-
-  local apk_sig_scheme_v3_file
-  apk_sig_scheme_v3_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSignatureSchemeV3Verifier.smali" | head -n1)
-  if [ -n "$apk_sig_scheme_v3_file" ]; then
-    replace_move_result_after_invoke "$apk_sig_scheme_v3_file" "invoke-static {v9, v3}, Ljava/security/MessageDigest;->isEqual([B[B)Z" "const/4 v0, 0x1"
-  else
-    warn "ApkSignatureSchemeV3Verifier.smali not found"
-  fi
+  # isEqual trong ApkSignatureSchemeV2Verifier / V3Verifier / ApkSigningBlockUtils
+  # KHÔNG vá ở đây. Ba file đó do patch_isequal_true() xử lý ngay sau bước này,
+  # và nó giữ nguyên số thanh ghi đích.
+  #
+  # Lý do bỏ: bản cũ gọi replace_move_result_after_invoke() với anchor cứng
+  # "invoke-static {v9, v3}" và đích cứng "const/4 v0, 0x1". Trên OS4 (A17):
+  #   V3Verifier  : invoke {v5, v4} -> move-result v11  -> anchor KHÔNG khớp
+  #                 => log build in WARN "Invoke pattern ... not found" mỗi lần,
+  #                    trong khi patch_isequal_true vá đúng 1 site ngay sau đó.
+  #   V2Verifier  : anchor khớp, nhưng nếu move-result đích không phải v0 thì
+  #                 helper ghi const/4 v0 -> giá trị rơi vào thanh ghi khác,
+  #                 chỗ kiểm tra chữ ký không nhận được 0x1.
+  # Bỏ hẳn 3 lời gọi: patch_isequal_true phủ cả 3 file và an toàn hơn.
 
   local apk_signature_verifier_file
   apk_signature_verifier_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSignatureVerifier.smali" | head -n1)
@@ -645,14 +574,6 @@ apply_framework_signature_patches() {
     insert_line_before_all "$apk_signature_verifier_file" "ApkSignatureVerifier;->verifyV1Signature" "const p3, 0x0"
   else
     warn "ApkSignatureVerifier.smali not found"
-  fi
-
-  local apk_signing_block_utils_file
-  apk_signing_block_utils_file=$(find "$decompile_dir" -type f -path "*/android/util/apk/ApkSigningBlockUtils.smali" | head -n1)
-  if [ -n "$apk_signing_block_utils_file" ]; then
-    replace_move_result_after_invoke "$apk_signing_block_utils_file" "invoke-static {v5, v6}, Ljava/security/MessageDigest;->isEqual([B[B)Z" "const/4 v7, 0x1"
-  else
-    warn "ApkSigningBlockUtils.smali not found"
   fi
 
   local strict_jar_verifier_file
@@ -679,20 +600,20 @@ apply_framework_signature_patches() {
     warn "ParsingPackageUtils.smali not found"
   fi
 
-  log "Signature verification patches applied to framework.jar (Android 16)"
+  log "Signature verification patches applied to framework.jar (Android 17)"
 }
 
-# Apply disable secure flag patches to framework.jar (Android 16)
+# Apply disable secure flag patches to framework.jar (Android 17)
 apply_framework_disable_secure_flag() {
   local decompile_dir="$1"
 
-  log "Applying disable secure flag patches to framework.jar (Android 16)..."
+  log "Applying disable secure flag patches to framework.jar (Android 17)..."
 
-  # Note: For Android 16, disable secure flag does not require framework.jar patches
+  # Note: For Android 17, disable secure flag does not require framework.jar patches
   # Only services.jar and miui-services.jar are affected
-  log "Disable secure flag: No framework.jar patches required for Android 16"
+  log "Disable secure flag: No framework.jar patches required for Android 17"
 
-  log "Disable secure flag patches applied to framework.jar (Android 16)"
+  log "Disable secure flag patches applied to framework.jar (Android 17)"
 }
 
 # ---------------------------------------------------------------------------
@@ -715,12 +636,15 @@ apply_framework_disable_secure_flag() {
 # Vá mọi chỗ gọi MessageDigest.isEqual trong file: đổi "move-result vN" ngay sau
 # đó thành "const/4 vN, 0x1" - GIỮ NGUYÊN số thanh ghi.
 #
-# Vì sao không dùng replace_move_result_after_invoke: helper đó khớp theo chuỗi
-# invoke CỐ ĐỊNH (kèm số thanh ghi) và thay bằng const/4 CỐ ĐỊNH. Trên Android 17:
-#   ApkSignatureSchemeV2Verifier : invoke {v8, v4} -> move-result v0    (khớp)
-#   ApkSignatureSchemeV3Verifier : invoke {v5, v4} -> move-result v11   (KHÔNG khớp
-#       vì anchor cũ là {v9, v3}; và nếu khớp thì const/4 v0 cũng sai, phải là v11)
-#   ApkSigningBlockUtils         : invoke {v5, v6} -> move-result v7    (khớp)
+# Đây là CÁCH DUY NHẤT repo vá isEqual sau khi bỏ helper khớp-anchor-cứng. Helper
+# cũ (replace_move_result_after_invoke) khớp theo chuỗi invoke kèm SỐ THANH GHI cố
+# định rồi ghi const/4 cũng cố định, nên trên Android 17:
+#   ApkSignatureSchemeV3Verifier : invoke {v5, v4} -> move-result v11
+#       anchor cũ {v9, v3} không khớp -> WARN mỗi lần build, patch không ăn
+#   ApkSignatureSchemeV2Verifier : invoke {v8, v4} -> move-result v0
+#       khớp, nhưng nếu đích khác v0 thì ghi const/4 v0 là SAI thanh ghi
+# Hàm dưới đây đọc đúng số thanh ghi từ chính dòng move-result nên đúng cho mọi
+# biến thể build.
 patch_isequal_true() {
   local file="$1"
   [ -f "$file" ] || { warn "A17 extra: không thấy $file"; return 0; }
@@ -783,7 +707,8 @@ patch_provider_authority_null() {
     return 0
   fi
 
-  python3 - "$f" <<'PYEOF'
+  local _out
+  _out=$(python3 - "$f" <<'PYEOF'
 import re, sys
 from pathlib import Path
 
@@ -829,8 +754,10 @@ if s2.count(':gms_authority_null_fix') != 2:
 p.write_text(s2)
 print('GMS authority: da them null-check trong installProviderAuthoritiesLocked')
 PYEOF
-
+  )
+  # Lay rc NGAY sau khi python ket thuc: dong debug ben duoi lam thay doi $?.
   local rc=$?
+  [ -n "$_out" ] && debug "GMS authority: $_out"
   if [ "$rc" -eq 0 ]; then
     log "A17 extra: ActivityThread.installProviderAuthoritiesLocked chong NPE khi authority=null"
   else
@@ -843,14 +770,23 @@ apply_a17_extra_framework() {
   local decompile_dir="$1"
   local f v
 
-  # 1) MessageDigest.isEqual -> luôn true, giữ nguyên thanh ghi
+  # 1) MessageDigest.isEqual -> luôn true, giữ nguyên thanh ghi.
+  #
+  #    ĐÂY LÀ PASS DUY NHẤT vá isEqual (pass anchor-cứng đã bị bỏ), nên:
+  #      - đếm được site  -> log INFO, nêu rõ số site
+  #      - 0 site         -> WARN thật, vì nghĩa là pattern isEqual đã đổi ở bản
+  #                          ROM này và bypass chữ ký có thể không ăn
   for v in ApkSignatureSchemeV2Verifier ApkSignatureSchemeV3Verifier ApkSigningBlockUtils; do
     f=$(find "$decompile_dir" -type f -name "$v.smali" 2>/dev/null | head -n 1)
-    if [ -n "$f" ]; then
-      log "A17 extra: $v -> isEqual true (register-preserving)"
-      patch_isequal_true "$f"
-    else
+    if [ -z "$f" ]; then
       warn "A17 extra: không thấy $v.smali"
+      continue
+    fi
+    _n=$(patch_isequal_true "$f" | awk -F': ' '/patched/ {print $2}')
+    if [ "${_n:-0}" -gt 0 ]; then
+      log "A17 extra: $v -> isEqual true ($_n site)"
+    else
+      warn "A17 extra: $v không có site isEqual nào - pattern đã đổi, cần xem lại"
     fi
   done
 
@@ -897,7 +833,8 @@ patch_notification_wake() {
     warn "A17 extra: không thấy NotificationManagerService.smali - bỏ qua vá wake"
     return 0
   fi
-  python3 - "$f" << 'PYEOF'
+  local _out
+  _out=$(python3 - "$f" << 'PYEOF'
 import re, sys
 from pathlib import Path
 p = Path(sys.argv[1])
@@ -917,6 +854,8 @@ s = s[:m.start(1)] + body2 + s[m.end(1):]
 p.write_text(s)
 print("da doi checkCallerIsSystem -> isCallerSystemOrSystemUi")
 PYEOF
+  )
+  [ -n "$_out" ] && debug "checkCallerIsSystem: $_out"
   if grep -A6 '\.method [^\n]*checkCallerIsSystem()V' "$f" 2>/dev/null | grep -q 'isCallerSystemOrSystemUi'; then
     log "A17 extra: NotificationManagerService.checkCallerIsSystem -> chấp nhận SystemUI (bật màn hình khi có thông báo)"
   else
@@ -1067,7 +1006,8 @@ apply_boot_state_spoof() {
 .end method
 SMALIEOF
 
-  python3 - "$sp" << 'PYEOF'
+  local _out
+  _out=$(python3 - "$sp" << 'PYEOF'
 import re, sys
 from pathlib import Path
 
@@ -1132,6 +1072,8 @@ if patched == 0:
 path.write_text(s)
 print(f"da va {patched} method")
 PYEOF
+  )
+  [ -n "$_out" ] && debug "BootStateSpoof: $_out"
 
   if grep -q "$MARK" "$sp" 2>/dev/null; then
     log "BootStateSpoof: SystemProperties.get -> green/locked cho 6 prop boot (chỉ tầng Java)"
@@ -1140,208 +1082,8 @@ PYEOF
   fi
 }
 
-# ===========================================================================
-# APP SPOOF - đổi Build props theo TỪNG app (Google Photos, game FPS cao...)
-#
-# Cơ chế: mỗi tiến trình app tự có bản Build riêng sau khi zygote fork, nên chỉ
-# cần set lại các field static trong tiến trình đó là app thấy máy khác - không
-# ảnh hưởng app khác hay system_server.
-#
-#   1. Build.smali: bỏ "final" ở 11 field để reflection set được.
-#   2. Instrumentation.newApplication: sau Application.attach(Context) gọi
-#      AppSpoof.apply(context) -> đọc config, set Build.*, nạp map prop.
-#   3. SystemProperties.get: trả giá trị spoof cho các key ro.product.* /
-#      ro.build.fingerprint, để app đọc prop trực tiếp cũng thấy giá trị giả.
-#
-# Config: Settings.Global "bugos_app_spoof" (base64 JSON) hoặc file mặc định
-# /system/etc/bugos/app-spoof.json do bin/package/AppSpoof/patch.sh đóng vào.
-# Tắt: app_spoof=false trong config.env.
-# ===========================================================================
-apply_app_spoof() {
-  local decompile_dir="$1"
 
-  local flag
-  flag=$(grep -m1 '^app_spoof=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
-  if [ "$flag" = "false" ]; then
-    log "AppSpoof: app_spoof=false - bỏ qua"
-    return 0
-  fi
-
-  local src_dir="$work_dir/bin/package/AppSpoof/smali/com/bugos/spoof"
-  if [ ! -d "$src_dir" ]; then
-    warn "AppSpoof: không thấy $src_dir - bỏ qua"
-    return 0
-  fi
-
-  local smali_root="$decompile_dir/smali"
-  [ -d "$smali_root" ] || smali_root=$(find "$decompile_dir" -maxdepth 1 -type d -name "smali*" | sort | head -n 1)
-  if [ -z "$smali_root" ] || [ ! -d "$smali_root" ]; then
-    warn "AppSpoof: không thấy thư mục smali - bỏ qua"
-    return 0
-  fi
-
-  mkdir -p "$smali_root/com/bugos/spoof"
-  cp -f "$src_dir"/*.smali "$smali_root/com/bugos/spoof/" || {
-    warn "AppSpoof: copy class thất bại"
-    return 0
-  }
-
-  # ---- 1. Build.smali: bỏ final -----------------------------------------
-  local build_smali
-  build_smali=$(find "$decompile_dir" -type f -path "*/android/os/Build.smali" | head -n 1)
-  if [ -n "$build_smali" ]; then
-    python3 - "$build_smali" << 'PYEOF'
-import re, sys
-path = sys.argv[1]
-s = open(path, encoding="utf-8").read()
-
-FIELDS = [
-    "BRAND", "DEVICE", "MANUFACTURER", "MODEL", "PRODUCT", "FINGERPRINT",
-    "BRAND_FOR_ATTESTATION", "DEVICE_FOR_ATTESTATION",
-    "MANUFACTURER_FOR_ATTESTATION", "MODEL_FOR_ATTESTATION",
-    "PRODUCT_FOR_ATTESTATION",
-]
-n = 0
-for f in FIELDS:
-    # baksmali 2.5.2 voi --api 37 in them co an (whitelist/blacklist/greylist)
-    # giua "final" va ten field, nen regex cu "final BRAND:" khong bao gio khop.
-    pat = re.compile(r"^\.field public static final ((?:[a-z][a-z0-9\-]* )*)" + re.escape(f) + r":", re.M)
-    s, k = pat.subn(lambda m: ".field public static " + m.group(1) + f + ":", s)
-    n += k
-
-open(path, "w", encoding="utf-8", newline="\n").write(s)
-print(f"bo final {n} field")
-PYEOF
-    log "AppSpoof: Build.smali -> bỏ final (reflection set được)"
-  else
-    warn "AppSpoof: không thấy android/os/Build.smali - spoof sẽ không có tác dụng"
-  fi
-
-  # ---- 2. Instrumentation.newApplication --------------------------------
-  local instr
-  instr=$(find "$decompile_dir" -type f -path "*/android/app/Instrumentation.smali" | head -n 1)
-  if [ -n "$instr" ]; then
-    python3 - "$instr" << 'PYEOF'
-import re, sys
-path = sys.argv[1]
-s = open(path, encoding="utf-8").read()
-MARK = "bugos_appspoof"
-
-if MARK in s:
-    print("da va roi")
-    sys.exit(0)
-
-AT = r"invoke-virtual \{([vp]\d+), ([vp]\d+)\}, Landroid/app/Application;->attach\(Landroid/content/Context;\)V"
-
-def add_hook(m):
-    ctx = m.group(2)
-    return (m.group(0)
-            + "\n\n    invoke-static {%s}, Lcom/bugos/spoof/AppSpoof;->apply(Landroid/content/Context;)V"
-              "\n\n    # %s" % (ctx, MARK))
-
-# baksmali chen co an (whitelist/blacklist/...) sau "public static" nen phai
-# cho phep moi token truoc ten method.
-pat = re.compile(r"\.method public [^(\n]*newApplication\([^\n]*\n(.*?)\.end method", re.S)
-total = 0
-
-def fix_method(m):
-    global total
-    body = m.group(1)
-    if "Application;->attach(Landroid/content/Context;)V" not in body:
-        return m.group(0)
-    new_body, k = re.subn(AT, add_hook, body, count=1)
-    if k:
-        total += k
-    return m.group(0).replace(body, new_body, 1)
-
-s2 = pat.sub(fix_method, s)
-open(path, "w", encoding="utf-8", newline="\n").write(s2)
-print("va %d newApplication" % total)
-PYEOF
-    if grep -q "bugos_appspoof" "$instr" 2>/dev/null; then
-      log "AppSpoof: Instrumentation.newApplication -> gọi AppSpoof.apply(Context)"
-    else
-      warn "AppSpoof: KHÔNG vá được newApplication - spoof không chạy"
-    fi
-  else
-    warn "AppSpoof: không thấy android/app/Instrumentation.smali"
-  fi
-
-  # ---- 3. SystemProperties.get ------------------------------------------
-  local sp
-  sp=$(find "$decompile_dir" -type f -path "*/android/os/SystemProperties.smali" | head -n 1)
-  if [ -n "$sp" ]; then
-    python3 - "$sp" << 'PYEOF'
-import re, sys
-path = sys.argv[1]
-s = open(path, encoding="utf-8").read()
-
-SIGS = [
-    "get(Ljava/lang/String;)Ljava/lang/String;",
-    "get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
-]
-MARK = "bugos_appspoof_stock"
-GUARD = (
-    "    invoke-static {p0}, Lcom/bugos/spoof/AppSpoof;->prop(Ljava/lang/String;)Ljava/lang/String;\n"
-    "\n"
-    "    move-result-object v0\n"
-    "\n"
-    "    if-eqz v0, :" + MARK + "\n"
-    "\n"
-    "    return-object v0\n"
-    "\n"
-    "    :" + MARK + "\n"
-)
-
-patched = 0
-for sig in SIGS:
-    m = re.search(r"\.method [^\n]*" + re.escape(sig) + r"\n(.*?)\.end method", s, re.S)
-    if not m:
-        print("khong thay method: " + sig)
-        continue
-    body = m.group(1)
-    if MARK in body:
-        print("da va roi: " + sig)
-        continue
-
-    lm = re.search(r"^(\s*)\.locals (\d+)\s*$", body, re.M)
-    rm = re.search(r"^(\s*)\.registers (\d+)\s*$", body, re.M)
-    if lm:
-        indent, n = lm.group(1), int(lm.group(2))
-        if n < 1:
-            body = body[:lm.start()] + indent + ".locals 1" + body[lm.end():]
-            lm = re.search(r"^(\s*)\.locals (\d+)\s*$", body, re.M)
-        anchor_end = lm.end()
-    elif rm:
-        indent, n = rm.group(1), int(rm.group(2))
-        body = body[:rm.start()] + indent + ".registers %d" % (n + 1) + body[rm.end():]
-        rm = re.search(r"^(\s*)\.registers (\d+)\s*$", body, re.M)
-        anchor_end = rm.end()
-    else:
-        print("khong thay .locals/.registers: " + sig)
-        continue
-
-    body = body[:anchor_end] + "\n\n" + GUARD + body[anchor_end:]
-    s = s[:m.start(1)] + body + s[m.end(1):]
-    patched += 1
-
-if patched == 0 and MARK not in s:
-    sys.exit(1)
-
-open(path, "w", encoding="utf-8", newline="\n").write(s)
-print("va %d SystemProperties.get" % patched)
-PYEOF
-    if grep -q "bugos_appspoof_stock" "$sp" 2>/dev/null; then
-      log "AppSpoof: SystemProperties.get -> trả prop giả cho app đã chọn"
-    else
-      warn "AppSpoof: KHÔNG vá được SystemProperties.get"
-    fi
-  fi
-
-  log "AppSpoof: đã nhúng com.bugos.spoof.AppSpoof vào framework.jar"
-}
-
-# Main framework patching function (Android 16)
+# Main framework patching function (Android 17)
 patch_framework() {
   local framework_path="$work_dir/build/baserom/images/system/system/framework/framework.jar"
 
@@ -1359,7 +1101,6 @@ patch_framework() {
   apply_a17_extra_framework "$decompile_dir"
   patch_provider_authority_null "$decompile_dir"
   apply_boot_state_spoof "$decompile_dir"
-  apply_app_spoof "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
   # modify_invoke_custom_methods "$decompile_dir"
@@ -1376,14 +1117,14 @@ patch_framework() {
 }
 
 # ----------------------------------------------
-# Services patches (Android 16)
+# Services patches (Android 17)
 # ----------------------------------------------
 
-# Apply signature verification bypass patches to services.jar (Android 16)
+# Apply signature verification bypass patches to services.jar (Android 17)
 apply_services_signature_patches() {
   local decompile_dir="$1"
 
-  log "Applying signature verification patches to services.jar (Android 16)..."
+  log "Applying signature verification patches to services.jar (Android 17)..."
 
   # Resolve smali files across classes*/ to handle layout differences in CI
   resolve_smali_file() {
@@ -1455,43 +1196,42 @@ apply_services_signature_patches() {
 
   # modify_invoke_custom_methods "$decompile_dir"
 
-  # Emit robust verification logs for CI (avoid brittle hardcoded file paths)
-  log "[VERIFY] services: locating isLeavingSharedUser invoke (context)"
-  grep -s -R -n --include='*.smali' \
+  # Kiểm chứng: các dòng grep ở đây in nguyên đường dẫn + số dòng smali ra log
+  # (log build thật đổ ~10 dòng /home/runner/.../classes3/... rất khó đọc). Chuyển
+  # sang debug - chỉ hiện khi DEBUG=1, vẫn tra được khi patch không ăn.
+  debug "[VERIFY] services: isLeavingSharedUser invoke (context)"
+  debug "$(grep -s -R -n --include='*.smali' \
     'invoke-interface {p5}, Lcom/android/server/pm/pkg/AndroidPackage;->isLeavingSharedUser()Z' \
-    "$decompile_dir" | head -n 1 || true
+    "$decompile_dir" | head -n 1)"
 
-  log "[VERIFY] services: verifySignatures/compareSignatures/matchSignaturesCompat presence"
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* verifySignatures' "$decompile_dir" | head -n 1 || true
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* compareSignatures' "$decompile_dir" | head -n 1 || true
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* matchSignaturesCompat' "$decompile_dir" | head -n 1 || true
+  debug "[VERIFY] services: verifySignatures/compareSignatures/matchSignaturesCompat presence"
+  debug "$(grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* verifySignatures' "$decompile_dir" | head -n 1)"
+  debug "$(grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* compareSignatures' "$decompile_dir" | head -n 1)"
+  debug "$(grep -s -R -n --include='*.smali' '^[[:space:]]*\\.method.* matchSignaturesCompat' "$decompile_dir" | head -n 1)"
 
-  log "[VERIFY] services: checkDowngrade methods now return-void"
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\.method.*checkDowngrade' "$decompile_dir" | head -n 5 || true
+  debug "[VERIFY] services: checkDowngrade -> return-void ($(grep -s -R -c --include='*.smali' '^[[:space:]]*\.method.*checkDowngrade' "$decompile_dir" | awk -F: '{s+=$2} END{print s+0}') method)"
 
-  log "[VERIFY] services: ReconcilePackageUtils <clinit> toggle lines"
   local rpu_file
   rpu_file=$(find "$decompile_dir" -type f -path "*/com/android/server/pm/ReconcilePackageUtils.smali" | head -n1)
   if [ -n "$rpu_file" ]; then
-    grep -n '^[[:space:]]*\\.method static constructor <clinit>()V' "$rpu_file" || true
-    grep -n 'const/4 v0, 0x[01]' "$rpu_file" | head -n 5 || true
+    debug "[VERIFY] ReconcilePackageUtils clinit toggle: $(grep -c 'const/4 v0, 0x[01]' "$rpu_file") dong"
   fi
 
-  log "Signature verification patches applied to services.jar (Android 16)"
+  log "Signature verification patches applied to services.jar (Android 17)"
 }
 
-# Apply disable secure flag patches to services.jar (Android 16)
+# Apply disable secure flag patches to services.jar (Android 17)
 apply_services_disable_secure_flag() {
   local decompile_dir="$1"
 
-  log "Applying disable secure flag patches to services.jar (Android 16)..."
+  log "Applying disable secure flag patches to services.jar (Android 17)..."
 
-  # Android 16: Patch WindowState.isSecureLocked()
+  # Android 17: Patch WindowState.isSecureLocked()
   log "Patching WindowState.isSecureLocked()..."
   local method_body="    .registers 6\n\n    const/4 v0, 0x0\n\n    return v0"
   replace_entire_method "isSecureLocked()Z" "$decompile_dir" "$method_body" "com/android/server/wm/WindowState"
 
-  log "Disable secure flag patches applied to services.jar (Android 16)"
+  log "Disable secure flag patches applied to services.jar (Android 17)"
 }
 
 # ---------------------------------------------------------------------------
@@ -1505,7 +1245,7 @@ apply_services_disable_secure_flag() {
 #     at WindowManagerService.captureDisplay(...)
 #
 # NGUỒN GỐC THẬT (đính chính so với kết luận đầu tiên): lời gọi đó do CHÍNH
-# patch của mình chèn vào - NOTIFICATION_FIX/A17/patch_miui_services_a17.py,
+# patch của mình chèn vào - script NOTIFICATION_FIX/A17 (đã xoá cùng module),
 # hàm patch_window_manager_secure_flag. Method này KHÔNG hề tồn tại trong
 # services.jar (đã quét cả 4 dex), nên patch đó tạo ra một lời gọi chết.
 # Patch ấy đã bị bỏ hẳn; xem commit ngay sau aab1ed2.
@@ -1541,7 +1281,132 @@ SMALI
   log "Đã chèn WindowState.isBypassSecureFlag() -> false (phòng hờ, không còn caller)"
 }
 
-# Main services patching function (Android 16)
+# Main services patching function (Android 17)
+# ---------------------------------------------------------------------------
+# FCM wake filter - nguyên lí lấy từ module HyperOS_FCM_OnTheFly_Fix v1.4.
+#
+# Nhúng class com.android.server.am.FcmWakeFilter vào services.jar rồi chèn vào
+# đầu BroadcastController.broadcastIntentLockedTraced:
+#
+#     move-object/from16 v0, p4
+#     if-eqz v0, :fcm_hook_done
+#     invoke-static {v0}, Lcom/android/server/am/FcmWakeFilter;->applyFlags(...)V
+#     :fcm_hook_done
+#
+# applyFlags đọc /data/system/fcm_wake.conf rồi thêm/bớt
+# FLAG_INCLUDE_STOPPED_PACKAGES (0x20) trên Intent của broadcast FCM. Đó là
+# toàn bộ cơ chế "lọc đánh thức": quyết định broadcast nào được phép đánh thức
+# app đang bị đóng băng.
+#
+# KHÔNG chép y nguyên bản gốc: nó dùng label :cond_7, mà method này ĐÃ CÓ sẵn
+# :cond_7 (đã kiểm tra trên services.jar thật) -> chèn nữa là trùng label và
+# smali không build được. Ở đây dùng label riêng. Thanh ghi v0 an toàn vì code
+# gốc ghi đè v0 trước khi đọc (lệnh đầu của method là move-object/from16 v1,p0).
+#
+# Class FcmWakeFilter lấy từ services.jar đã vá trên máy thật (A17/OS4.0.6),
+# không phải viết lại từ đầu.
+# ---------------------------------------------------------------------------
+apply_fcm_wake_filter() {
+  local decompile_dir="$1"
+  local flag
+  flag=$(grep -m1 '^fcm_fix_bytecode=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+  if [ "$flag" = "false" ]; then
+    log "FcmWakeFilter: fcm_fix_bytecode=false - bỏ qua"
+    return 0
+  fi
+
+  local target
+  target=$(find "$decompile_dir" -type f -name "BroadcastController.smali" \
+           -path "*/com/android/server/am/*" 2>/dev/null | head -n1)
+  if [ -z "$target" ]; then
+    warn "FcmWakeFilter: không thấy BroadcastController.smali - bỏ qua"
+    return 0
+  fi
+
+  local dir
+  dir=$(dirname "$target")
+  if ! cp -f "$work_dir/bin/package/COREPATCH/assets/FcmWakeFilter.smali" \
+             "$dir/FcmWakeFilter.smali"; then
+    warn "FcmWakeFilter: không chép được class - bỏ qua"
+    return 0
+  fi
+
+  local _out
+  _out=$(python3 - "$target" <<'PYEOF'
+import re
+import sys
+
+path = sys.argv[1]
+lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
+
+start = None
+for i, l in enumerate(lines):
+    if l.startswith(".method") and "broadcastIntentLockedTraced(" in l:
+        start = i
+        break
+if start is None:
+    print("KHONG_THAY_METHOD")
+    raise SystemExit(0)
+
+end = None
+for i in range(start, len(lines)):
+    if lines[i].strip() == ".end method":
+        end = i
+        break
+if end is None:
+    print("KHONG_THAY_END")
+    raise SystemExit(0)
+
+body = lines[start:end]
+if any("FcmWakeFilter" in l for l in body):
+    print("DA_CO")
+    raise SystemExit(0)
+if any(l.strip() == ":fcm_hook_done" for l in body):
+    print("TRUNG_LABEL")
+    raise SystemExit(0)
+
+# chèn trước lệnh đầu tiên: bỏ qua .param/.line/.local và khối .annotation
+ins = None
+depth = 0
+for i in range(start + 1, end):
+    s = lines[i].strip()
+    if s.startswith(".annotation"):
+        depth += 1
+        continue
+    if s.startswith(".end annotation"):
+        depth -= 1
+        continue
+    if depth > 0 or not s or s.startswith(".") or s.startswith("#") or s.startswith(":"):
+        continue
+    if re.match(r"^[a-z]", s):
+        ins = i
+        break
+if ins is None:
+    print("KHONG_THAY_LENH")
+    raise SystemExit(0)
+
+lines[ins:ins] = [
+    "",
+    "    move-object/from16 v0, p4",
+    "",
+    "    if-eqz v0, :fcm_hook_done",
+    "",
+    "    invoke-static {v0}, Lcom/android/server/am/FcmWakeFilter;->applyFlags(Landroid/content/Intent;)V",
+    "",
+    "    :fcm_hook_done",
+]
+open(path, "w", encoding="utf-8", newline="\n").write("\n".join(lines))
+print("DA_CHEN")
+PYEOF
+  )
+  case "$_out" in
+    DA_CHEN)     log "FcmWakeFilter: đã chèn hook vào broadcastIntentLockedTraced" ;;
+    DA_CO)       log "FcmWakeFilter: hook đã có sẵn - bỏ qua" ;;
+    TRUNG_LABEL) warn "FcmWakeFilter: method đã có label :fcm_hook_done - bỏ qua" ;;
+    *)           warn "FcmWakeFilter: không chèn được ($_out)" ;;
+  esac
+}
+
 patch_services() {
   local services_path="$work_dir/build/baserom/images/system/system/framework/services.jar"
 
@@ -1579,6 +1444,9 @@ patch_services() {
   apply_no_secure_windows "$decompile_dir"
   #apply_services_disable_secure_flag "$decompile_dir"
 
+  # Lọc đánh thức FCM (module HyperOS_FCM_OnTheFly_Fix) - xem hàm.
+  apply_fcm_wake_filter "$decompile_dir"
+
   # Apply invoke-custom patches (common to all features)
   # modify_invoke_custom_methods "$decompile_dir"
 
@@ -1593,39 +1461,38 @@ patch_services() {
 }
 
 # ----------------------------------------------
-# MIUI services patches (Android 16)
+# MIUI services patches (Android 17)
 # ----------------------------------------------
 
-# Apply signature verification bypass patches to miui-services.jar (Android 16)
+# Apply signature verification bypass patches to miui-services.jar (Android 17)
 apply_miui_services_signature_patches() {
   local decompile_dir="$1"
 
-  log "Applying signature verification patches to miui-services.jar (Android 16)..."
+  log "Applying signature verification patches to miui-services.jar (Android 17)..."
 
   # According to the miui-services guide: force specific methods to return-void
   patch_return_void_methods_all "verifyIsolationViolation" "$decompile_dir"
   patch_return_void_methods_all "canBeUpdate" "$decompile_dir"
 
-  # Targeted verification that won't hang
-  log "[VERIFY] miui-services: verifyIsolationViolation/canBeUpdate return-void"
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\.method.*verifyIsolationViolation' "$decompile_dir" | head -n 5 || true
-  grep -s -R -n --include='*.smali' '^[[:space:]]*\.method.*canBeUpdate' "$decompile_dir" | head -n 5 || true
+  # Kiểm chứng: chỉ đếm, không đổ đường dẫn smali ra log (xem ghi chú ở
+  # apply_services_signature_patches).
+  debug "[VERIFY] miui-services: verifyIsolationViolation $(grep -s -R -c --include='*.smali' '^[[:space:]]*\.method.*verifyIsolationViolation' "$decompile_dir" | awk -F: '{s+=$2} END{print s+0}') method, canBeUpdate $(grep -s -R -c --include='*.smali' '^[[:space:]]*\.method.*canBeUpdate' "$decompile_dir" | awk -F: '{s+=$2} END{print s+0}') method"
 
-  log "Signature verification patches applied to miui-services.jar (Android 16)"
+  log "Signature verification patches applied to miui-services.jar (Android 17)"
 }
 
-# Apply disable secure flag patches to miui-services.jar (Android 16)
+# Apply disable secure flag patches to miui-services.jar (Android 17)
 apply_miui_services_disable_secure_flag() {
   local decompile_dir="$1"
 
-  log "Applying disable secure flag patches to miui-services.jar (Android 16)..."
+  log "Applying disable secure flag patches to miui-services.jar (Android 17)..."
 
-  # Android 16: Patch WindowManagerServiceImpl.notAllowCaptureDisplay()
+  # Android 17: Patch WindowManagerServiceImpl.notAllowCaptureDisplay()
   log "Patching WindowManagerServiceImpl.notAllowCaptureDisplay()..."
   local method_body="    .registers 9\n\n    const/4 v0, 0x0\n\n    return v0"
   replace_entire_method "notAllowCaptureDisplay(Lcom/android/server/wm/RootWindowContainer;I)Z" "$decompile_dir" "$method_body" "com/android/server/wm/WindowManagerServiceImpl"
 
-  log "Disable secure flag patches applied to miui-services.jar (Android 16)"
+  log "Disable secure flag patches applied to miui-services.jar (Android 17)"
 }
 
 # Apply Gboard patches
@@ -1643,25 +1510,125 @@ apply_miui_services_gboard() {
   sed_all_smali "$decompile_dir" "$expr" "com/android/server/wm/MiuiSplitInputMethodImpl.smali"
   sed_all_smali "$decompile_dir" "$expr" "com/miui/server/security/AppBehaviorService.smali"
 
-  echo "Gboard patches applied to miui-services.jar"
+  log "Gboard patches applied to miui-services.jar"
 }
 
 # Apply ContentExtension patches
 apply_miui_services_contentextension() {
   local decompile_dir="$1"
   replace_line_contains_in_smali_method "IS_INTERNATIONAL_BUILD" "updateContentCatcherWhitelist()V" "    const/4 v0, 0x0" "$decompile_dir/smali/com/android/server/am/ProcessPolicy.smali"
-  echo "ContentExtension patches applied to miui-services.jar"
+  log "ContentExtension patches applied to miui-services.jar"
 }
 
 # Apply floating
 apply_miui_services_floating() {
   local decompile_dir="$1"
-  for i in "$decompile_dir/"*"/com/android/server/wm/MiuiFreeFormStackDisplayStrategy.smali"; do
-    patch_method_in_file "getMaxMiuiFreeFormStackCount(Ljava/lang/String;Lcom/android/server/wm/MiuiFreeFormActivityStack;)I" 6 "$i"
+  # Chỉ lặp các thư mục smali THẬT. Bản cũ dùng "$decompile_dir/"*"/..." nên khớp
+  # cả symlink tương thích classes -> smali, và vá/log hai lần cùng một file
+  # (log build thật in hai dòng "✓ Patched getMaxMiuiFreeFormStackCount ...").
+  local d
+  for d in "$decompile_dir"/smali "$decompile_dir"/smali_classes*; do
+    [ -f "$d/com/android/server/wm/MiuiFreeFormStackDisplayStrategy.smali" ] || continue
+    patch_method_in_file "getMaxMiuiFreeFormStackCount(Ljava/lang/String;Lcom/android/server/wm/MiuiFreeFormActivityStack;)I" 6 \
+      "$d/com/android/server/wm/MiuiFreeFormStackDisplayStrategy.smali"
   done
 }
 
-# Main miui-services patching function (Android 16)
+# Main miui-services patching function (Android 17)
+# ---------------------------------------------------------------------------
+# Bỏ chặn broadcast trên ROM China (fix "notification delay").
+#
+# ĐO ĐƯỢC, không phải suy đoán: so miui-services.jar gốc với bản vá bằng tool
+# online (19/11) ở mức method, toàn bộ khác biệt THẬT chỉ là 6 chỗ đổi
+#     sget-boolean vX, Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z
+# thành
+#     sget-boolean vX, Lmiui/os/Build;->IS_MIUI:Z
+# Phần "khác" còn lại của dex chỉ là nhiễu do build lại: const-string ->
+# const-string/jumbo, số hiệu label đổi, thêm nop.
+#
+# Vì sao có tác dụng: các nhánh "international" trong BroadcastQueue bỏ qua
+# chặn auto-start và cho com.google.android.c2dm.intent.RECEIVE (FCM) đi qua.
+# ROM China có IS_INTERNATIONAL_BUILD=false nên các nhánh đó bị bỏ -> thông báo
+# bị giữ lại. Đổi sang IS_MIUI (luôn true trên MIUI) làm ROM China chạy đúng
+# như bản quốc tế.
+#
+# Cố ý KHÔNG thay cả thân method như bảng JSON của PRECHINAFIX: chỉ đổi đúng
+# tên field bên trong method, nên không phụ thuộc bản ROM và không ghi đè
+# nhầm code khác khi Xiaomi sửa method.
+# ---------------------------------------------------------------------------
+patch_is_international_in_method() {
+  local decompile_dir="$1" rel="$2" method="$3"
+  local d f start end total i hits=0 found=0
+  for d in "$decompile_dir"/smali "$decompile_dir"/smali_classes*; do
+    f="$d/$rel"
+    [ -f "$f" ] || continue
+    start=$(grep -n "^[[:space:]]*\.method.* $method" "$f" | cut -d: -f1 | head -n1)
+    [ -z "$start" ] && continue
+    found=1
+    total=$(wc -l < "$f")
+    end=0
+    i=$start
+    while [ "$i" -le "$total" ]; do
+      [ "$(sed -n "${i}p" "$f" | tr -d ' \r')" = ".endmethod" ] && { end=$i; break; }
+      i=$((i + 1))
+    done
+    [ "$end" -eq 0 ] && continue
+    if sed -n "${start},${end}p" "$f" | grep -q "Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z"; then
+      sed -i "${start},${end}s|Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z|Lmiui/os/Build;->IS_MIUI:Z|g" "$f"
+      hits=$((hits + 1))
+    fi
+  done
+  if [ "$found" -eq 1 ] && [ "$hits" -eq 0 ]; then
+    # Method co nhung khong con doc IS_INTERNATIONAL_BUILD. Thuong la
+    # PRECHINAFIX da thay ca than method truoc do (no chay TRUOC COREPATCH) va
+    # da hard-code ket qua - vd: const/4 v0, 0x1 thay cho sget-boolean
+    # IS_INTERNATIONAL_BUILD. Khi do patch nay khong con gi de lam, va day la
+    # trang thai DUNG, khong phai loi. Chi bao o muc debug.
+    debug "ChinaBroadcast: $rel::$method đã được PRECHINAFIX xử lý trước - bỏ qua"
+  fi
+  return 0
+}
+
+apply_china_broadcast_unblock() {
+  local decompile_dir="$1"
+  local flag
+  flag=$(grep -m1 '^china_broadcast_unblock=' "$work_dir/config.env" 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+  if [ "$flag" = "false" ]; then
+    log "ChinaBroadcast: china_broadcast_unblock=false - bỏ qua"
+    return 0
+  fi
+
+  local rel_am="com/android/server/am/BroadcastQueueModernStubImpl.smali"
+  local before=$(grep -rl "Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z" \
+      "$decompile_dir"/smali* 2>/dev/null | wc -l)
+
+  patch_is_international_in_method "$decompile_dir" "$rel_am" \
+    "isInternationalSpecialAction(Ljava/lang/String;Landroid/content/pm/ResolveInfo;)Z"
+  patch_is_international_in_method "$decompile_dir" "$rel_am" "updateBlockBroadcast()V"
+  patch_is_international_in_method "$decompile_dir" "$rel_am" \
+    "checkApplicationAutoStart(Lcom/android/server/am/BroadcastQueue;Lcom/android/server/am/BroadcastRecord;Landroid/content/pm/ResolveInfo;)Z"
+  patch_is_international_in_method "$decompile_dir" \
+    "com/android/server/am/ProcessManagerService.smali" \
+    "isForceStopEnable(Lcom/android/server/am/ProcessRecord;I)Z"
+  patch_is_international_in_method "$decompile_dir" \
+    "com/android/server/am/ProcessSceneCleaner.smali" \
+    "handleSwipeKill(Lmiui/process/ProcessConfig;)Z"
+  patch_is_international_in_method "$decompile_dir" \
+    "com/android/server/am/ProcessSceneCleaner.smali" \
+    "killAppForHasOtherTask(ILmiui/process/ProcessConfig;)Z"
+
+  # Khong in "6 method da chuyen" mot cach vo dieu kien: PRECHINAFIX chay
+  # TRUOC va da thay than 6 method nay (hard-code ket qua), nen o day thuong
+  # khong con gi de doi. Bao dung su that thay vi bao so luong cho co.
+  local after=$(grep -rl "Lmiui/os/Build;->IS_INTERNATIONAL_BUILD:Z" \
+      "$decompile_dir"/smali* 2>/dev/null | wc -l)
+  if [ "${before:-0}" = "${after:-0}" ]; then
+    log "ChinaBroadcast: 6 method đã được PRECHINAFIX xử lý trước (không còn IS_INTERNATIONAL_BUILD để đổi)"
+  else
+    log "ChinaBroadcast: đổi IS_INTERNATIONAL_BUILD -> IS_MIUI trong $((before - after)) file"
+  fi
+}
+
 patch_miui_services() {
   local miui_services_path="$work_dir/build/baserom/images/system_ext/framework/miui-services.jar"
 
@@ -1695,6 +1662,7 @@ patch_miui_services() {
   apply_miui_services_floating "$decompile_dir"
   apply_miui_services_gboard "$decompile_dir"
   apply_miui_services_contentextension "$decompile_dir"
+  apply_china_broadcast_unblock "$decompile_dir"
 
   # Apply invoke-custom patches (common to all features)
   # modify_invoke_custom_methods "$decompile_dir"
@@ -1724,7 +1692,7 @@ apply_miui_framework_gboard() {
   sed_all_smali "$decompile_dir" "$expr" "com/android/internal/os/AnrEnhanceImpl.smali"
   sed_all_smali "$decompile_dir" "$expr" "miui/util/HapticFeedbackUtil.smali"
 
-  echo "Gboard patches applied to miui-framework.jar"
+  log "Gboard patches applied to miui-framework.jar"
 }
 
 # Main miui-framework patching function

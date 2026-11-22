@@ -120,7 +120,7 @@ $method_head_escaped\\
 
 modify_invoke_custom_methods() {
   local decompile_dir="$1"
-  echo "Checking for invoke-custom in $decompile_dir..."
+  debug "kiểm tra invoke-custom trong $decompile_dir"
 
   # Use find with + instead of \; to batch files and suppress all grep errors
   local smali_files
@@ -248,14 +248,14 @@ patch_method_in_file() {
   if [ ! -f "$file" ]; then
     # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
     smali_run_variants "patch_method_in_file" "$file" "${@:1:$#-1}" && return
-    echo "⚠ File not found: $(basename "$file")"
+    warn "File not found: $(basename "$file")"
     return
   fi
 
   local start
   start=$(grep -n "^[[:space:]]*\.method.* $method" "$file" | cut -d: -f1 | head -n1)
   [ -z "$start" ] && {
-    echo "⚠ Method $method not found in $(basename "$file")"
+    warn "Method $method not found in $(basename "$file")"
     return
   }
 
@@ -271,7 +271,7 @@ patch_method_in_file() {
   done
 
   [ "$end" -eq 0 ] && {
-    echo "⚠ End not found for $method"
+    warn "End not found for $method"
     return
   }
 
@@ -286,7 +286,7 @@ $method_head_escaped\\
     return v0\\
 .end method" "$file"
 
-  echo "✓ Patched $method to return $ret_val in $(basename "$file")"
+  debug "Patched $method to return $ret_val in $(basename "$file")"
 }
 
 patch_return_void_in_file() {
@@ -297,14 +297,14 @@ patch_return_void_in_file() {
   if [ ! -f "$file" ]; then
     # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
     smali_run_variants "patch_return_void_in_file" "$file" "${@:1:$#-1}" && return
-    echo "⚠ File not found: $(basename "$file")"
+    warn "File not found: $(basename "$file")"
     return
   fi
 
   local start
   start=$(grep -n "^[[:space:]]*\.method.* $method" "$file" | cut -d: -f1 | head -n1)
   [ -z "$start" ] && {
-    echo "⚠ Method $method not found in $(basename "$file")"
+    warn "Method $method not found in $(basename "$file")"
     return
   }
 
@@ -320,7 +320,7 @@ patch_return_void_in_file() {
   done
 
   [ "$end" -eq 0 ] && {
-    echo "⚠ Method $method end not found"
+    warn "Method $method end not found"
     return
   }
 
@@ -334,7 +334,7 @@ $method_head_escaped\\
     return-void\\
 .end method" "$file"
 
-  echo "✓ Patched $method → return-void in $(basename "$file")"
+  debug "Patched $method → return-void in $(basename "$file")"
 }
 
 patch_smali_method_in_file() {
@@ -345,7 +345,7 @@ patch_smali_method_in_file() {
   if [ ! -f "$file" ]; then
     # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
     smali_run_variants "patch_smali_method_in_file" "$file" "${@:1:$#-1}" && return
-    echo "⚠ File not found: $(basename "$file")"
+    warn "File not found: $(basename "$file")"
     return
   fi
 
@@ -353,7 +353,7 @@ patch_smali_method_in_file() {
   local start
   start=$(grep -n "^[[:space:]]*\.method.* $method" "$file" | cut -d: -f1 | head -n1)
   [ -z "$start" ] && {
-    echo "⚠️ Method $method not found in $(basename "$file")"
+    warn "Method $method not found in $(basename "$file")"
     return
   }
 
@@ -368,7 +368,7 @@ patch_smali_method_in_file() {
     i=$((i + 1))
   done
   [ "$end" -eq 0 ] && {
-    echo "⚠️ .end method not found"
+    warn ".end method not found"
     return
   }
 
@@ -379,7 +379,7 @@ patch_smali_method_in_file() {
     | head -n1 | cut -d: -f1)
 
   [ -z "$rel" ] && {
-    echo "⚠️ No .registers/.locals"
+    warn "No .registers/.locals"
     return
   }
 
@@ -392,7 +392,7 @@ $line" "$file"
     inject_line=$((inject_line + 1))
   done <<< "$inject_code"
 
-  echo "✓ Injected code into $method in $(basename "$file")"
+  debug "Injected code into $method in $(basename "$file")"
 }
 
 replace_line_contains_in_smali_method() {
@@ -404,7 +404,7 @@ replace_line_contains_in_smali_method() {
   if [ ! -f "$file" ]; then
     # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
     smali_run_variants "replace_line_contains_in_smali_method" "$file" "${@:1:$#-1}" && return 0
-    echo "⚠️ File not found: $(basename "$file")"
+    warn "File not found: $(basename "$file")"
     return 1
   fi
 
@@ -412,7 +412,7 @@ replace_line_contains_in_smali_method() {
   local start
   start=$(grep -n "^[[:space:]]*\.method.* $method" "$file" | cut -d: -f1 | head -n1)
   [ -z "$start" ] && {
-    echo "⚠️ Method $method not found in $(basename "$file")"
+    warn "Method $method not found in $(basename "$file")"
     return 1
   }
 
@@ -428,7 +428,7 @@ replace_line_contains_in_smali_method() {
   done
 
   [ "$end" -eq 0 ] && {
-    echo "⚠️ .end method not found for $method"
+    warn ".end method not found for $method"
     return 1
   }
 
@@ -438,7 +438,7 @@ replace_line_contains_in_smali_method() {
     | grep -n "$keyword" | head -n1 | cut -d: -f1)
 
   [ -z "$rel" ] && {
-    echo "⚠️ No line containing '$keyword' in method $method"
+    warn "No line containing '$keyword' in method $method"
     return 1
   }
 
@@ -448,7 +448,7 @@ replace_line_contains_in_smali_method() {
   sed -i "${real_line}c\\
 $replace_line" "$file"
 
-  echo "✓ Replaced line containing '$keyword' in $method ($(basename "$file"))"
+  debug "Replaced line containing '$keyword' in $method ($(basename "$file"))"
 }
 
 patch_smali_after_keyword() {
@@ -460,7 +460,7 @@ patch_smali_after_keyword() {
   if [ ! -f "$file" ]; then
     # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
     smali_run_variants "patch_smali_after_keyword" "$file" "${@:1:$#-1}" && return
-    echo "⚠ File not found: $(basename "$file")"
+    warn "File not found: $(basename "$file")"
     return
   fi
 
@@ -469,7 +469,7 @@ patch_smali_after_keyword() {
   start=$(grep -n "^[[:space:]]*\.method.* $method" "$file" | cut -d: -f1 | head -n1)
 
   [ -z "$start" ] && {
-    echo "⚠️ Method $method not found in $(basename "$file")"
+    warn "Method $method not found in $(basename "$file")"
     return
   }
 
@@ -486,7 +486,7 @@ patch_smali_after_keyword() {
   done
 
   [ "$end" -eq 0 ] && {
-    echo "⚠️ .end method not found"
+    warn ".end method not found"
     return
   }
 
@@ -497,7 +497,7 @@ patch_smali_after_keyword() {
     | head -n1 | cut -d: -f1)
 
   [ -z "$rel" ] && {
-    echo "⚠️ Keyword '$keyword' not found in $method"
+    warn "Keyword '$keyword' not found in $method"
     return
   }
 
@@ -510,7 +510,7 @@ $line" "$file"
     inject_line=$((inject_line + 1))
   done <<< "$inject_code"
 
-  echo "✓ Injected after '$keyword' in $method ($(basename "$file"))"
+  debug "Injected after '$keyword' in $method ($(basename "$file"))"
 }
 
 delete_lines_in_smali_method() {
@@ -522,7 +522,7 @@ delete_lines_in_smali_method() {
   if [ ! -f "$file" ]; then
     # Class co the nam o dex khac (smali_classes2..) - xem smali_other_variants
     smali_run_variants "delete_lines_in_smali_method" "$file" "${@:1:$#-1}" && return 0
-    echo "⚠️ File not found: $(basename "$file")"
+    warn "File not found: $(basename "$file")"
     return 1
   fi
 
@@ -531,7 +531,7 @@ delete_lines_in_smali_method() {
   start=$(grep -n "^[[:space:]]*\.method.* $method" "$file" | cut -d: -f1 | head -n1)
 
   [ -z "$start" ] && {
-    echo "⚠️ Method $method not found in $(basename "$file")"
+    warn "Method $method not found in $(basename "$file")"
     return 1
   }
 
@@ -548,13 +548,13 @@ delete_lines_in_smali_method() {
   done
 
   [ "$end" -eq 0 ] && {
-    echo "⚠️ .end method not found"
+    warn ".end method not found"
     return 1
   }
 
   # Kiểm tra hợp lệ
   if [ "$from_line" -lt 1 ] || [ "$to_line" -lt "$from_line" ]; then
-    echo "⚠️ Invalid line range"
+    warn "Invalid line range"
     return 1
   fi
 
@@ -570,5 +570,5 @@ delete_lines_in_smali_method() {
   # Thực hiện xóa
   sed -i "${real_start},${real_end}d" "$file"
 
-  echo "✓ Deleted lines $from_line → $to_line inside $method in $(basename "$file")"
+  debug "Deleted lines $from_line → $to_line inside $method in $(basename "$file")"
 }

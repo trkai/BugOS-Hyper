@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<FrameLayout android:layout_width="fill_parent"
+             android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+  <miuix.springback.view.SpringBackLayout android:id="@id/springview"
+                        android:layout_width="fill_parent"
+                        android:layout_height="fill_parent"
+                        app:scrollableView="@id/id_0x7f0b0c97">
+    <miuix.core.widget.NestedScrollView android:id="@id/id_0x7f0b0c97"
+                          android:clipToPadding="false"
+                          android:layout_width="fill_parent"
+                          android:layout_height="fill_parent">
+      <LinearLayout android:orientation="vertical"
+                    android:id="@id/scroll_layout"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content">
+        <!-- BugOS: hardcode 172dp thay vi @dimen/my_device_os_logo_area_height
+             (dimen goc = 200dp). Day la View TRONG giu cho cho card logo
+             (miui_version_card_view ve de len, cung dung dimen nay o cuoi file).
+             Card logo can 168dp, nen 200dp de thua ~32dp trong duoi logo.
+             172dp bot 28dp -> 2 card Ten thiet bi / Bo nho len gan hon.
+             Khong sua thang file dimens.xml vi file do 5461 dong, ghi de ca
+             file se mat toan bo resource khac cua ROM. -->
+        <View android:id="@id/version_card_click_view"
+              android:layout_width="fill_parent"
+              android:layout_height="172.0dp" />
+        <include layout="@layout/device_layout" />
+        <!-- BugOS: an han card "thong so" (CPU/RAM/pin...).
+             Code o MiuiMyDeviceSettings dong 361-362 DA set visibility=GONE,
+             nhung DeviceBasicInfoPresenter.showGridView() bat lai thanh VISIBLE
+             (do la patch "khong an card khi server khong tra du lieu" - nay bo).
+             Dat visibility=gone ngay trong layout de khong bi bat lai. -->
+        <RelativeLayout android:id="@id/device_params"
+                        android:visibility="gone"
+                        android:background="@drawable/new_device_card_back_ground"
+                        android:paddingTop="16.0dp"
+                        android:layout_width="fill_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/my_device_card_margin_edge"
+                        android:layout_marginStart="@dimen/card_margin_edge"
+                        android:layout_marginEnd="@dimen/card_margin_edge">
+          <androidx.recyclerview.widget.RecyclerView android:id="@id/description_grid"
+                                android:layout_width="fill_parent"
+                                android:layout_height="wrap_content"
+                                android:overScrollMode="never"
+                                android:paddingStart="@dimen/preference_item_padding_os2"
+                                android:paddingEnd="@dimen/preference_item_padding_os2"
+                                android:nestedScrollingEnabled="false" />
+        </RelativeLayout>
+        <!-- BugOS: 12dp -> 6dp. Cong voi marginBottom 8dp cua 2 card o tren,
+             tong khoang cach 2card->card duoi thanh ~14dp thay vi ~20dp. -->
+        <FrameLayout android:id="@id/prefs_container"
+                     android:clipChildren="false"
+                     android:clipToPadding="false"
+                     android:layout_width="fill_parent"
+                     android:layout_height="0.0dp"
+                     android:layout_marginTop="6.0dp"
+                     android:layout_weight="1.0"
+                     android:smoothScrollbar="false" />
+        <TextView android:textSize="13.0sp"
+                  android:id="@id/disclaimer"
+                  android:visibility="gone"
+                  android:layout_width="fill_parent"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="20.0dp"
+                  android:layout_marginBottom="@dimen/my_card_bottom_padding"
+                  android:text="@string/my_device_disclaimer"
+                  android:layout_marginStart="@dimen/device_name_edit_usage_padding"
+                  android:layout_marginEnd="@dimen/device_name_edit_usage_padding"
+                  style="@style/Miuix.AppCompat.TextAppearance.List.Secondary.Preference" />
+      </LinearLayout>
+    </miuix.core.widget.NestedScrollView>
+  </miuix.springback.view.SpringBackLayout>
+  <!-- BugOS: cung hardcode 172dp de khop voi View giu cho o tren. -->
+  <com.android.settings.device.MiuiVersionCard android:id="@id/miui_version_card_view"
+                        android:layout_width="fill_parent"
+                        android:layout_height="172.0dp" />
+</FrameLayout>

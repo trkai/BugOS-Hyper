@@ -40,13 +40,12 @@ s = open(path, encoding="utf-8").read()
 MARK = "bugos_no_secure"
 
 if MARK in s:
-    print("da va roi")
+    # Không in gì: shell kiểm tra MARK sau khi python chạy và tự log kết quả.
     sys.exit(0)
 
 pat = re.compile(r"\.method [^\n]*getDisableSecureWindows\(\)Z\n(.*?)\.end method", re.S)
 m = pat.search(s)
 if not m:
-    print("khong thay getDisableSecureWindows")
     sys.exit(1)
 
 body = ("    .registers 1\n\n"
@@ -56,7 +55,6 @@ body = ("    .registers 1\n\n"
 
 s = s[:m.start(1)] + body + s[m.end(1):]
 open(path, "w", encoding="utf-8", newline="\n").write(s)
-print("va getDisableSecureWindows -> true")
 PYEOF
     if grep -q "bugos_no_secure" "$wms" 2>/dev/null; then
       log "SecureShot: WindowManagerService.getDisableSecureWindows() -> true"
@@ -82,13 +80,11 @@ s = open(path, encoding="utf-8").read()
 MARK = "bugos_no_secure"
 
 if MARK in s:
-    print("da va roi")
     sys.exit(0)
 
 pat = re.compile(r"\.method [^\n]*isSecureLocked\(\)Z\n(.*?)\.end method", re.S)
 m = pat.search(s)
 if not m:
-    print("khong thay isSecureLocked")
     sys.exit(1)
 
 body = ("    .registers 1\n\n"
@@ -98,7 +94,6 @@ body = ("    .registers 1\n\n"
 
 s = s[:m.start(1)] + body + s[m.end(1):]
 open(path, "w", encoding="utf-8", newline="\n").write(s)
-print("va isSecureLocked -> false")
 PYEOF
   if grep -q "bugos_no_secure" "$ws" 2>/dev/null; then
     log "SecureShot: WindowState.isSecureLocked() -> false"

@@ -1,0 +1,26 @@
+# BugOS FCM fix - chay o class late_start, KHONG dung `disabled`.
+#
+# VI SAO BO `disabled` + `on property:sys.boot_completed=1`:
+#   Do tren annibale (A17/OS4.0.6, build 21/11) ca 3 service cua BugOS deu
+#   khong chay du file rc da duoc init nap (init.svc.bugos_sukisu_manager =
+#   stopped, 2 cai kia rong). Kiem tra cheo tren chinh ROM do:
+#     dmesgd, boottrace, aisealhostservice - service CUA ROM, cung dung
+#     `on property:sys.boot_completed=1` - cung KHONG chay (init.svc rong).
+#   Trong khi do cac service late_start KHONG co disabled thi chay binh thuong:
+#     gatekeeperd, traced -> running
+#   => Trigger `on property:sys.boot_completed=1` khong con hieu luc tren ROM
+#      nay (boot_completed duoc set o stage khac, sau khi init da parse xong
+#      rc va khong con dispatch trigger cho property do nua).
+#
+# Cach lam dung: bo `disabled` de init tu start o class late_start, giong
+# gatekeeperd. Script TU CHO sys.boot_completed (vong while o dau fcm-fix.sh),
+# nen khong can trigger nua - va do la ly do script da co san vong cho.
+#
+# Neu service khong chay, kiem tra:
+#   dmesg | grep -E "avc.*bugos|bugos-fcm"
+service bugos-fcm /system/bin/sh /system/bin/bugos-fcm.sh
+    class late_start
+    user root
+    group root system
+    oneshot
+    seclabel u:r:shell:s0
