@@ -862,6 +862,28 @@ PYEOF
         warn "Settings: Không thấy MiuiAboutPhoneUtils.smali"
     fi
 
+    # ---- smali: an card "thong so thiet bi" (device_params) ----------------
+    # Card CPU/RAM/pin/man hinh do DeviceBasicInfoPresenter.showGridView() bat
+    # lai VISIBLE, nen chi dat visibility=gone trong layout la khong du.
+    # File .ini nay thay ca method bang `return-void`.
+    local pb
+    pb=$(find "$out" -type f -name "DeviceBasicInfoPresenter.smali" 2>/dev/null | head -n 1)
+    if [ -n "$pb" ] && [ -f "$pb" ]; then
+        if [ -f "$SRC_DIR/hideDeviceParams.ini" ]; then
+            local b_before b_after
+            b_before=$(md5sum "$pb" | cut -d' ' -f1)
+            $repS "$SRC_DIR/hideDeviceParams.ini" "$pb" >/dev/null 2>&1
+            b_after=$(md5sum "$pb" | cut -d' ' -f1)
+            if [ "$b_before" = "$b_after" ]; then
+                warn "Settings: smali patch 'hideDeviceParams' KHONG khop (method da doi?)"
+            else
+                mods "Settings: smali patch 'hideDeviceParams' OK"
+            fi
+        fi
+    else
+        warn "Settings: Khong thay DeviceBasicInfoPresenter.smali"
+    fi
+
     # ---- rebuild ----------------------------------------------------------
     mods "Settings: Rebuild..."
     if ! $APKEDITOR b -f -i "$out" -o "$work/new.apk" > "$work/build.log" 2>&1 || [ ! -s "$work/new.apk" ]; then
