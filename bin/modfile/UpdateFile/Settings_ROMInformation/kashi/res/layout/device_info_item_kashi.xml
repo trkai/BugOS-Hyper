@@ -1,7 +1,8 @@
 <?xml version='1.0' encoding='utf-8' ?>
 <com.google.android.material.card.MaterialCardView android:layout_width="fill_parent"
-                      android:layout_height="130.0dp"
-                      android:layout_marginBottom="16.0dp"
+                      android:layout_height="wrap_content"
+                      android:minHeight="130.0dp"
+                      android:layout_marginBottom="8.0dp"
                       android:layout_marginStart="12.0dp"
                       android:layout_marginEnd="8.0dp"
                       app:cardBackgroundColor="@color/my_device_info_item_background_color"

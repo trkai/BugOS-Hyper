@@ -1,7 +1,8 @@
 <?xml version='1.0' encoding='utf-8' ?>
 <com.google.android.material.card.MaterialCardView android:layout_width="fill_parent"
-                      android:layout_height="130.0dp"
-                      android:layout_marginBottom="16.0dp"
+                      android:layout_height="wrap_content"
+                      android:minHeight="130.0dp"
+                      android:layout_marginBottom="8.0dp"
                       android:layout_marginStart="4.0dp"
                       android:layout_marginEnd="12.0dp"
                       app:cardBackgroundColor="@color/my_device_info_item_background_color"
@@ -33,13 +34,20 @@
               android:lineSpacingMultiplier="1.1"
               android:fontFamily="@android:string/config_headlineFontFamilyMedium"
               android:textAlignment="viewStart" />
+    <!-- BugOS: summary 1 dong + ellipsize. Truoc day wrap_content + khong
+         gioi han dong nen chuoi "37,2GB/264GB (8GB co mo rong luu tru)" xuong
+         2 dong, day card Bo nho cao hon card Ten thiet bi 40px (do tren may
+         22/11: 293px vs 333px). width phai la fill_parent thi ellipsize moi
+         co tac dung. -->
     <TextView android:textSize="14.0sp"
               android:textColor="?android:attr/textColorSecondary"
               android:id="@id/summary"
-              android:layout_width="wrap_content"
+              android:layout_width="fill_parent"
               android:layout_height="wrap_content"
               android:layout_marginTop="4.0dp"
               android:lineSpacingMultiplier="1.15"
+              android:maxLines="1"
+              android:ellipsize="end"
               android:textAlignment="viewStart" />
   </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
