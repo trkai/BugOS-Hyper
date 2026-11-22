@@ -1,9 +1,8 @@
 <?xml version='1.0' encoding='utf-8' ?>
 <!-- BugOS: ban sua tu layout OxygenOS cua tool online. Thay TextView ten ROM (34sp)
      bang ImageView logo BugOS, bo dong build info (#UI Built by Kashi).
-     layout_height cua FrameLayout: 150dp -> wrap_content. Noi dung ben trong can
-     168dp (khoi anh: MaterialCardView 150dp + marginTop 18dp), nen 150dp lam cat
-     mat day khung anh dien thoai - dung loi thay tren may 21/11 08:39. -->
+     layout_height cua FrameLayout: wrap_content. Khung anh dien thoai ben phai cao
+     CO DINH 150dp de cat phang day MaterialCardView (xem ghi chu tai cho). -->
 <FrameLayout android:id="@id/version_layout"
              android:clipToPadding="false"
              android:layout_width="fill_parent"
@@ -62,11 +61,22 @@
                               android:layout_alignStart="@id/about_phone_rom_name_info" />
         
       </LinearLayout>
+      <!-- BugOS: khung anh bi CAT PHANG o day, giong HyperOS goc.
+           Truoc day FrameLayout la wrap_content nen MaterialCardView 150dp +
+           marginTop 18dp = 168dp, card phinh theo 168dp va hien DU vien trang +
+           bo goc 14dp o day -> trong nhu mot tam anh noi giua card, khac ROM goc.
+           Nay: FrameLayout cao CO DINH 150dp, con MaterialCardView de 168dp.
+           clipChildren=true (mac dinh) nen 36dp duoi cua MaterialCardView bi cat
+           phang tai day khung -> mat ca vien ngang lan bo goc duoi; chi con 2 vien
+           doc chay xuong het, dung nhu mau HyperOS. -->
       <FrameLayout android:layout_width="wrap_content"
-                   android:layout_height="wrap_content"
+                   android:layout_height="150.0dp"
+                   android:layout_gravity="top"
+                   android:clipChildren="true"
+                   android:clipToPadding="true"
                    android:layout_marginEnd="3.0dp">
         <com.google.android.material.card.MaterialCardView android:layout_width="100.0dp"
-                              android:layout_height="150.0dp"
+                              android:layout_height="168.0dp"
                               android:layout_marginTop="18.0dp"
                               app:cardCornerRadius="14.0dp"
                               app:cardElevation="0.0dp"
