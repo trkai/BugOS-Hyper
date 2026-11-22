@@ -863,11 +863,15 @@ PYEOF
     fi
 
     # ---- smali: an card "thong so thiet bi" (device_params) ----------------
-    # Card CPU/RAM/pin/man hinh do DeviceBasicInfoPresenter.showGridView() bat
+    # Card CPU/RAM/pin/man hinh bi DeviceBasicInfoPresenter.showGridView() bat
     # lai VISIBLE, nen chi dat visibility=gone trong layout la khong du.
-    # File .ini nay thay ca method bang `return-void`.
+    #
+    # Patch vao MiuiMyDeviceSettings$2 (callback RIENG cua trang "Thiet bi cua
+    # toi"), KHONG patch presenter: showGridView() con duoc
+    # MiuiMyDeviceDetailSettings$1 goi cho trang "Thong tin va thong so chi
+    # tiet" - trang do PHAI giu card (ten may, chip, ram...).
     local pb
-    pb=$(find "$out" -type f -name "DeviceBasicInfoPresenter.smali" 2>/dev/null | head -n 1)
+    pb=$(find "$out" -type f -name 'MiuiMyDeviceSettings$2.smali' 2>/dev/null | head -n 1)
     if [ -n "$pb" ] && [ -f "$pb" ]; then
         if [ -f "$SRC_DIR/hideDeviceParams.ini" ]; then
             local b_before b_after
@@ -875,13 +879,13 @@ PYEOF
             $repS "$SRC_DIR/hideDeviceParams.ini" "$pb" >/dev/null 2>&1
             b_after=$(md5sum "$pb" | cut -d' ' -f1)
             if [ "$b_before" = "$b_after" ]; then
-                warn "Settings: smali patch 'hideDeviceParams' KHONG khop (method da doi?)"
+                warn "Settings: smali patch 'hideDeviceParams' KHONG khop (callback da doi?)"
             else
                 mods "Settings: smali patch 'hideDeviceParams' OK"
             fi
         fi
     else
-        warn "Settings: Khong thay DeviceBasicInfoPresenter.smali"
+        warn "Settings: Khong thay MiuiMyDeviceSettings\$2.smali"
     fi
 
     # ---- rebuild ----------------------------------------------------------

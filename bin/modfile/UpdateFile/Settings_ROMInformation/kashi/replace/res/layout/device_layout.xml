@@ -9,10 +9,17 @@
         storage_info_item_kashi: marginStart  4dp, marginEnd 12dp
      Ghep lai thanh 12dp le ngoai + 12dp khe giua (8+4), dung y do.
 
-     layout_height 130dp co dinh: item layout cung 130dp
+     layout_height fill_parent (KHONG con 130dp co dinh):
+     Truoc day dat 130dp cung cho ca 2 card -> chu ben trong bi CAT (thay ro
+     o anh chu.p 22/11 14:12: dong "REDMI K90" va "39,6GB/264GB (8GB..." bi
+     cat ngang day card). Nguyen nhan: noi dung that can ~150dp
      (16 marginTop + 38 icon/progress + 12 + title + 4 + summary + 16 padding).
-     width 0dp + weight 1: cach dung chuan cho chia doi; dat fill_parent nhu
-     ban tool van ra 50/50 nhung de gay nham lan.
+     Doi sang fill_parent: trong LinearLayout NGANG co layout_height
+     wrap_content, ca 2 card se cung cao bang card cao nhat -> luon bang nhau
+     va tu gian khi chu dai, khong cat.
+     baselineAligned="false": bat buoc, neu khong 2 card se lech nhau theo
+     duong baseline cua TextView dau tien.
+     width 0dp + weight 1: cach dung chuan cho chia doi 50/50.
 
      Phai chep ca file nay, khong chi cac layout item: neu thieu, ROM dung ban
      goc cua Xiaomi (xep doc) va 2 card se chiem het chieu rong. -->
@@ -30,15 +37,16 @@
                 android:layout_height="wrap_content">
     <LinearLayout android:orientation="horizontal"
                   android:clipChildren="true"
+                  android:baselineAligned="false"
                   android:layout_width="fill_parent"
                   android:layout_height="wrap_content">
       <com.android.settings.device.MiuiDeviceNameCard android:id="@id/device_name_card_view"
                             android:layout_width="0.0dp"
-                            android:layout_height="130.0dp"
+                            android:layout_height="fill_parent"
                             android:layout_weight="1.0" />
       <com.android.settings.device.MiuiMemoryCard android:id="@id/device_memory_card_view"
                             android:layout_width="0.0dp"
-                            android:layout_height="130.0dp"
+                            android:layout_height="fill_parent"
                             android:layout_weight="1.0" />
     </LinearLayout>
     <com.android.settings.device.MiuiGuaranteeCard android:id="@id/device_guarantee_card_view"
