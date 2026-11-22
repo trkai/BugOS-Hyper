@@ -23,3 +23,4 @@ service bugos-fcm /system/bin/sh /system/bin/bugos-fcm.sh
     user root
     group root system
     oneshot
+    seclabel u:r:shell:s0

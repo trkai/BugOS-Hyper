@@ -27,3 +27,4 @@ service bugos-fakelock /system/bin/sh /system/bin/bugos-fakelock.sh
     user root
     group root system
     oneshot
+    seclabel u:r:shell:s0

@@ -9,6 +9,17 @@ AUTHOR = "affggh"
 LICENES = "Apache 2.0"
 VERSION = "1.0"
 
+# BugOS: script do BugOS them vao /system/bin, phai giu 0755.
+# fspatch ep MOI file .sh duoi /bin thanh 0750 (quy uoc ROM goc), nhung 3 script
+# nay chay bang `/system/bin/sh` duoi domain shell (seclabel u:r:shell:s0) nen
+# can quyen doc cho group/other. Ep 0750 lam service khong chay: da do tren
+# annibale 21/11 - ca 3 service deu "stopped", log khong ton tai.
+BUGOS_EXEC_SCRIPTS = {
+    "system/bin/bugos_sukisu_manager.sh",
+    "system/bin/bugos-fcm.sh",
+    "system/bin/bugos-fakelock.sh",
+}
+
 
 def scanfs(file) -> dict:
     filesystem_config = {}
@@ -90,6 +101,15 @@ def fs_patch(fs_file, dir_path) -> tuple:  # 接收两个字典对比
                     mode = "0750"
                 else:
                     mode = "0644"
+                # BugOS: 3 script cua minh PHAI 0755, khong duoc ep 0750.
+                # Service cua chung chay bang /system/bin/sh duoi domain shell
+                # (seclabel u:r:shell:s0). Voi 0750 root:shell thi user root doc
+                # duoc, nhung khi init doi domain hoac script goi `su`/`cmd` thi
+                # mat quyen doc -> service "stopped", root va FCM khong song.
+                # Da do tren annibale 21/11: ca 3 service deu stopped va log
+                # khong ton tai (script chua tung chay).
+                if i in BUGOS_EXEC_SCRIPTS:
+                    mode = "0755"
                 link = islink(filepath)
                 config = [uid, gid, mode, link]
             elif ("/bin" in i) or ("/xbin" in i):
@@ -107,6 +127,9 @@ def fs_patch(fs_file, dir_path) -> tuple:  # 接收两个字典对比
                               'installed_su', 'bin/rw-system.sh', 'bin/getSPL']:
                         if s in i:
                             mode = "0755"
+                # BugOS: giu 0755 cho 3 script cua minh (ly do o nhanh tren).
+                if i in BUGOS_EXEC_SCRIPTS:
+                    mode = "0755"
                 config = [uid, gid, mode]
             else:
                 uid = '0'
