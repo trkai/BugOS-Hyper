@@ -1,151 +1,272 @@
+#!/usr/bin/env bash
+# Classic ROM Installer - macOS
+# Giữ nguyên luồng gốc, chỉ gọn lại giao diện và sửa đường dẫn fastboot.
 
-#!/bin/bash
-echo "Welcome to PenguinOS Fastboot ROM Installer for macOS"
 cd "$(dirname "$0")" || exit 1
 
-# Define commands
-FASTBOOT="fastboot"
+BAR="=========================================================================================="
+if [ -t 1 ]; then
+    C_CYAN=$'\033[96m'; C_GREEN=$'\033[92m'; C_YELLOW=$'\033[93m'; C_RED=$'\033[91m'; C_OFF=$'\033[0m'
+else
+    C_CYAN=''; C_GREEN=''; C_YELLOW=''; C_RED=''; C_OFF=''
+fi
 
-if ! command -v $FASTBOOT >/dev/null 2>&1; then
-    # Check if bundled fastboot exists
+hr()      { printf '%s\n' "$BAR"; }
+say()     { printf '  %s\n' "$*"; }
+ok()      { printf '  %s[OK]%s %s\n' "$C_GREEN" "$C_OFF" "$*"; }
+warn()    { printf '  %s[!]%s %s\n' "$C_YELLOW" "$C_OFF" "$*"; }
+err()     { printf '  %s[X]%s %s\n' "$C_RED" "$C_OFF" "$*"; }
+section() { printf '\n%s\n  %s%s%s\n%s\n' "$BAR" "$C_CYAN" "$*" "$C_OFF" "$BAR"; }
+progress() {
+    local cur=$1 tot=$2 pct filled i bar
+    [ "$tot" -le 0 ] && tot=1
+    pct=$((cur * 100 / tot))
+    filled=$((pct / 5))
+    bar=""
+    i=0
+    while [ "$i" -lt "$filled" ]; do bar="${bar}#"; i=$((i + 1)); done
+    while [ "$i" -lt 20 ]; do bar="${bar}."; i=$((i + 1)); done
+    printf '  [%s] %s%%\n' "$bar" "$pct"
+}
+
+FASTBOOT=""
+ZSTD=""
+DEVICE_ROM=""
+DEVICE_REAL=""
+SLOTS=""
+CHOICE="n"
+
+ensure_fastboot() {
+    if command -v fastboot >/dev/null 2>&1; then
+        FASTBOOT="fastboot"
+        return 0
+    fi
+    if [ -x "META-INF/fastboot_mac" ]; then
+        FASTBOOT="META-INF/fastboot_mac"
+        return 0
+    fi
     if [ -x "META-INF/bin/fastboot_mac" ]; then
         FASTBOOT="META-INF/bin/fastboot_mac"
-    elif [ -x "META-INF/bin/fastboot" ]; then
-        FASTBOOT="META-INF/bin/fastboot"
-    else
-        echo "fastboot not found. Attempting to install via brew..."
-        brew install android-platform-tools
+        return 0
+    fi
+    if [ -x "META-INF/fastboot" ]; then
+        FASTBOOT="META-INF/fastboot"
+        return 0
+    fi
+
+    warn "Không tìm thấy fastboot, thử cài qua brew..."
+    if command -v brew >/dev/null 2>&1; then
+        brew install android-platform-tools >/dev/null 2>&1
         if command -v fastboot >/dev/null 2>&1; then
             FASTBOOT="fastboot"
-        else
-            echo "Failed to install fastboot. Please install it manually."
-            read -r -p "Press Enter to exit..."
-            exit 1
+            return 0
         fi
     fi
+
+    err "Không cài được fastboot. Hãy cài Homebrew rồi chạy lại."
+    read -r -p "Nhấn Enter để thoát... " _
+    exit 1
+}
+
+ensure_zstd() {
+    if command -v zstd >/dev/null 2>&1; then
+        ZSTD="zstd"
+        return 0
+    fi
+
+    warn "Không tìm thấy zstd, thử cài qua brew..."
+    if command -v brew >/dev/null 2>&1; then
+        brew install zstd >/dev/null 2>&1
+        if command -v zstd >/dev/null 2>&1; then
+            ZSTD="zstd"
+            return 0
+        fi
+    fi
+
+    err "Không cài được zstd. Hãy cài Homebrew rồi chạy lại."
+    read -r -p "Nhấn Enter để thoát... " _
+    exit 1
+}
+
+section "CLASSIC ROM INSTALLER  /  MACOS"
+hr
+say "[i] Đọc kỹ trước khi flash  /  Read before flashing"
+say ""
+say "  1. Cần bootloader ĐÃ MỞ KHÓA. Nếu chưa, đóng terminal này ngay."
+say "  2. Chọn sai sẽ MẤT TOÀN BỘ DỮ LIỆU. Hãy chắc chắn."
+say "  3. ROM MIỄN PHÍ. Nếu thấy ai bán / thu tiền cài, liên hệ Admin."
+say "  4. Không chịu trách nhiệm nếu máy brick hoặc mất dữ liệu."
+say "  5. Kiểm tra kỹ bản ROM phải đúng model thiết bị."
+say ""
+say "Đã đọc và đồng ý? Nhấn Enter để tiếp tục (đóng terminal nếu chưa)."
+read -r -p "" _
+
+section "CHỌN CHẾ ĐỘ FLASH  /  FLASH MODE"
+say "  [Y] Xóa sạch dữ liệu  - Clean flash  (format userdata)"
+say "  [N] Giữ lại dữ liệu   - Dirty flash  (keep data)"
+read -r -p "  Nhập lựa chọn [Y/N]: " CHOICE
+case "$CHOICE" in
+    [yY]) CHOICE="y" ;;
+    *)    CHOICE="n" ;;
+esac
+say "  -> Chế độ đã chọn: $CHOICE"
+
+section "KIỂM TRA THIẾT BỊ  /  DEVICE CHECK"
+say "Đưa thiết bị vào FASTBOOT MODE."
+say "Nếu không nhận, cài driver rồi chạy lại."
+hr
+
+ensure_fastboot
+ensure_zstd
+
+if [ ! -f "META-INF/Data/DeviceCode" ]; then
+    err "Thiếu file: META-INF/Data/DeviceCode"
+    read -r -p "Nhấn Enter để thoát... " _
+    exit 1
 fi
-
-DeviceCodeRom=$(cat META-INF/Data/DeviceCode 2>/dev/null | tr -d '\r\n')
-
-echo ""
-echo "[i] - Read this information before flashing"
-echo ""
-echo "1. Our ROM, like most other custom ROMS, requires an unlocked bootloader! If your device is NOT, please close this window."
-echo "2. You have to choose carefully else you will LOST ALL DATA!"
-echo "3. THIS IS A FREE ROM!!! If you see someone sell or install this ROM for fees, please CONTACT ADMIN NOW."
-echo "4. We will NOT take responsibility if you brick your phone or lose all data while installing this ROM."
-echo "5. Make sure you have downloaded the exact build for your device, else you might get bricked."
-echo ""
-echo "[i] - If you have read and agreed to all of the above, press Enter to start the installation."
-echo "[i] - Else, close this terminal window."
-read -r -p ""
-
-echo "========================================================================================="
-echo " Please Choose Format Option Before Flash ROM"
-echo ""
-echo "   y = Format All Data(Clean Flash)         "
-echo "   n = Keep Data And Document(Dirty Flash)"
-echo ""
-echo "========================================================================================="
-read -r -p "Your choice {y/n}: " CHOICE
-echo "========================================================================================="
-echo "Make Sure Your Devices Is On Fastboot Mode"
-echo "If It Still Not Detect Please Install Driver"
-echo "And Try Again..."
-echo "========================================================================================="
-
-DeviceCodeReal=$($FASTBOOT getvar product 2>&1 | grep -i "product:" | awk '{print $2}' | tr -d '\r\n')
-fqlx=$($FASTBOOT getvar slot-count 2>&1 | grep -i "slot-count:" | awk '{print $2}' | tr -d '\r\n')
-
-if [ "$fqlx" = "2" ]; then
-    fqlx="AB"
-else
-    fqlx="A"
-fi
-
-if [ "$DeviceCodeReal" = "mars" ]; then
-    DeviceCodeReal="star"
-fi
-
-# Check DeviceCode Match
-if [[ "$DeviceCodeReal" != *"$DeviceCodeRom"* ]]; then
-    echo "Device Code Mismatch!"
-    echo "Device codename does not match, your device is \"$DeviceCodeReal\". This rom file is for \"$DeviceCodeRom\"."
-    read -r -p "Press Enter to exit..."
+DEVICE_ROM=$(tr -d '\r\n' < "META-INF/Data/DeviceCode")
+if [ -z "$DEVICE_ROM" ]; then
+    err "File DeviceCode rỗng. Hãy kiểm tra package ROM."
+    read -r -p "Nhấn Enter để thoát... " _
     exit 1
 fi
 
-for f in *.img.zst; do
-    [ -e "$f" ] || continue
-    par="${f%.img.zst}"
-    rm -f "${par}.img" 2>/dev/null
-    echo "  Extract ${par} ..."
-    if command -v zstd >/dev/null 2>&1; then
-        zstd -d "$f" -o "${par}.img"
-    else
-        echo "zstd not found. Attempting to install via brew..."
-        brew install zstd
-        if command -v zstd >/dev/null 2>&1; then
-            zstd -d "$f" -o "${par}.img"
-        else
-            echo "Failed to install zstd. Please install it manually."
-            exit 1
-        fi
-    fi
-done
+DEVICE_REAL=$($FASTBOOT getvar product 2>&1 | grep -i '^product:' | awk '{print $2}' | tr -d '\r\n')
+SLOTS=$($FASTBOOT getvar slot-count 2>&1 | grep -i '^slot-count:' | awk '{print $2}' | tr -d '\r\n')
 
+if [ "$SLOTS" = "2" ]; then
+    FLASH_MODE="AB"
+else
+    FLASH_MODE="A"
+fi
+if [ "$DEVICE_REAL" = "mars" ]; then
+    DEVICE_REAL="star"
+fi
+
+case "$DEVICE_REAL" in
+    *"$DEVICE_ROM"*) ;;
+    *)
+        err "SAI MÃ THIẾT BỊ  /  DEVICE CODE MISMATCH"
+        say "Thiết bị: $DEVICE_REAL   |   ROM này: $DEVICE_ROM"
+        read -r -p "Nhấn Enter để thoát... " _
+        exit 1
+        ;;
+esac
+
+ok "Thiết bị : $DEVICE_REAL"
+ok "ROM      : $DEVICE_ROM"
+ok "Slot     : $FLASH_MODE"
+ok "Chế độ   : $CHOICE"
+
+section "TIẾN TRÌNH  /  PROGRESS"
+TOTAL=0
+for f in *.img.zst; do
+    [ -e "$f" ] && TOTAL=$((TOTAL + 1))
+done
 if [ -d "images" ]; then
     for f in images/*; do
         [ -e "$f" ] || continue
         filename=$(basename "$f")
         par="${filename%.*}"
-        url="$f"
+        case "$par" in
+            cust) TOTAL=$((TOTAL + 1)) ;;
+            preloader_raw) TOTAL=$((TOTAL + 4)) ;;
+            vbmeta*)
+                if [ "$FLASH_MODE" = "AB" ]; then TOTAL=$((TOTAL + 2)); else TOTAL=$((TOTAL + 1)); fi
+                ;;
+            *)
+                if [ "$FLASH_MODE" = "AB" ]; then TOTAL=$((TOTAL + 2)); else TOTAL=$((TOTAL + 1)); fi
+                ;;
+        esac
+    done
+fi
+[ -f "super.img" ] && TOTAL=$((TOTAL + 1))
+[ "$CHOICE" = "y" ] && TOTAL=$((TOTAL + 3))
+[ "$FLASH_MODE" = "AB" ] && TOTAL=$((TOTAL + 1))
+TOTAL=$((TOTAL + 1))
+DONE=0
+progress "$DONE" "$TOTAL"
+
+section "GIẢI NÉN IMAGE  /  EXTRACTING"
+for f in *.img.zst; do
+    [ -e "$f" ] || continue
+    par="${f%.img.zst}"
+    rm -f "${par}.img" 2>/dev/null
+    say "- $par"
+    "$ZSTD" -d "$f" -o "${par}.img"
+    DONE=$((DONE + 1))
+    progress "$DONE" "$TOTAL"
+done
+
+section "FLASH ROM"
+if [ -d "images" ]; then
+    for f in images/*; do
+        [ -e "$f" ] || continue
+        filename=$(basename "$f")
+        par="${filename%.*}"
 
         if [ "$par" = "cust" ]; then
-            $FASTBOOT flash "$par" "$url" >/dev/null 2>&1
+            $FASTBOOT flash "$par" "$f" >/dev/null 2>&1
+            DONE=$((DONE + 1))
+            progress "$DONE" "$TOTAL"
         elif [ "$par" = "preloader_raw" ]; then
-            $FASTBOOT flash preloader_a "$url" >/dev/null 2>&1
-            $FASTBOOT flash preloader_b "$url" >/dev/null 2>&1
-            $FASTBOOT flash preloader1 "$url" >/dev/null 2>&1
-            $FASTBOOT flash preloader2 "$url" >/dev/null 2>&1
+            $FASTBOOT flash preloader_a "$f" >/dev/null 2>&1
+            $FASTBOOT flash preloader_b "$f" >/dev/null 2>&1
+            $FASTBOOT flash preloader1 "$f" >/dev/null 2>&1
+            $FASTBOOT flash preloader2 "$f" >/dev/null 2>&1
+            DONE=$((DONE + 4))
+            progress "$DONE" "$TOTAL"
         elif [[ "$par" == vbmeta* ]]; then
-            if [ "$fqlx" = "AB" ]; then
-                $FASTBOOT --disable-verity --disable-verification flash "${par}_a" "$url"
-                $FASTBOOT --disable-verity --disable-verification flash "${par}_b" "$url"
+            if [ "$FLASH_MODE" = "AB" ]; then
+                $FASTBOOT --disable-verity --disable-verification flash "${par}_a" "$f"
+                $FASTBOOT --disable-verity --disable-verification flash "${par}_b" "$f"
+                DONE=$((DONE + 2))
             else
-                $FASTBOOT --disable-verity --disable-verification flash "$par" "$url"
+                $FASTBOOT --disable-verity --disable-verification flash "$par" "$f"
+                DONE=$((DONE + 1))
             fi
-        elif [ "$fqlx" = "AB" ]; then
-            $FASTBOOT flash "${par}_a" "$url"
-            $FASTBOOT flash "${par}_b" "$url"
+            progress "$DONE" "$TOTAL"
+        elif [ "$FLASH_MODE" = "AB" ]; then
+            $FASTBOOT flash "${par}_a" "$f"
+            $FASTBOOT flash "${par}_b" "$f"
+            DONE=$((DONE + 2))
+            progress "$DONE" "$TOTAL"
         else
-            $FASTBOOT flash "$par" "$url"
+            $FASTBOOT flash "$par" "$f"
+            DONE=$((DONE + 1))
+            progress "$DONE" "$TOTAL"
         fi
     done
 fi
 
 if [ -f "super.img" ]; then
+    say "- super"
     $FASTBOOT flash super super.img
     rm -f super.img 2>/dev/null
+    DONE=$((DONE + 1))
+    progress "$DONE" "$TOTAL"
 fi
 
-if [ "$CHOICE" = "y" ] || [ "$CHOICE" = "Y" ]; then
-    echo "  Formatting..."
+if [ "$CHOICE" = "y" ]; then
+    section "FORMAT DATA"
     $FASTBOOT erase frp >/dev/null 2>&1
     $FASTBOOT erase userdata >/dev/null 2>&1
     $FASTBOOT erase metadata >/dev/null 2>&1
-    echo ""
+    say "- frp / userdata / metadata  [ok]"
+    DONE=$((DONE + 3))
+    progress "$DONE" "$TOTAL"
 fi
 
-echo "  All done,Your Devices Is Automatic Restart..."
-echo "  Now Wait For 10-15 Min For Booting"
-echo "  "
-echo ""
-
-if [ "$fqlx" = "AB" ]; then
+section "HOÀN TẤT  /  ALL DONE"
+say "Thiết bị sẽ tự khởi động lại. Vui lòng đợi 10-15 phút."
+if [ "$FLASH_MODE" = "AB" ]; then
     $FASTBOOT set_active a >/dev/null 2>&1
+    DONE=$((DONE + 1))
+    progress "$DONE" "$TOTAL"
 fi
 $FASTBOOT reboot
-
-read -r -p "Press Enter to exit..."
+DONE=$((DONE + 1))
+progress "$DONE" "$TOTAL"
+hr
+read -r -p "Nhấn Enter để thoát... " _
 exit 0
